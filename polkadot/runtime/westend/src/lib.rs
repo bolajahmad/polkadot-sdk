@@ -87,8 +87,8 @@ use sp_runtime::{
 	curve::PiecewiseLinear,
 	generic, impl_opaque_keys,
 	traits::{
-		BlakeTwo256, Block as BlockT, ConvertInto, Extrinsic as ExtrinsicT, IdentityLookup,
-		Keccak256, OpaqueKeys, SaturatedConversion, Verify,
+		AccountIdLookup, BlakeTwo256, Block as BlockT, ConvertInto, Extrinsic as ExtrinsicT,
+		IdentityLookup, Keccak256, OpaqueKeys, SaturatedConversion, Verify,
 	},
 	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, FixedU128, KeyTypeId, Perbill, Percent, Permill,
@@ -202,8 +202,8 @@ impl frame_system::Config for Runtime {
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type OnSetCode = ();
-	type SingleBlockMigrations = SingleBlockMigration;
-	type MultiBlockMigrator = MultiStepMigrator;
+	type SingleBlockMigrations = ();
+	type MultiBlockMigrator = ();
 	type PreInherents = ();
 	type PostInherents = ();
 	type PostTransactions = ();

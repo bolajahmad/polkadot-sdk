@@ -11,13 +11,8 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-parity-scale-codec = { version = "3.6.12", default-features = false, features = [
-	"derive",
-	"max-encoded-len",
-] }
-scale-info = { version = "2.11.1", default-features = false, features = [
-	"derive",
-] }
+parity-scale-codec = { version = "3.6.12", default-features = false, features = ["derive", "max-encoded-len"] }
+scale-info = { version = "2.11.1", default-features = false, features = ["derive"] }
 log = { workspace = true }
 serde = { workspace = true }
 serde_derive = { optional = true, workspace = true }
@@ -331,6 +326,7 @@ try-runtime = [
 	"sp-runtime/try-runtime",
 ]
 
+# If enabled, the runtime apis will not be exposed by the runtime.
 disable-runtime-api = []
 
 # Set timing constants (e.g. session period) to faster versions to speed up testing.

@@ -148,7 +148,7 @@ where
 	H: Hasher,
 {
 	fn new_trie_backend(trie_backend: TrieBackend<S, H, C, R>) -> Self {
-		panic!("new_trie_backend is never expected");
+		Self { inner: InnerStateBackend::Trie(trie_backend) }
 	}
 
 	fn new_nomt_backend(db: Arc<Nomt<Blake3Hasher>>, recorder: bool) -> Self {
@@ -336,6 +336,7 @@ where
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.storage_root(delta, state_version),
 			InnerStateBackend::Nomt { recorder, reads, session, .. } => {
+				let init_time = std::time::Instant::now();
 				let mut actual_access: Vec<_> = if *recorder {
 					delta
 						.into_iter()
@@ -378,6 +379,9 @@ where
 				let witness = finished.take_witness();
 				let root = finished.root().into_inner();
 				let overlay = finished.into_overlay();
+				let time_took = std::time::Instant::now() - init_time;
+				log::info!("storage root took: {}us", time_took.as_micros());
+
 				(
 					sp_core::hash::convert_hash(&root),
 					BackendTransaction::new_nomt_transaction(NomtBackendTransaction {

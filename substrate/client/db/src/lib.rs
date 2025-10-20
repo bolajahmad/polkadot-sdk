@@ -1427,7 +1427,9 @@ impl<Block: BlockT> Backend<Block> {
 		current_transaction_justifications: &mut HashMap<Block::Hash, Justification>,
 		remove_displaced: bool,
 	) -> ClientResult<MetaUpdate<Block>> {
-		panic!("Not handled by NOMT PoC");
+		if self.storage.nomt_db.is_some() {
+			panic!("Not handled by NOMT PoC");
+		}
 
 		// TODO: ensure best chain contains this block.
 		let number = *header.number();
@@ -1459,7 +1461,9 @@ impl<Block: BlockT> Backend<Block> {
 		&self,
 		transaction: &mut Transaction<DbHash>,
 	) -> ClientResult<()> {
-		panic!("Not handled by NOMT PoC");
+		if self.storage.nomt_db.is_some() {
+			panic!("Not handled by NOMT PoC");
+		}
 		let best_canonical = match self.storage.state_db.last_canonicalized() {
 			LastCanonicalized::None => 0,
 			LastCanonicalized::Block(b) => b,
@@ -1977,7 +1981,9 @@ impl<Block: BlockT> Backend<Block> {
 		finalized_number: NumberFor<Block>,
 		current_transaction_justifications: &mut HashMap<Block::Hash, Justification>,
 	) -> ClientResult<()> {
-		panic!("Not handled by NOMT PoC");
+		if self.storage.nomt_db.is_some() {
+			panic!("Not handled by NOMT PoC");
+		}
 
 		if let BlocksPruning::Some(blocks_pruning) = self.blocks_pruning {
 			// Always keep the last finalized block
@@ -2024,7 +2030,9 @@ impl<Block: BlockT> Backend<Block> {
 		transaction: &mut Transaction<DbHash>,
 		id: BlockId<Block>,
 	) -> ClientResult<()> {
-		panic!("Not handled by NOMT PoC");
+		if self.storage.nomt_db.is_some() {
+			panic!("Not handled by NOMT PoC");
+		}
 		debug!(target: "db", "Removing block #{id}");
 		utils::remove_from_db(
 			transaction,

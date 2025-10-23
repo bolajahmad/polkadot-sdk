@@ -67,7 +67,7 @@ impl<D: KeyValueDB> DbAdapter<D> {
 impl<D: KeyValueDB, H: Clone + AsRef<[u8]>> Database<H> for DbAdapter<D> {
 	fn commit(&self, transaction: Transaction<H>) -> error::Result<()> {
 		let mut tx = DBTransaction::new();
-		for change in transaction.0.into_iter() {
+		for change in transaction.kvdb_changes.into_iter() {
 			match change {
 				Change::Set(col, key, value) => tx.put_vec(col, &key, value),
 				Change::Remove(col, key) => tx.delete(col, &key),

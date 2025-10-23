@@ -21,6 +21,10 @@ pub mod error;
 mod kvdb;
 mod mem;
 
+use nomt::Overlay as NomtOverlay;
+use parking_lot::{Condvar, Mutex, RwLock};
+use std::sync::Arc;
+
 pub use crate::kvdb::as_database;
 pub use mem::MemDb;
 
@@ -37,43 +41,57 @@ pub enum Change<H> {
 	Release(ColumnId, H),
 }
 
+#[derive(Clone)]
+pub struct NomtChanges {
+	pub overlay: Arc<NomtOverlay>,
+	pub sync_data: Arc<(Mutex<bool>, Condvar)>,
+}
+
 /// A series of changes to the database that can be committed atomically. They do not take effect
 /// until passed into `Database::commit`.
 #[derive(Default, Clone)]
-pub struct Transaction<H>(pub Vec<Change<H>>);
+pub struct Transaction<H> {
+	pub kvdb_changes: Vec<Change<H>>,
+	pub nomt_changes: Option<NomtChanges>,
+}
 
 impl<H> Transaction<H> {
 	/// Create a new transaction to be prepared and committed atomically.
 	pub fn new() -> Self {
-		Transaction(Vec::new())
+		Transaction { kvdb_changes: Vec::new(), nomt_changes: None }
 	}
 	/// Set the value of `key` in `col` to `value`, replacing anything that is there currently.
 	pub fn set(&mut self, col: ColumnId, key: &[u8], value: &[u8]) {
-		self.0.push(Change::Set(col, key.to_vec(), value.to_vec()))
+		self.kvdb_changes.push(Change::Set(col, key.to_vec(), value.to_vec()))
 	}
 	/// Set the value of `key` in `col` to `value`, replacing anything that is there currently.
 	pub fn set_from_vec(&mut self, col: ColumnId, key: &[u8], value: Vec<u8>) {
-		self.0.push(Change::Set(col, key.to_vec(), value))
+		self.kvdb_changes.push(Change::Set(col, key.to_vec(), value))
 	}
 	/// Remove the value of `key` in `col`.
 	pub fn remove(&mut self, col: ColumnId, key: &[u8]) {
-		self.0.push(Change::Remove(col, key.to_vec()))
+		self.kvdb_changes.push(Change::Remove(col, key.to_vec()))
 	}
 	/// Store the `preimage` of `hash` into the database, so that it may be looked up later with
 	/// `Database::get`. This may be called multiple times, but subsequent
 	/// calls will ignore `preimage` and simply increase the number of references on `hash`.
 	pub fn store(&mut self, col: ColumnId, hash: H, preimage: Vec<u8>) {
-		self.0.push(Change::Store(col, hash, preimage))
+		self.kvdb_changes.push(Change::Store(col, hash, preimage))
 	}
 	/// Increase the number of references for `hash` in the database.
 	pub fn reference(&mut self, col: ColumnId, hash: H) {
-		self.0.push(Change::Reference(col, hash))
+		self.kvdb_changes.push(Change::Reference(col, hash))
 	}
 	/// Release the preimage of `hash` from the database. An equal number of these to the number of
 	/// corresponding `store`s must have been given before it is legal for `Database::get` to
 	/// be unable to provide the preimage.
 	pub fn release(&mut self, col: ColumnId, hash: H) {
-		self.0.push(Change::Release(col, hash))
+		self.kvdb_changes.push(Change::Release(col, hash))
+	}
+
+	pub fn set_nomt_changes(&mut self, changes: NomtChanges) {
+		let prev = self.nomt_changes.replace(changes);
+		assert!(prev.is_none());
 	}
 }
 

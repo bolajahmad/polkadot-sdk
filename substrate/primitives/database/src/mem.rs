@@ -31,7 +31,7 @@ where
 {
 	fn commit(&self, transaction: Transaction<H>) -> error::Result<()> {
 		let mut s = self.0.write();
-		for change in transaction.0.into_iter() {
+		for change in transaction.kvdb_changes.into_iter() {
 			match change {
 				Change::Set(col, key, value) => {
 					s.entry(col).or_default().insert(key, (1, value));

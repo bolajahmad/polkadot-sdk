@@ -41,6 +41,7 @@
 //! See `RefWindow` for pruning algorithm details. `StateDb` prunes on each canonicalization until
 //! pruning constraints are satisfied.
 
+mod nomt_state_db;
 mod noncanonical;
 mod pruning;
 #[cfg(test)]
@@ -293,7 +294,7 @@ impl<Key: Hash> Changes<Key> {
 
 enum InnerStateDb<BlockHash: Hash, Key: Hash, D: MetaDb> {
 	Trie(trie_state_db::StateDb<BlockHash, Key, D>),
-	Nomt(),
+	Nomt(nomt_state_db::StateDb<BlockHash>),
 }
 
 /// State DB maintenance. See module description.
@@ -354,13 +355,19 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	}
 
 	pub fn open_nomt_state_db(requested_mode: Option<PruningMode>) -> StateDb<BlockHash, Key, D> {
-		unimplemented!()
+		let pruning_mode = match requested_mode.unwrap_or_default() {
+			PruningMode::ArchiveAll => unimplemented!("Not Addressed by nomt PoC"),
+			PruningMode::ArchiveCanonical => unimplemented!(),
+			pruning_mode => pruning_mode,
+		};
+
+		StateDb { db: RwLock::new(InnerStateDb::Nomt(nomt_state_db::StateDb::new(pruning_mode))) }
 	}
 
 	pub fn pruning_mode(&self) -> PruningMode {
 		match *self.db.read() {
 			InnerStateDb::Trie(ref trie_state_db) => trie_state_db.mode.clone(),
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref nomt_state_db) => nomt_state_db.mode.clone(),
 		}
 	}
 
@@ -382,7 +389,10 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 				)?;
 				Ok(Some(commit_set))
 			},
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref mut nomt_state_db) => {
+				nomt_state_db.insert_block(hash, number, parent_hash, changes.nomt_changes())?;
+				Ok(None)
+			},
 		}
 	}
 
@@ -394,7 +404,8 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) =>
 				Ok(CommitChanges::Trie(trie_state_db.canonicalize_block(hash)?)),
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref mut nomt_state_db) =>
+				Ok(CommitChanges::Nomt(nomt_state_db.canonicalize_block(hash)?)),
 		}
 	}
 
@@ -406,7 +417,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	{
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.pin(hash, number, hint),
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref mut nomt_state_db) => Ok(()),
 		}
 	}
 
@@ -414,7 +425,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	pub fn unpin(&self, hash: &BlockHash) {
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.unpin(hash),
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref mut nomt_state_db) => (),
 		}
 	}
 
@@ -423,7 +434,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	pub fn sync(&self) {
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.sync(),
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref mut nomt_state_db) => (),
 		}
 	}
 
@@ -440,7 +451,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	{
 		match *self.db.read() {
 			InnerStateDb::Trie(ref trie_state_db) => trie_state_db.get(key, db),
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref nomt_state_db) => unimplemented!(),
 		}
 	}
 
@@ -450,7 +461,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	pub fn revert_one(&self) -> Option<CommitSet<Key>> {
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.revert_one(),
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref mut nomt_state_db) => unimplemented!(),
 		}
 	}
 
@@ -459,7 +470,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	pub fn remove(&self, hash: &BlockHash) -> Option<CommitSet<Key>> {
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.remove(hash),
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref mut nomt_state_db) => unimplemented!(),
 		}
 	}
 
@@ -467,7 +478,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	pub fn last_canonicalized(&self) -> LastCanonicalized {
 		match *self.db.read() {
 			InnerStateDb::Trie(ref trie_state_db) => trie_state_db.last_canonicalized(),
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref nomt_state_db) => nomt_state_db.last_canonicalized(),
 		}
 	}
 
@@ -475,7 +486,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	pub fn is_pruned(&self, hash: &BlockHash, number: u64) -> IsPruned {
 		match *self.db.read() {
 			InnerStateDb::Trie(ref trie_state_db) => trie_state_db.is_pruned(hash, number),
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref nomt_state_db) => nomt_state_db.is_pruned(hash, number),
 		}
 	}
 
@@ -489,10 +500,26 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 					db,
 				)?;
 			},
-			InnerStateDb::Nomt() => unimplemented!(),
+			InnerStateDb::Nomt(ref mut nomt_state_db) => {
+				*nomt_state_db = nomt_state_db::StateDb::new(nomt_state_db.mode.clone());
+			},
 		};
 
 		Ok(())
+	}
+
+	pub fn overlays(&self, hash: &BlockHash) -> Vec<std::sync::Arc<NomtOverlay>> {
+		match *self.db.read() {
+			InnerStateDb::Nomt(ref nomt_state_db) => nomt_state_db.overlays(hash),
+			InnerStateDb::Trie(ref trie_state_db) => unimplemented!(),
+		}
+	}
+
+	pub fn wait_for_canonicalization(&self) {
+		match *self.db.read() {
+			InnerStateDb::Nomt(ref nomt_state_db) => nomt_state_db.wait_for_canonicalization(),
+			InnerStateDb::Trie(ref trie_state_db) => unimplemented!(),
+		}
 	}
 }
 

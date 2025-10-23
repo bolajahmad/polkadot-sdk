@@ -93,7 +93,7 @@ fn ref_counted_column(col: u32) -> bool {
 impl<H: Clone + AsRef<[u8]>> Database<H> for DbAdapter {
 	fn commit(&self, transaction: Transaction<H>) -> Result<(), DatabaseError> {
 		let mut not_ref_counted_column = Vec::new();
-		let result = self.0.commit(transaction.0.into_iter().filter_map(|change| {
+		let result = self.0.commit(transaction.kvdb_changes.into_iter().filter_map(|change| {
 			Some(match change {
 				Change::Set(col, key, value) => (col as u8, key, Some(value)),
 				Change::Remove(col, key) => (col as u8, key, None),

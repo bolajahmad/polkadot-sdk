@@ -9,8 +9,10 @@ use crate::{
 use crate::backend::{AsTrieBackend, NomtBackendTransaction};
 use codec::Codec;
 use nomt::{
-	hasher::Blake3Hasher, KeyReadWrite, KeyValueIterator, Nomt, Session, SessionParams, WitnessMode,
+	hasher::Blake3Hasher, KeyReadWrite, KeyValueIterator, Nomt, Overlay as NomtOverlay, Session,
+	SessionParams, WitnessMode,
 };
+use parking_lot::{ArcRwLockReadGuard, Mutex, RawRwLock, RwLock};
 use sp_core::storage::{ChildInfo, StateVersion};
 use std::{cell::RefCell, collections::BTreeMap, sync::Arc};
 
@@ -24,8 +26,17 @@ pub enum StateBackendBuilder<
 	C = DefaultCache<H>,
 	R = DefaultRecorder<H>,
 > {
-	Trie { storage: S, root: H::Out, recorder: Option<R>, cache: Option<C> },
-	Nomt { db: Arc<Nomt<Blake3Hasher>>, recorder: bool },
+	Trie {
+		storage: S,
+		root: H::Out,
+		recorder: Option<R>,
+		cache: Option<C>,
+	},
+	Nomt {
+		db: ArcRwLockReadGuard<parking_lot::RawRwLock, Nomt<Blake3Hasher>>,
+		recorder: bool,
+		overlay: Option<Vec<Arc<NomtOverlay>>>,
+	},
 }
 
 impl<S, H> StateBackendBuilder<S, H>
@@ -39,8 +50,8 @@ where
 	}
 
 	/// Create a [`TrieBackend::Nomt`] state backend builder.
-	pub fn new_nomt(db: Arc<Nomt<Blake3Hasher>>) -> Self {
-		Self::Nomt { db, recorder: false }
+	pub fn new_nomt(db: ArcRwLockReadGuard<parking_lot::RawRwLock, Nomt<Blake3Hasher>>) -> Self {
+		Self::Nomt { db, recorder: false, overlay: None }
 	}
 }
 
@@ -78,6 +89,14 @@ where
 		self
 	}
 
+	/// Toggle [`TrieBackend::Nomt`] recorder.
+	pub fn with_nomt_overlay(mut self, nomt_overlay: Vec<Arc<NomtOverlay>>) -> Self {
+		if let StateBackendBuilder::Nomt { overlay, .. } = &mut self {
+			*overlay = Some(nomt_overlay);
+		}
+		self
+	}
+
 	/// Use the given optional `cache` for the to be configured [`TrieBackend::Trie`].
 	pub fn with_trie_optional_cache<LC>(
 		mut self,
@@ -108,8 +127,8 @@ where
 					.build();
 				StateBackend::new_trie_backend(trie_backend)
 			},
-			StateBackendBuilder::Nomt { db, recorder } =>
-				StateBackend::new_nomt_backend(db, recorder),
+			StateBackendBuilder::Nomt { db, recorder, overlay } =>
+				StateBackend::new_nomt_backend(db, recorder, overlay),
 		}
 	}
 }
@@ -117,10 +136,12 @@ where
 enum InnerStateBackend<S: TrieBackendStorage<H>, H: Hasher, C, R> {
 	Trie(TrieBackend<S, H, C, R>),
 	Nomt {
-		db: Arc<Nomt<Blake3Hasher>>,
 		recorder: bool,
 		session: RefCell<Option<Session<Blake3Hasher>>>,
 		reads: RefCell<BTreeMap<Vec<u8>, Option<Vec<u8>>>>,
+		// NOTE: This needs to be placed after the session so the drop order
+		// unlock properly the read-locks.
+		db: ArcRwLockReadGuard<parking_lot::RawRwLock, Nomt<Blake3Hasher>>,
 	},
 }
 
@@ -151,16 +172,26 @@ where
 		Self { inner: InnerStateBackend::Trie(trie_backend) }
 	}
 
-	fn new_nomt_backend(db: Arc<Nomt<Blake3Hasher>>, recorder: bool) -> Self {
+	fn new_nomt_backend(
+		db: ArcRwLockReadGuard<parking_lot::RawRwLock, Nomt<Blake3Hasher>>,
+		recorder: bool,
+		overlay: Option<Vec<Arc<NomtOverlay>>>,
+	) -> Self {
 		let witness_mode =
 			if recorder { WitnessMode::read_write() } else { WitnessMode::disabled() };
-		let session = db.begin_session(SessionParams::default().witness_mode(witness_mode));
+		let overlay = overlay.unwrap_or(vec![]);
+		let params = SessionParams::default()
+			.witness_mode(witness_mode)
+			.overlay(overlay.iter().map(|o| o.as_ref()))
+			.unwrap();
+		let session = db.begin_session(params);
+
 		Self {
 			inner: InnerStateBackend::Nomt {
-				db,
 				recorder,
 				session: RefCell::new(Some(session)),
 				reads: RefCell::new(BTreeMap::new()),
+				db,
 			},
 		}
 	}
@@ -332,11 +363,11 @@ where
 		delta: impl Iterator<Item = (&'a [u8], Option<&'a [u8]>)>,
 		state_version: StateVersion,
 	) -> (H::Out, BackendTransaction<H>) {
-		match &self.inner {
+		let init_time = std::time::Instant::now();
+		let res = match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.storage_root(delta, state_version),
 			InnerStateBackend::Nomt { recorder, reads, session, .. } => {
-				let init_time = std::time::Instant::now();
 				let mut actual_access: Vec<_> = if *recorder {
 					delta
 						.into_iter()
@@ -379,8 +410,6 @@ where
 				let witness = finished.take_witness();
 				let root = finished.root().into_inner();
 				let overlay = finished.into_overlay();
-				let time_took = std::time::Instant::now() - init_time;
-				log::info!("storage root took: {}us", time_took.as_micros());
 
 				(
 					sp_core::hash::convert_hash(&root),
@@ -390,7 +419,10 @@ where
 					}),
 				)
 			},
-		}
+		};
+
+		log::info!("storage root took: {}ms", init_time.elapsed().as_millis());
+		res
 	}
 
 	fn child_storage_root<'a>(

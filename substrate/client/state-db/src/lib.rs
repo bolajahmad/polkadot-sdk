@@ -45,6 +45,7 @@ mod noncanonical;
 mod pruning;
 #[cfg(test)]
 mod test;
+mod trie_state_db;
 
 use codec::Codec;
 use log::trace;
@@ -55,6 +56,10 @@ use std::{
 	collections::{hash_map::Entry, HashMap},
 	fmt,
 };
+
+use nomt::Overlay as NomtOverlay;
+use trie_state_db::to_meta_key;
+pub use trie_state_db::{ChangeSet, CommitSet, MetaDb, NodeDb};
 
 const LOG_TARGET: &str = "state-db";
 const LOG_TARGET_PIN: &str = "state-db::pin";
@@ -76,6 +81,7 @@ pub trait Hash:
 	+ PartialEq
 	+ Clone
 	+ Default
+	+ AsMut<[u8]>
 	+ fmt::Debug
 	+ Codec
 	+ std::hash::Hash
@@ -90,29 +96,13 @@ impl<
 			+ PartialEq
 			+ Clone
 			+ Default
+			+ AsMut<[u8]>
 			+ fmt::Debug
 			+ Codec
 			+ std::hash::Hash
 			+ 'static,
 	> Hash for T
 {
-}
-
-/// Backend database trait. Read-only.
-pub trait MetaDb {
-	type Error: fmt::Debug;
-
-	/// Get meta value, such as the journal.
-	fn get_meta(&self, key: &[u8]) -> Result<Option<DBValue>, Self::Error>;
-}
-
-/// Backend database trait. Read-only.
-pub trait NodeDb {
-	type Key: ?Sized;
-	type Error: fmt::Debug;
-
-	/// Get state trie node.
-	fn get(&self, key: &Self::Key) -> Result<Option<DBValue>, Self::Error>;
 }
 
 /// Error type.
@@ -200,24 +190,6 @@ impl fmt::Debug for StateDbError {
 	}
 }
 
-/// A set of state node changes.
-#[derive(Default, Debug, Clone)]
-pub struct ChangeSet<H: Hash> {
-	/// Inserted nodes.
-	pub inserted: Vec<(H, DBValue)>,
-	/// Deleted nodes.
-	pub deleted: Vec<H>,
-}
-
-/// A set of changes to the backing database.
-#[derive(Default, Debug, Clone)]
-pub struct CommitSet<H: Hash> {
-	/// State node changes.
-	pub data: ChangeSet<H>,
-	/// Metadata changes.
-	pub meta: ChangeSet<Vec<u8>>,
-}
-
 /// Pruning constraints. If none are specified pruning is
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Constraints {
@@ -282,12 +254,6 @@ impl Default for Constraints {
 	}
 }
 
-fn to_meta_key<S: Codec>(suffix: &[u8], data: &S) -> Vec<u8> {
-	let mut buffer = data.encode();
-	buffer.extend(suffix);
-	buffer
-}
-
 /// Status information about the last canonicalized block.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LastCanonicalized {
@@ -299,240 +265,46 @@ pub enum LastCanonicalized {
 	NotCanonicalizing,
 }
 
-pub struct StateDbSync<BlockHash: Hash, Key: Hash, D: MetaDb> {
-	mode: PruningMode,
-	non_canonical: NonCanonicalOverlay<BlockHash, Key>,
-	pruning: Option<RefWindow<BlockHash, Key, D>>,
-	pinned: HashMap<BlockHash, u32>,
-	ref_counting: bool,
+pub enum Changes<Key: Hash> {
+	Trie(ChangeSet<Key>),
+	Nomt(NomtOverlay),
 }
 
-impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDbSync<BlockHash, Key, D> {
-	fn new(
-		mode: PruningMode,
-		ref_counting: bool,
-		db: D,
-	) -> Result<StateDbSync<BlockHash, Key, D>, Error<D::Error>> {
-		trace!(target: LOG_TARGET, "StateDb settings: {:?}. Ref-counting: {}", mode, ref_counting);
+pub enum CommitChanges<Key: Hash> {
+	Trie(CommitSet<Key>),
+	Nomt(sp_database::NomtChanges),
+}
 
-		let non_canonical: NonCanonicalOverlay<BlockHash, Key> = NonCanonicalOverlay::new(&db)?;
-		let pruning: Option<RefWindow<BlockHash, Key, D>> = match mode {
-			PruningMode::Constrained(Constraints { max_blocks }) =>
-				Some(RefWindow::new(db, max_blocks.unwrap_or(0), ref_counting)?),
-			PruningMode::ArchiveAll | PruningMode::ArchiveCanonical => None,
-		};
-
-		Ok(StateDbSync { mode, non_canonical, pruning, pinned: Default::default(), ref_counting })
-	}
-
-	fn insert_block(
-		&mut self,
-		hash: &BlockHash,
-		number: u64,
-		parent_hash: &BlockHash,
-		mut changeset: ChangeSet<Key>,
-	) -> Result<CommitSet<Key>, Error<D::Error>> {
-		match self.mode {
-			PruningMode::ArchiveAll => {
-				changeset.deleted.clear();
-				// write changes immediately
-				Ok(CommitSet { data: changeset, meta: Default::default() })
-			},
-			PruningMode::Constrained(_) | PruningMode::ArchiveCanonical => self
-				.non_canonical
-				.insert(hash, number, parent_hash, changeset)
-				.map_err(Into::into),
+impl<Key: Hash> Changes<Key> {
+	pub fn trie_changes(self) -> ChangeSet<Key> {
+		match self {
+			Changes::Trie(commit_set) => commit_set,
+			_ => unreachable!(),
 		}
 	}
 
-	fn canonicalize_block(&mut self, hash: &BlockHash) -> Result<CommitSet<Key>, Error<D::Error>> {
-		// NOTE: it is important that the change to `LAST_CANONICAL` (emit from
-		// `non_canonical.canonicalize`) and the insert of the new pruning journal (emit from
-		// `pruning.note_canonical`) are collected into the same `CommitSet` and are committed to
-		// the database atomically to keep their consistency when restarting the node
-		let mut commit = CommitSet::default();
-		if self.mode == PruningMode::ArchiveAll {
-			return Ok(commit)
-		}
-		let number = self.non_canonical.canonicalize(hash, &mut commit)?;
-		if self.mode == PruningMode::ArchiveCanonical {
-			commit.data.deleted.clear();
-		}
-		if let Some(ref mut pruning) = self.pruning {
-			pruning.note_canonical(hash, number, &mut commit)?;
-		}
-		self.prune(&mut commit)?;
-		Ok(commit)
-	}
-
-	/// Returns the block number of the last canonicalized block.
-	fn last_canonicalized(&self) -> LastCanonicalized {
-		if self.mode == PruningMode::ArchiveAll {
-			LastCanonicalized::NotCanonicalizing
-		} else {
-			self.non_canonical
-				.last_canonicalized_block_number()
-				.map(LastCanonicalized::Block)
-				.unwrap_or_else(|| LastCanonicalized::None)
+	pub fn nomt_changes(self) -> NomtOverlay {
+		match self {
+			Changes::Nomt(overlay) => overlay,
+			_ => unreachable!(),
 		}
 	}
+}
 
-	fn is_pruned(&self, hash: &BlockHash, number: u64) -> IsPruned {
-		IsPruned::NotPruned
-		//match self.mode {
-		//PruningMode::ArchiveAll => IsPruned::NotPruned,
-		//PruningMode::ArchiveCanonical | PruningMode::Constrained(_) => {
-		//if self
-		//.non_canonical
-		//.last_canonicalized_block_number()
-		//.map(|c| number > c)
-		//.unwrap_or(true)
-		//{
-		//log::info!("last_canonicalized_block_number < number");
-		//log::info!("the block is following the last canonicalized");
-		//if self.non_canonical.have_block(hash) {
-		//IsPruned::NotPruned
-		//} else {
-		//log::info!("IsPruned::Pruned - non canonical doesn't have the block");
-		//IsPruned::Pruned
-		//} else {
-		//log::info!("the block is NOT following the last canonicalized");
-		//match self.pruning.as_ref() {
-		//// We don't know for sure.
-		//None => IsPruned::MaybePruned,
-		//Some(pruning) => match pruning.have_block(hash, number) {
-		//HaveBlock::No => IsPruned::Pruned,
-		//HaveBlock::Yes => IsPruned::NotPruned,
-		//HaveBlock::Maybe => IsPruned::MaybePruned,
-		//},
-		//}
-	}
-
-	fn prune(&mut self, commit: &mut CommitSet<Key>) -> Result<(), Error<D::Error>> {
-		if let (&mut Some(ref mut pruning), PruningMode::Constrained(constraints)) =
-			(&mut self.pruning, &self.mode)
-		{
-			loop {
-				if pruning.window_size() <= constraints.max_blocks.unwrap_or(0) as u64 {
-					break
-				}
-
-				let pinned = &self.pinned;
-				match pruning.next_hash() {
-					// the block record is temporary unavailable, break and try next time
-					Err(Error::StateDb(StateDbError::BlockUnavailable)) => break,
-					res =>
-						if res?.map_or(false, |h| pinned.contains_key(&h)) {
-							break
-						},
-				}
-				match pruning.prune_one(commit) {
-					// this branch should not reach as previous `next_hash` don't return error
-					// keeping it for robustness
-					Err(Error::StateDb(StateDbError::BlockUnavailable)) => break,
-					res => res?,
-				}
-			}
-		}
-		Ok(())
-	}
-
-	/// Revert all non-canonical blocks with the best block number.
-	/// Returns a database commit or `None` if not possible.
-	/// For archive an empty commit set is returned.
-	fn revert_one(&mut self) -> Option<CommitSet<Key>> {
-		match self.mode {
-			PruningMode::ArchiveAll => Some(CommitSet::default()),
-			PruningMode::ArchiveCanonical | PruningMode::Constrained(_) =>
-				self.non_canonical.revert_one(),
-		}
-	}
-
-	fn remove(&mut self, hash: &BlockHash) -> Option<CommitSet<Key>> {
-		match self.mode {
-			PruningMode::ArchiveAll => Some(CommitSet::default()),
-			PruningMode::ArchiveCanonical | PruningMode::Constrained(_) =>
-				self.non_canonical.remove(hash),
-		}
-	}
-
-	fn pin<F>(&mut self, hash: &BlockHash, number: u64, hint: F) -> Result<(), PinError>
-	where
-		F: Fn() -> bool,
-	{
-		match self.mode {
-			PruningMode::ArchiveAll => Ok(()),
-			PruningMode::ArchiveCanonical | PruningMode::Constrained(_) => {
-				let have_block = self.non_canonical.have_block(hash) ||
-					self.pruning.as_ref().map_or_else(
-						|| hint(),
-						|pruning| match pruning.have_block(hash, number) {
-							HaveBlock::No => false,
-							HaveBlock::Yes => true,
-							HaveBlock::Maybe => hint(),
-						},
-					);
-				if have_block {
-					let refs = self.pinned.entry(hash.clone()).or_default();
-					if *refs == 0 {
-						trace!(target: LOG_TARGET_PIN, "Pinned block: {:?}", hash);
-						self.non_canonical.pin(hash);
-					}
-					*refs += 1;
-					Ok(())
-				} else {
-					Err(PinError::InvalidBlock)
-				}
-			},
-		}
-	}
-
-	fn unpin(&mut self, hash: &BlockHash) {
-		match self.pinned.entry(hash.clone()) {
-			Entry::Occupied(mut entry) => {
-				*entry.get_mut() -= 1;
-				if *entry.get() == 0 {
-					trace!(target: LOG_TARGET_PIN, "Unpinned block: {:?}", hash);
-					entry.remove();
-					self.non_canonical.unpin(hash);
-				} else {
-					trace!(target: LOG_TARGET_PIN, "Releasing reference for {:?}", hash);
-				}
-			},
-			Entry::Vacant(_) => {},
-		}
-	}
-
-	fn sync(&mut self) {
-		self.non_canonical.sync();
-	}
-
-	pub fn get<DB: NodeDb, Q: ?Sized>(
-		&self,
-		key: &Q,
-		db: &DB,
-	) -> Result<Option<DBValue>, Error<DB::Error>>
-	where
-		Q: AsRef<DB::Key>,
-		Key: std::borrow::Borrow<Q>,
-		Q: std::hash::Hash + Eq,
-	{
-		if let Some(value) = self.non_canonical.get(key) {
-			return Ok(Some(value))
-		}
-		db.get(key.as_ref()).map_err(Error::Db)
-	}
+enum InnerStateDb<BlockHash: Hash, Key: Hash, D: MetaDb> {
+	Trie(trie_state_db::StateDb<BlockHash, Key, D>),
+	Nomt(),
 }
 
 /// State DB maintenance. See module description.
 /// Can be shared across threads.
-pub struct StateDb<BlockHash: Hash, Key: Hash, D: MetaDb> {
-	db: RwLock<StateDbSync<BlockHash, Key, D>>,
+pub struct StateDb<BlockHash: Hash, Key: Hash, D: trie_state_db::MetaDb> {
+	db: RwLock<InnerStateDb<BlockHash, Key, D>>,
 }
 
 impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	/// Create an instance of [`StateDb`].
-	pub fn open(
+	pub fn open_trie_state_db(
 		db: D,
 		requested_mode: Option<PruningMode>,
 		ref_counting: bool,
@@ -570,14 +342,26 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 			Default::default()
 		};
 
-		let state_db =
-			StateDb { db: RwLock::new(StateDbSync::new(selected_mode, ref_counting, db)?) };
+		let state_db = StateDb {
+			db: RwLock::new(InnerStateDb::Trie(trie_state_db::StateDb::new(
+				selected_mode,
+				ref_counting,
+				db,
+			)?)),
+		};
 
 		Ok((db_init_commit_set, state_db))
 	}
 
+	pub fn open_nomt_state_db(requested_mode: Option<PruningMode>) -> StateDb<BlockHash, Key, D> {
+		unimplemented!()
+	}
+
 	pub fn pruning_mode(&self) -> PruningMode {
-		self.db.read().mode.clone()
+		match *self.db.read() {
+			InnerStateDb::Trie(ref trie_state_db) => trie_state_db.mode.clone(),
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Add a new non-canonical block.
@@ -586,14 +370,32 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 		hash: &BlockHash,
 		number: u64,
 		parent_hash: &BlockHash,
-		changeset: ChangeSet<Key>,
-	) -> Result<CommitSet<Key>, Error<D::Error>> {
-		self.db.write().insert_block(hash, number, parent_hash, changeset)
+		changes: Changes<Key>,
+	) -> Result<Option<CommitSet<Key>>, Error<D::Error>> {
+		match *self.db.write() {
+			InnerStateDb::Trie(ref mut trie_state_db) => {
+				let commit_set = trie_state_db.insert_block(
+					hash,
+					number,
+					parent_hash,
+					changes.trie_changes(),
+				)?;
+				Ok(Some(commit_set))
+			},
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Finalize a previously inserted block.
-	pub fn canonicalize_block(&self, hash: &BlockHash) -> Result<CommitSet<Key>, Error<D::Error>> {
-		self.db.write().canonicalize_block(hash)
+	pub fn canonicalize_block(
+		&self,
+		hash: &BlockHash,
+	) -> Result<CommitChanges<Key>, Error<D::Error>> {
+		match *self.db.write() {
+			InnerStateDb::Trie(ref mut trie_state_db) =>
+				Ok(CommitChanges::Trie(trie_state_db.canonicalize_block(hash)?)),
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Prevents pruning of specified block and its descendants.
@@ -602,18 +404,27 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	where
 		F: Fn() -> bool,
 	{
-		self.db.write().pin(hash, number, hint)
+		match *self.db.write() {
+			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.pin(hash, number, hint),
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Allows pruning of specified block.
 	pub fn unpin(&self, hash: &BlockHash) {
-		self.db.write().unpin(hash)
+		match *self.db.write() {
+			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.unpin(hash),
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Confirm that all changes made to commit sets are on disk. Allows for temporarily pinned
 	/// blocks to be released.
 	pub fn sync(&self) {
-		self.db.write().sync()
+		match *self.db.write() {
+			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.sync(),
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Get a value from non-canonical/pruning overlay or the backing DB.
@@ -627,36 +438,60 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 		Key: std::borrow::Borrow<Q>,
 		Q: std::hash::Hash + Eq,
 	{
-		self.db.read().get(key, db)
+		match *self.db.read() {
+			InnerStateDb::Trie(ref trie_state_db) => trie_state_db.get(key, db),
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Revert all non-canonical blocks with the best block number.
 	/// Returns a database commit or `None` if not possible.
 	/// For archive an empty commit set is returned.
 	pub fn revert_one(&self) -> Option<CommitSet<Key>> {
-		self.db.write().revert_one()
+		match *self.db.write() {
+			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.revert_one(),
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Remove specified non-canonical block.
 	/// Returns a database commit or `None` if not possible.
 	pub fn remove(&self, hash: &BlockHash) -> Option<CommitSet<Key>> {
-		self.db.write().remove(hash)
+		match *self.db.write() {
+			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.remove(hash),
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Returns last canonicalized block.
 	pub fn last_canonicalized(&self) -> LastCanonicalized {
-		self.db.read().last_canonicalized()
+		match *self.db.read() {
+			InnerStateDb::Trie(ref trie_state_db) => trie_state_db.last_canonicalized(),
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Check if block is pruned away.
 	pub fn is_pruned(&self, hash: &BlockHash, number: u64) -> IsPruned {
-		self.db.read().is_pruned(hash, number)
+		match *self.db.read() {
+			InnerStateDb::Trie(ref trie_state_db) => trie_state_db.is_pruned(hash, number),
+			InnerStateDb::Nomt() => unimplemented!(),
+		}
 	}
 
 	/// Reset in-memory changes to the last disk-backed state.
 	pub fn reset(&self, db: D) -> Result<(), Error<D::Error>> {
-		let mut state_db = self.db.write();
-		*state_db = StateDbSync::new(state_db.mode.clone(), state_db.ref_counting, db)?;
+		match *self.db.write() {
+			InnerStateDb::Trie(ref mut trie_state_db) => {
+				*trie_state_db = trie_state_db::StateDb::new(
+					trie_state_db.mode.clone(),
+					trie_state_db.ref_counting,
+					db,
+				)?;
+			},
+			InnerStateDb::Nomt() => unimplemented!(),
+		};
+
 		Ok(())
 	}
 }

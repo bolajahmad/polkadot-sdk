@@ -1462,7 +1462,6 @@ impl<Block: BlockT> Backend<Block> {
 		self.ensure_sequential_finalization(header, last_finalized)?;
 		let with_state = sc_client_api::Backend::have_state_at(self, hash, number);
 
-		log::info!("note finalized from finalize block with transation");
 		self.note_finalized(
 			transaction,
 			header,
@@ -1522,7 +1521,6 @@ impl<Block: BlockT> Backend<Block> {
 			}
 
 			trace!(target: "db", "Canonicalize block #{to_canonicalize} ({hash_to_canonicalize:?})");
-			log::info!("getting last canonicalized from force delayed canonicalization");
 			let commit = self.storage.state_db.canonicalize_block(&hash_to_canonicalize).map_err(
 				sp_blockchain::Error::from_state_db::<
 					sc_state_db::Error<sp_database::error::DatabaseError>,
@@ -1557,7 +1555,6 @@ impl<Block: BlockT> Backend<Block> {
 
 		while let Some((block_hash, justification)) = finalized_blocks.next() {
 			let block_header = self.blockchain.expect_header(block_hash)?;
-			log::info!("finalize_block_with_transaction from try_commit_operation");
 			meta_updates.push(self.finalize_block_with_transaction(
 				&mut transaction,
 				block_hash,
@@ -1717,9 +1714,6 @@ impl<Block: BlockT> Backend<Block> {
 
 				if number <= last_finalized_num {
 					// Canonicalize in the db when re-importing existing blocks with state.
-					log::info!(
-						"getting last canonicalized from try commit operation instant finality"
-					);
 					let commit = self.storage.state_db.canonicalize_block(&hash).map_err(
 						sp_blockchain::Error::from_state_db::<
 							sc_state_db::Error<sp_database::error::DatabaseError>,
@@ -1760,7 +1754,6 @@ impl<Block: BlockT> Backend<Block> {
 				// TODO: ensure best chain contains this block.
 				self.ensure_sequential_finalization(header, Some(last_finalized_hash))?;
 				let mut current_transaction_justifications = HashMap::new();
-				log::info!("note_finalized from try commit op - finalized");
 				self.note_finalized(
 					&mut transaction,
 					header,
@@ -1984,7 +1977,6 @@ impl<Block: BlockT> Backend<Block> {
 		};
 
 		if requires_canonicalization && sc_client_api::Backend::have_state_at(self, f_hash, f_num) {
-			log::info!("getting last canonicalized from note finalized");
 			let commit = self.storage.state_db.canonicalize_block(&f_hash).map_err(
 				sp_blockchain::Error::from_state_db::<
 					sc_state_db::Error<sp_database::error::DatabaseError>,
@@ -2150,7 +2142,6 @@ fn apply_state_commit(
 			}
 		},
 		sc_state_db::CommitChanges::Nomt(overlay) => {
-			log::info!("set_nomt_changes");
 			transaction.set_nomt_changes(overlay);
 		},
 	}
@@ -2319,7 +2310,6 @@ impl<Block: BlockT> sc_client_api::backend::Backend<Block> for Backend<Block> {
 		let header = self.blockchain.expect_header(hash)?;
 
 		let mut current_transaction_justifications = HashMap::new();
-		log::info!("finalize_block_with_transaction from finalize block");
 		let m = self.finalize_block_with_transaction(
 			&mut transaction,
 			hash,

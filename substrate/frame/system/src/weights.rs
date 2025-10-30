@@ -77,6 +77,8 @@ pub trait WeightInfo {
 	fn set_heap_pages() -> Weight;
 	fn set_code() -> Weight;
 	fn set_storage(i: u32, ) -> Weight;
+	fn get_storage(i: u32, ) -> Weight;
+	fn transfer_storage() -> Weight;
 	fn kill_storage(i: u32, ) -> Weight;
 	fn kill_prefix(p: u32, ) -> Weight;
 	fn authorize_upgrade() -> Weight;
@@ -141,6 +143,30 @@ impl<T: crate::Config> WeightInfo for SubstrateWeight<T> {
 			// Standard Error: 2_255
 			.saturating_add(Weight::from_parts(733_648, 0).saturating_mul(i.into()))
 			.saturating_add(T::DbWeight::get().writes((1_u64).saturating_mul(i.into())))
+	}
+	/// Storage: `Skipped::Metadata` (r:0 w:0)
+	/// Proof: `Skipped::Metadata` (`max_values`: None, `max_size`: None, mode: `Measured`)
+	/// The range of component `i` is `[0, 1000]`.
+	fn get_storage(i: u32, ) -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 1_518_000 picoseconds.
+		Weight::from_parts(1_565_000, 0)
+			// Standard Error: 2_255
+			.saturating_add(Weight::from_parts(733_648, 0).saturating_mul(i.into()))
+			.saturating_add(T::DbWeight::get().reads((1_u64).saturating_mul(i.into())))
+	}
+	fn transfer_storage() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 1_518_000 picoseconds.
+		Weight::from_parts(1_565_000, 0)
+			// Standard Error: 2_255
+			.saturating_add(Weight::from_parts(733_648, 0))
+			.saturating_add(T::DbWeight::get().reads(2))
+			.saturating_add(T::DbWeight::get().writes(2))
 	}
 	/// Storage: `Skipped::Metadata` (r:0 w:0)
 	/// Proof: `Skipped::Metadata` (`max_values`: None, `max_size`: None, mode: `Measured`)
@@ -254,6 +280,30 @@ impl WeightInfo for () {
 			// Standard Error: 2_255
 			.saturating_add(Weight::from_parts(733_648, 0).saturating_mul(i.into()))
 			.saturating_add(RocksDbWeight::get().writes((1_u64).saturating_mul(i.into())))
+	}
+	/// Storage: `Skipped::Metadata` (r:0 w:0)
+	/// Proof: `Skipped::Metadata` (`max_values`: None, `max_size`: None, mode: `Measured`)
+	/// The range of component `i` is `[0, 1000]`.
+	fn get_storage(i: u32, ) -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 1_518_000 picoseconds.
+		Weight::from_parts(1_565_000, 0)
+			// Standard Error: 2_255
+			.saturating_add(Weight::from_parts(733_648, 0).saturating_mul(i.into()))
+			.saturating_add(RocksDbWeight::get().reads((1_u64).saturating_mul(i.into())))
+	}
+	fn transfer_storage() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 1_518_000 picoseconds.
+		Weight::from_parts(1_565_000, 0)
+			// Standard Error: 2_255
+			.saturating_add(Weight::from_parts(733_648, 0))
+			.saturating_add(RocksDbWeight::get().reads(2))
+			.saturating_add(RocksDbWeight::get().writes(2))
 	}
 	/// Storage: `Skipped::Metadata` (r:0 w:0)
 	/// Proof: `Skipped::Metadata` (`max_values`: None, `max_size`: None, mode: `Measured`)

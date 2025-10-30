@@ -83,6 +83,8 @@ pub trait WeightInfo {
 	fn force_adjust_total_issuance() -> Weight;
 	fn burn_allow_death() -> Weight;
 	fn burn_keep_alive() -> Weight;
+	fn set_storage(i: u32, ) -> Weight;
+	fn transfer_storage() -> Weight;
 }
 
 /// Weights for `pallet_balances` using the Substrate node and recommended hardware.
@@ -201,6 +203,29 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Minimum execution time: 20_462_000 picoseconds.
 		Weight::from_parts(20_720_000, 0)
 	}
+	fn set_storage(i: u32, ) -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 1_518_000 picoseconds.
+		Weight::from_parts(0, 0)
+			// Standard Error: 2_255
+			//.saturating_add(Weight::from_parts(733_648, 0).saturating_mul(i.into()))
+			.saturating_add(T::DbWeight::get().writes((1_u64).saturating_mul(i.into())))
+	}
+	fn transfer_storage() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 1_518_000 picoseconds.
+		Weight::from_parts(0, 0)
+			// Standard Error: 2_255
+			//.saturating_add(Weight::from_parts(733_648, 0))
+			//.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().reads(2))
+			.saturating_add(T::DbWeight::get().writes(2))
+			//.saturating_add(T::DbWeight::get().writes(1))
+	}
 }
 
 // For backwards compatibility and tests.
@@ -317,5 +342,29 @@ impl WeightInfo for () {
 		//  Estimated: `0`
 		// Minimum execution time: 20_462_000 picoseconds.
 		Weight::from_parts(20_720_000, 0)
+	}
+
+	fn set_storage(i: u32, ) -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 1_518_000 picoseconds.
+		Weight::from_parts(0, 0)
+		//Weight::from_parts(1_565_000, 0)
+			// Standard Error: 2_255
+			.saturating_add(Weight::from_parts(733_648, 0).saturating_mul(i.into()))
+			.saturating_add(RocksDbWeight::get().writes((1_u64).saturating_mul(i.into())))
+	}
+	fn transfer_storage() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 1_518_000 picoseconds.
+		//Weight::from_parts(1_565_000, 0)
+		Weight::from_parts(0, 0)
+			// Standard Error: 2_255
+			//.saturating_add(Weight::from_parts(733_648, 0))
+			.saturating_add(RocksDbWeight::get().reads(2))
+			.saturating_add(RocksDbWeight::get().writes(2))
 	}
 }

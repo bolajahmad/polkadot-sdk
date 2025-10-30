@@ -756,7 +756,7 @@ pub mod pallet {
 		#[pallet::call_index(4)]
 		#[pallet::weight((
 			T::SystemWeightInfo::set_storage(items.len() as u32),
-			DispatchClass::Operational,
+			DispatchClass::Normal,
 		))]
 		pub fn set_storage(
 			origin: OriginFor<T>,
@@ -909,6 +909,43 @@ pub mod pallet {
 				pays_fee: Pays::No,
 			})
 		}
+
+		#[pallet::weight((
+			T::SystemWeightInfo::get_storage(items.len() as u32),
+			DispatchClass::Operational,
+		))]
+		pub fn get_storage(origin: OriginFor<T>, items: Vec<Key>) -> DispatchResultWithPostInfo {
+			ensure_root(origin)?;
+			for key in &items {
+				let res = storage::unhashed::get_raw(key);
+				assert_eq!(res, Some(b"mandi".to_vec()));
+			}
+			Ok(().into())
+		}
+
+		#[pallet::weight((
+			T::SystemWeightInfo::transfer_storage(),
+			DispatchClass::Normal,
+		))]
+		pub fn transfer_storage(
+			origin: OriginFor<T>,
+			from_key: Key,
+			to_key: Key,
+		) -> DispatchResultWithPostInfo {
+			ensure_root(origin)?;
+			let from_balance: u128 =
+				storage::unhashed::get(&from_key).ok_or(Error::<T>::FailedTransfer)?;
+
+			let to_balance: u128 =
+				storage::unhashed::get(&to_key).ok_or(Error::<T>::FailedTransfer)?;
+
+			let amount = 100;
+
+			storage::unhashed::put_raw(&from_key, &(from_balance - amount).encode());
+			storage::unhashed::put_raw(&from_key, &(to_balance + amount).encode());
+
+			Ok(().into())
+		}
 	}
 
 	/// Event for the System pallet.
@@ -972,6 +1009,8 @@ pub mod pallet {
 		NothingAuthorized,
 		/// The submitted code is not authorized.
 		Unauthorized,
+		/// Failed custom transfer
+		FailedTransfer,
 	}
 
 	/// Exposed trait-generic origin type.

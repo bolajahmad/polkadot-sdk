@@ -1026,44 +1026,27 @@ struct StorageDb<Block: BlockT> {
 
 impl<Block: BlockT> StorageDb<Block> {
 	fn nomt_storage(&self) -> Option<ArcRwLockReadGuard<RawRwLock, Nomt<Blake3Hasher>>> {
+		// First make sure there is no ongoing canonicalization, if so wait for it to end.
+		self.state_db.wait_for_canonicalization();
+		// Acquire a read lock over nomt.
 		self.nomt_db.as_ref().map(|nomt| RwLock::read_arc(nomt))
 	}
 
 	fn commit(&self, mut transaction: Transaction<DbHash>) -> ClientResult<()> {
 		if let Some(nomt_db) = self.nomt_db.as_ref() {
-			if let Some(sp_database::NomtChanges { overlay, sync_data }) =
+			if let Some(sp_database::NomtChanges { overlay, _canonicalization_guard }) =
 				std::mem::take(&mut transaction.nomt_changes)
 			{
-				let (ref lock, ref cvar) = &*sync_data;
-				let mut done = lock.lock();
-
-				// UNWRAP: There is an expectation of no other reference to the overlay
-				// which is being canonicalized
+				// UNWRAP: There is an expectation of no other references to the overlay
+				// which is being canonicalized.
 				let mut overlay = std::sync::Arc::into_inner(overlay).unwrap();
-
-				let init = std::time::Instant::now();
 				let nomt = nomt_db.write();
-				let lock_acquiring_time = init.elapsed();
-				log::info!(
-					"time spent by acquiring the lock {:?}",
-					lock_acquiring_time.as_micros()
-				);
-
-				loop {
-					match overlay.try_commit_nonblocking(&nomt).unwrap() {
-						Some(o) => {
-							overlay = o;
-							if init.elapsed().as_millis() - lock_acquiring_time.as_millis() > 1000 {
-								panic!("more than 1 sec elapsed while trying to commit");
-							}
-						},
-						None => break,
-					}
-				}
-
-				log::info!("nomt commit required: {:?}us", init.elapsed().as_micros());
-				*done = true;
-				cvar.notify_all();
+				// PANICs: At this point NOMT should not have any other live session
+				// thus commit should happen directly.
+				let commit_result = overlay.try_commit_nonblocking(&nomt).unwrap();
+				if let Some(_overlay) = commit_result {
+					unreachable!("Nomt is locked, should")
+				};
 			}
 		}
 
@@ -2132,7 +2115,6 @@ impl<Block: BlockT> Backend<Block> {
 		let root = EmptyStorage::<Block>::new().0; // Empty trie
 
 		let db_state = if self.storage.nomt_db.is_some() {
-			self.storage.state_db.wait_for_canonicalization();
 			let nomt_storage = self.storage.nomt_storage().unwrap();
 			DbStateBuilder::<HashingFor<Block>>::new_nomt(nomt_storage).build()
 		} else {
@@ -2689,14 +2671,12 @@ impl<Block: BlockT> sc_client_api::backend::Backend<Block> for Backend<Block> {
 						.is_some()
 				};
 
-				let nomt_storage = self.storage.nomt_storage();
 				let is_nomt_backend = self.storage.nomt_db.is_some();
 
 				let build_state_backend = || -> Self::State {
 					let root = hdr.state_root;
 					let db_state = if is_nomt_backend {
-						let nomt_storage = nomt_storage.unwrap();
-						self.storage.state_db.wait_for_canonicalization();
+						let nomt_storage = self.storage.nomt_storage().unwrap();
 						DbStateBuilder::<HashingFor<Block>>::new_nomt(nomt_storage)
 							.with_nomt_overlay(self.storage.state_db.overlays(&hash))
 							.build()

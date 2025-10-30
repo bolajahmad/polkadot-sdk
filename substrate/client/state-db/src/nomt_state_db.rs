@@ -10,7 +10,7 @@ pub struct StateDb<BlockHash: Hash> {
 	pub(super) mode: PruningMode,
 	overlays: VecDeque<(u64, BlockHash, Arc<NomtOverlay>)>,
 	last_canonicalized: Option<(u64, BlockHash)>,
-	canonicalization_sync_data: Option<Arc<(Mutex<bool>, Condvar)>>,
+	canonicalization_lock: Arc<Mutex<()>>,
 	_phantom: core::marker::PhantomData<BlockHash>,
 }
 
@@ -20,7 +20,7 @@ impl<BlockHash: Hash> StateDb<BlockHash> {
 			overlays: VecDeque::new(),
 			mode,
 			last_canonicalized: None,
-			canonicalization_sync_data: None,
+			canonicalization_lock: Arc::new(Mutex::new(())),
 			_phantom: core::marker::PhantomData::default(),
 		}
 	}
@@ -51,6 +51,8 @@ impl<BlockHash: Hash> StateDb<BlockHash> {
 		&mut self,
 		hash: &BlockHash,
 	) -> Result<NomtChanges, StateDbError> {
+		let guard = self.canonicalization_lock.lock_arc();
+
 		match self.overlays.front() {
 			Some((_, front_hash, _)) if front_hash == hash => (),
 			_ => return Err(StateDbError::InvalidBlock),
@@ -60,12 +62,9 @@ impl<BlockHash: Hash> StateDb<BlockHash> {
 		let (canonicalized_number, canonicalized_hash, canonicalized_overlay) =
 			self.overlays.pop_front().unwrap();
 
-		self.wait_for_canonicalization();
-		let sync_data = Arc::new((Mutex::new(false), Condvar::new()));
 		self.last_canonicalized = Some((canonicalized_number, canonicalized_hash));
-		self.canonicalization_sync_data = Some(sync_data.clone());
 
-		Ok(NomtChanges { overlay: canonicalized_overlay, sync_data })
+		Ok(NomtChanges { overlay: canonicalized_overlay, _canonicalization_guard: guard })
 	}
 
 	pub(super) fn last_canonicalized(&self) -> LastCanonicalized {
@@ -75,19 +74,7 @@ impl<BlockHash: Hash> StateDb<BlockHash> {
 			.unwrap_or(LastCanonicalized::None)
 	}
 
-	pub(super) fn wait_for_canonicalization(&self) {
-		if let Some(sync_data) = self.canonicalization_sync_data.as_ref() {
-			let (ref lock, ref cvar) = &**sync_data;
-			let mut done = lock.lock();
-			if !*done {
-				cvar.wait(&mut done);
-			}
-		}
-	}
-
 	pub(super) fn is_pruned(&self, hash: &BlockHash, number: u64) -> IsPruned {
-		self.wait_for_canonicalization();
-
 		let Some((last_canonicalized_number, last_canonicalized_hash)) =
 			self.last_canonicalized.as_ref()
 		else {
@@ -105,18 +92,25 @@ impl<BlockHash: Hash> StateDb<BlockHash> {
 		}
 	}
 
-	pub fn overlays(&self, hash: &BlockHash) -> Vec<Arc<NomtOverlay>> {
-		self.wait_for_canonicalization();
+	pub fn wait_for_canonicalization(&self) {
+		if self.canonicalization_lock.is_locked() {
+			let _guard = self.canonicalization_lock.lock();
+		}
+	}
 
+	pub fn overlays(&self, hash: &BlockHash) -> Vec<Arc<NomtOverlay>> {
 		let Some(idx) = self.overlays.iter().position(|(_, block_hash, _)| block_hash == hash)
 		else {
 			return vec![]
 		};
 
-		self.overlays
+		let overlays: Vec<_> = self
+			.overlays
 			.range(0..=idx)
 			.map(|(_, _, overlay)| overlay.clone())
 			.rev()
-			.collect()
+			.collect();
+
+		overlays
 	}
 }

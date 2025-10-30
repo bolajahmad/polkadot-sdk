@@ -209,7 +209,7 @@ fn open_database_at<Block: BlockT>(
 			let mut opts = nomt::Options::new();
 			opts.path(nomt_path);
 			opts.commit_concurrency(32);
-			opts.hashtable_buckets(1_000_000);
+			opts.hashtable_buckets(5_000_000);
 
 			// Open nomt database.
 			log::info!("Opening NOMT");

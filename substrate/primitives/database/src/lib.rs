@@ -22,7 +22,7 @@ mod kvdb;
 mod mem;
 
 use nomt::Overlay as NomtOverlay;
-use parking_lot::{Condvar, Mutex, RwLock};
+use parking_lot::{ArcMutexGuard, Condvar, Mutex, RawMutex, RwLock};
 use std::sync::Arc;
 
 pub use crate::kvdb::as_database;
@@ -41,15 +41,14 @@ pub enum Change<H> {
 	Release(ColumnId, H),
 }
 
-#[derive(Clone)]
 pub struct NomtChanges {
 	pub overlay: Arc<NomtOverlay>,
-	pub sync_data: Arc<(Mutex<bool>, Condvar)>,
+	pub _canonicalization_guard: ArcMutexGuard<RawMutex, ()>,
 }
 
 /// A series of changes to the database that can be committed atomically. They do not take effect
 /// until passed into `Database::commit`.
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct Transaction<H> {
 	pub kvdb_changes: Vec<Change<H>>,
 	pub nomt_changes: Option<NomtChanges>,

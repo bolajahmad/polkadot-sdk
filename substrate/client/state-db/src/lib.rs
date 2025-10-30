@@ -300,6 +300,7 @@ enum InnerStateDb<BlockHash: Hash, Key: Hash, D: MetaDb> {
 /// State DB maintenance. See module description.
 /// Can be shared across threads.
 pub struct StateDb<BlockHash: Hash, Key: Hash, D: trie_state_db::MetaDb> {
+	nomt: bool,
 	db: RwLock<InnerStateDb<BlockHash, Key, D>>,
 }
 
@@ -344,6 +345,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 		};
 
 		let state_db = StateDb {
+			nomt: false,
 			db: RwLock::new(InnerStateDb::Trie(trie_state_db::StateDb::new(
 				selected_mode,
 				ref_counting,
@@ -361,7 +363,10 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 			pruning_mode => pruning_mode,
 		};
 
-		StateDb { db: RwLock::new(InnerStateDb::Nomt(nomt_state_db::StateDb::new(pruning_mode))) }
+		StateDb {
+			nomt: true,
+			db: RwLock::new(InnerStateDb::Nomt(nomt_state_db::StateDb::new(pruning_mode))),
+		}
 	}
 
 	pub fn pruning_mode(&self) -> PruningMode {
@@ -415,26 +420,36 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	where
 		F: Fn() -> bool,
 	{
+		if self.nomt {
+			return Ok(());
+		}
+
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.pin(hash, number, hint),
-			InnerStateDb::Nomt(ref mut nomt_state_db) => Ok(()),
+			_ => unreachable!(),
 		}
 	}
 
 	/// Allows pruning of specified block.
 	pub fn unpin(&self, hash: &BlockHash) {
+		if self.nomt {
+			return;
+		}
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.unpin(hash),
-			InnerStateDb::Nomt(ref mut nomt_state_db) => (),
+			_ => unreachable!(),
 		}
 	}
 
 	/// Confirm that all changes made to commit sets are on disk. Allows for temporarily pinned
 	/// blocks to be released.
 	pub fn sync(&self) {
+		if self.nomt {
+			return;
+		}
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.sync(),
-			InnerStateDb::Nomt(ref mut nomt_state_db) => (),
+			_ => unreachable!(),
 		}
 	}
 
@@ -449,9 +464,12 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 		Key: std::borrow::Borrow<Q>,
 		Q: std::hash::Hash + Eq,
 	{
+		if self.nomt {
+			return unimplemented!();
+		}
 		match *self.db.read() {
 			InnerStateDb::Trie(ref trie_state_db) => trie_state_db.get(key, db),
-			InnerStateDb::Nomt(ref nomt_state_db) => unimplemented!(),
+			_ => unreachable!(),
 		}
 	}
 
@@ -459,18 +477,24 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	/// Returns a database commit or `None` if not possible.
 	/// For archive an empty commit set is returned.
 	pub fn revert_one(&self) -> Option<CommitSet<Key>> {
+		if self.nomt {
+			return unimplemented!();
+		}
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.revert_one(),
-			InnerStateDb::Nomt(ref mut nomt_state_db) => unimplemented!(),
+			_ => unreachable!(),
 		}
 	}
 
 	/// Remove specified non-canonical block.
 	/// Returns a database commit or `None` if not possible.
 	pub fn remove(&self, hash: &BlockHash) -> Option<CommitSet<Key>> {
+		if self.nomt {
+			return unimplemented!();
+		}
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => trie_state_db.remove(hash),
-			InnerStateDb::Nomt(ref mut nomt_state_db) => unimplemented!(),
+			_ => unreachable!(),
 		}
 	}
 
@@ -511,14 +535,14 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	pub fn overlays(&self, hash: &BlockHash) -> Vec<std::sync::Arc<NomtOverlay>> {
 		match *self.db.read() {
 			InnerStateDb::Nomt(ref nomt_state_db) => nomt_state_db.overlays(hash),
-			InnerStateDb::Trie(ref trie_state_db) => unimplemented!(),
+			_ => unimplemented!(),
 		}
 	}
 
 	pub fn wait_for_canonicalization(&self) {
 		match *self.db.read() {
 			InnerStateDb::Nomt(ref nomt_state_db) => nomt_state_db.wait_for_canonicalization(),
-			InnerStateDb::Trie(ref trie_state_db) => unimplemented!(),
+			_ => unimplemented!(),
 		}
 	}
 }

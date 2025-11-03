@@ -532,9 +532,12 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 		Ok(())
 	}
 
-	pub fn overlays(&self, hash: &BlockHash) -> Vec<std::sync::Arc<NomtOverlay>> {
+	pub fn overlays(
+		&self,
+		hash: &BlockHash,
+	) -> Result<Vec<std::sync::Arc<NomtOverlay>>, Error<D::Error>> {
 		match *self.db.read() {
-			InnerStateDb::Nomt(ref nomt_state_db) => nomt_state_db.overlays(hash),
+			InnerStateDb::Nomt(ref nomt_state_db) => Ok(nomt_state_db.overlays(hash)?),
 			_ => unimplemented!(),
 		}
 	}

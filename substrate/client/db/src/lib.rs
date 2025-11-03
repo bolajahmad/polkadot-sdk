@@ -2663,12 +2663,16 @@ impl<Block: BlockT> sc_client_api::backend::Backend<Block> for Backend<Block> {
 
 				let is_nomt_backend = self.storage.nomt_db.is_some();
 
-				let build_state_backend = || -> Self::State {
+				let build_state_backend = || -> ClientResult<Self::State> {
 					let root = hdr.state_root;
 					let db_state = if is_nomt_backend {
 						let nomt_storage = self.storage.nomt_storage().unwrap();
 						DbStateBuilder::<HashingFor<Block>>::new_nomt(nomt_storage)
-							.with_nomt_overlay(self.storage.state_db.overlays(&hash))
+							.with_nomt_overlay(self.storage.state_db.overlays(&hash).map_err(
+								sp_blockchain::Error::from_state_db::<
+									sc_state_db::Error<sp_database::error::DatabaseError>,
+								>,
+							)?)
 							.build()
 					} else {
 						DbStateBuilder::<HashingFor<Block>>::new_trie(self.storage.clone(), root)
@@ -2682,17 +2686,17 @@ impl<Block: BlockT> sc_client_api::backend::Backend<Block> for Backend<Block> {
 							.build()
 					};
 					let state = RefTrackingState::new(db_state, self.storage.clone(), Some(hash));
-					RecordStatsState::new(state, Some(hash), self.state_usage.clone())
+					Ok(RecordStatsState::new(state, Some(hash), self.state_usage.clone()))
 				};
 
 				if is_nomt_backend {
-					return Ok(build_state_backend())
+					return build_state_backend()
 				}
 
 				if let Ok(()) =
 					self.storage.state_db.pin(&hash, hdr.number.saturated_into::<u64>(), hint)
 				{
-					Ok(build_state_backend())
+					build_state_backend()
 				} else {
 					Err(sp_blockchain::Error::UnknownBlock(format!(
 						"State already discarded for {hash:?}",

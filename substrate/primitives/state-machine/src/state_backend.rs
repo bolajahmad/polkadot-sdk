@@ -368,7 +368,7 @@ where
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.storage_root(delta, state_version),
 			InnerStateBackend::Nomt { recorder, reads, session, .. } => {
-				let mut actual_access: Vec<_> = if *recorder {
+				let mut actual_access: Vec<_> = if !*recorder {
 					delta
 						.into_iter()
 						.map(|(key, maybe_val)| {

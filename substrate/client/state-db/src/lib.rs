@@ -273,7 +273,7 @@ pub enum Changes<Key: Hash> {
 
 pub enum CommitChanges<Key: Hash> {
 	Trie(CommitSet<Key>),
-	Nomt(sp_database::NomtChanges),
+	Nomt { nomt_changes: sp_database::NomtChanges, db_changes: CommitSet<Key> },
 }
 
 impl<Key: Hash> Changes<Key> {
@@ -294,7 +294,7 @@ impl<Key: Hash> Changes<Key> {
 
 enum InnerStateDb<BlockHash: Hash, Key: Hash, D: MetaDb> {
 	Trie(trie_state_db::StateDb<BlockHash, Key, D>),
-	Nomt(nomt_state_db::StateDb<BlockHash>),
+	Nomt(nomt_state_db::StateDb<BlockHash, Key>),
 }
 
 /// State DB maintenance. See module description.
@@ -356,7 +356,11 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 		Ok((db_init_commit_set, state_db))
 	}
 
-	pub fn open_nomt_state_db(requested_mode: Option<PruningMode>) -> StateDb<BlockHash, Key, D> {
+	pub fn open_nomt_state_db(
+		requested_mode: Option<PruningMode>,
+		meta_db: &D,
+		nomt: std::sync::Arc<nomt::Nomt<nomt::hasher::Blake3Hasher>>,
+	) -> StateDb<BlockHash, Key, D> {
 		let pruning_mode = match requested_mode.unwrap_or_default() {
 			PruningMode::ArchiveAll => unimplemented!("Not Addressed by nomt PoC"),
 			PruningMode::ArchiveCanonical => unimplemented!(),
@@ -365,7 +369,10 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 
 		StateDb {
 			nomt: true,
-			db: RwLock::new(InnerStateDb::Nomt(nomt_state_db::StateDb::new(pruning_mode))),
+			// TODO: handle unwrap
+			db: RwLock::new(InnerStateDb::Nomt(
+				nomt_state_db::StateDb::new(pruning_mode, meta_db, nomt).unwrap(),
+			)),
 		}
 	}
 
@@ -377,6 +384,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	}
 
 	/// Add a new non-canonical block.
+	// TODO: the option could be removed now.
 	pub fn insert_block(
 		&self,
 		hash: &BlockHash,
@@ -395,8 +403,13 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 				Ok(Some(commit_set))
 			},
 			InnerStateDb::Nomt(ref mut nomt_state_db) => {
-				nomt_state_db.insert_block(hash, number, parent_hash, changes.nomt_changes())?;
-				Ok(None)
+				let commit = nomt_state_db.insert_block(
+					hash,
+					number,
+					parent_hash,
+					changes.nomt_changes(),
+				)?;
+				Ok(Some(commit))
 			},
 		}
 	}
@@ -409,8 +422,10 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) =>
 				Ok(CommitChanges::Trie(trie_state_db.canonicalize_block(hash)?)),
-			InnerStateDb::Nomt(ref mut nomt_state_db) =>
-				Ok(CommitChanges::Nomt(nomt_state_db.canonicalize_block(hash)?)),
+			InnerStateDb::Nomt(ref mut nomt_state_db) => {
+				let (nomt_changes, db_changes) = nomt_state_db.canonicalize_block(hash)?;
+				Ok(CommitChanges::Nomt { nomt_changes, db_changes })
+			},
 		}
 	}
 
@@ -525,7 +540,8 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 				)?;
 			},
 			InnerStateDb::Nomt(ref mut nomt_state_db) => {
-				*nomt_state_db = nomt_state_db::StateDb::new(nomt_state_db.mode.clone());
+				todo!()
+				//*nomt_state_db = nomt_state_db::StateDb::new(nomt_state_db.mode.clone());
 			},
 		};
 

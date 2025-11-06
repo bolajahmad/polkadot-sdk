@@ -1270,8 +1270,8 @@ impl<Block: BlockT> Backend<Block> {
 		let state_meta_db = StateMetaDb(kvdb.clone());
 		let map_e = sp_blockchain::Error::from_state_db;
 
-		let state_db = if nomt_db.is_some() {
-			StateDb::open_nomt_state_db(requested_state_pruning)
+		let state_db = if let Some(nomt) = nomt_db.as_ref() {
+			StateDb::open_nomt_state_db(requested_state_pruning, &state_meta_db, nomt.clone())
 		} else {
 			let (state_db_init_commit_set, state_db) = StateDb::open_trie_state_db(
 				state_meta_db,
@@ -1633,7 +1633,9 @@ impl<Block: BlockT> Backend<Block> {
 			let finalized = if operation.commit_state {
 				if self.storage.nomt_db.is_some() {
 					let nomt_overlay = operation.db_updates.nomt_transaction().transaction;
-					self.storage
+
+					let commit = self
+						.storage
 						.state_db
 						.insert_block(
 							&hash,
@@ -1643,7 +1645,11 @@ impl<Block: BlockT> Backend<Block> {
 						)
 						.map_err(|e: sc_state_db::Error<sp_database::error::DatabaseError>| {
 							sp_blockchain::Error::from_state_db(e)
-						})?;
+						})?
+						.unwrap();
+
+					// meta changes
+					apply_state_commit(&mut transaction, sc_state_db::CommitChanges::Trie(commit));
 				} else {
 					let mut changeset: sc_state_db::ChangeSet<Vec<u8>> =
 						sc_state_db::ChangeSet::default();
@@ -2141,8 +2147,15 @@ fn apply_state_commit(
 				transaction.remove(columns::STATE_META, &key[..]);
 			}
 		},
-		sc_state_db::CommitChanges::Nomt(overlay) => {
-			transaction.set_nomt_changes(overlay);
+		sc_state_db::CommitChanges::Nomt { nomt_changes, db_changes } => {
+			transaction.set_nomt_changes(nomt_changes);
+
+			for (key, val) in db_changes.meta.inserted.into_iter() {
+				transaction.set_from_vec(columns::STATE_META, &key[..], val);
+			}
+			for key in db_changes.meta.deleted.into_iter() {
+				transaction.remove(columns::STATE_META, &key[..]);
+			}
 		},
 	}
 }

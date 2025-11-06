@@ -458,7 +458,7 @@ impl<Hasher: Hash> StateBackend<Hasher> for BenchmarkingState<Hasher> {
 		child_info: &ChildInfo,
 		delta: impl Iterator<Item = (&'a [u8], Option<&'a [u8]>)>,
 		state_version: StateVersion,
-	) -> (Hasher::Output, bool, BackendTransaction<Hasher>) {
+	) -> Option<(Hasher::Output, bool, BackendTransaction<Hasher>)> {
 		self.state
 			.borrow()
 			.as_ref()

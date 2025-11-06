@@ -683,7 +683,7 @@ impl<H: Hasher> OverlayedChanges<H> {
 		child_info: &ChildInfo,
 		backend: &B,
 		state_version: StateVersion,
-	) -> Result<(H::Out, bool), B::Error>
+	) -> Result<Option<(H::Out, bool)>, B::Error>
 	where
 		H::Out: Ord + Encode + Decode,
 	{
@@ -701,12 +701,15 @@ impl<H: Hasher> OverlayedChanges<H> {
 				// V1 is equivalent to V0 on empty root.
 				.unwrap_or_else(empty_child_trie_root::<LayoutV1<H>>);
 
-			return Ok((root, true))
+			return Ok(Some((root, true)))
 		}
 
 		let root = if let Some((changes, info)) = self.child_changes_mut(storage_key) {
 			let delta = changes.map(|(k, v)| (k.as_ref(), v.value().map(AsRef::as_ref)));
-			Some(backend.child_storage_root(info, delta, state_version))
+			let Some(root) = backend.child_storage_root(info, delta, state_version) else {
+				return Ok(None)
+			};
+			Some(root)
 		} else {
 			None
 		};
@@ -733,7 +736,7 @@ impl<H: Hasher> OverlayedChanges<H> {
 			root
 		};
 
-		Ok((root, false))
+		Ok(Some((root, false)))
 	}
 
 	/// Returns an iterator over the keys (in lexicographic order) following `key` (excluding `key`)

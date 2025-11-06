@@ -139,6 +139,7 @@ enum InnerStateBackend<S: TrieBackendStorage<H>, H: Hasher, C, R> {
 		recorder: bool,
 		session: RefCell<Option<Session<Blake3Hasher>>>,
 		reads: RefCell<BTreeMap<Vec<u8>, Option<Vec<u8>>>>,
+		child_deltas: RefCell<Vec<(Vec<u8>, Option<Vec<u8>>)>>,
 		// NOTE: This needs to be placed after the session so the drop order
 		// unlock properly the read-locks.
 		db: ArcRwLockReadGuard<parking_lot::RawRwLock, Nomt<Blake3Hasher>>,
@@ -191,6 +192,7 @@ where
 				recorder,
 				session: RefCell::new(Some(session)),
 				reads: RefCell::new(BTreeMap::new()),
+				child_deltas: RefCell::new(vec![]),
 				db,
 			},
 		}
@@ -271,7 +273,13 @@ where
 	) -> Result<Option<Vec<u8>>, Self::Error> {
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) => trie_backend.child_storage(child_info, key),
-			InnerStateBackend::Nomt { .. } => todo!(),
+			InnerStateBackend::Nomt { .. } => {
+				let prefix = child_info.prefixed_storage_key();
+				let mut full_key = Vec::with_capacity(prefix.len() + key.len());
+				full_key.extend(prefix.clone().into_inner());
+				full_key.extend(key);
+				self.storage(&full_key[..])
+			},
 		}
 	}
 
@@ -283,7 +291,13 @@ where
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.child_storage_hash(child_info, key),
-			InnerStateBackend::Nomt { .. } => todo!(),
+			InnerStateBackend::Nomt { .. } => {
+				let prefix = child_info.prefixed_storage_key();
+				let mut full_key = Vec::with_capacity(prefix.len() + key.len());
+				full_key.extend(prefix.clone().into_inner());
+				full_key.extend(key);
+				self.storage_hash(&full_key[..])
+			},
 		}
 	}
 
@@ -332,7 +346,13 @@ where
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.exists_child_storage(child_info, key),
-			InnerStateBackend::Nomt { .. } => todo!(),
+			InnerStateBackend::Nomt { .. } => {
+				let prefix = child_info.prefixed_storage_key();
+				let mut full_key = Vec::with_capacity(prefix.len() + key.len());
+				full_key.extend(prefix.clone().into_inner());
+				full_key.extend(key);
+				self.exists_storage(&full_key[..])
+			},
 		}
 	}
 
@@ -354,7 +374,13 @@ where
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.next_child_storage_key(child_info, key),
-			InnerStateBackend::Nomt { .. } => todo!(),
+			InnerStateBackend::Nomt { .. } => {
+				let prefix = child_info.prefixed_storage_key();
+				let mut full_key = Vec::with_capacity(prefix.len() + key.len());
+				full_key.extend(prefix.clone().into_inner());
+				full_key.extend(key);
+				self.next_storage_key(&full_key[..])
+			},
 		}
 	}
 
@@ -367,7 +393,18 @@ where
 		let res = match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.storage_root(delta, state_version),
-			InnerStateBackend::Nomt { recorder, reads, session, .. } => {
+			InnerStateBackend::Nomt { recorder, reads, child_deltas, session, .. } => {
+				let child_deltas = std::mem::take(&mut *child_deltas.borrow_mut()).into_iter().map(
+					|(key, maybe_val)| {
+						(
+							key.to_vec(),
+							KeyReadWrite::Write(
+								maybe_val.as_ref().map(|inner_val| inner_val.to_vec()),
+							),
+						)
+					},
+				);
+
 				let mut actual_access: Vec<_> = if !*recorder {
 					delta
 						.into_iter()
@@ -379,6 +416,7 @@ where
 								),
 							)
 						})
+						.chain(child_deltas)
 						.collect()
 				} else {
 					let mut reads = reads.borrow_mut();
@@ -397,6 +435,7 @@ where
 							.into_iter()
 							.map(|(key, val)| (key, KeyReadWrite::Read(val))),
 					);
+					actual_access.extend(child_deltas);
 					actual_access
 				};
 
@@ -430,11 +469,23 @@ where
 		child_info: &ChildInfo,
 		delta: impl Iterator<Item = (&'a [u8], Option<&'a [u8]>)>,
 		state_version: StateVersion,
-	) -> (H::Out, bool, BackendTransaction<H>) {
+	) -> Option<(H::Out, bool, BackendTransaction<H>)> {
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.child_storage_root(child_info, delta, state_version),
-			InnerStateBackend::Nomt { .. } => todo!(),
+			InnerStateBackend::Nomt { child_deltas, .. } => {
+				let prefix = child_info.prefixed_storage_key();
+				let child_trie_delta: Vec<_> = delta
+					.map(|(k, maybe_val)| {
+						let mut full_key = Vec::with_capacity(prefix.len() + k.len());
+						full_key.extend(prefix.clone().into_inner());
+						full_key.extend(k);
+						(full_key, maybe_val.map(|val| val.to_vec()))
+					})
+					.collect();
+				child_deltas.borrow_mut().extend(child_trie_delta);
+				None
+			},
 		}
 	}
 

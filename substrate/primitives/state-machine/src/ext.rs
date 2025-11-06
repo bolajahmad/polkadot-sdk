@@ -496,10 +496,15 @@ where
 	) -> Vec<u8> {
 		let _guard = guard();
 
-		let (root, _cached) = self
+		let Some((root, _cached)) = self
 			.overlay
 			.child_storage_root(child_info, self.backend, state_version)
-			.expect(EXT_NOT_ALLOWED_TO_FAIL);
+			.expect(EXT_NOT_ALLOWED_TO_FAIL)
+		else {
+			unreachable!(
+				"Nomt PoC doesn't support partial trie update and thus child trie root computation"
+			)
+		};
 
 		trace!(
 			target: "state",

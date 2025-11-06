@@ -663,7 +663,7 @@ where
 		child_info: &ChildInfo,
 		delta: impl Iterator<Item = (&'a [u8], Option<&'a [u8]>)>,
 		state_version: StateVersion,
-	) -> (H::Out, bool, BackendTransaction<H>) {
+	) -> Option<(H::Out, bool, BackendTransaction<H>)> {
 		let default_root = match child_info.child_type() {
 			ChildType::ParentKeyId => empty_child_trie_root::<sp_trie::LayoutV1<H>>(),
 		};
@@ -710,7 +710,7 @@ where
 
 		let is_default = new_child_root == default_root;
 
-		(new_child_root, is_default, BackendTransaction::new_trie_transaction(write_overlay))
+		Some((new_child_root, is_default, BackendTransaction::new_trie_transaction(write_overlay)))
 	}
 }
 

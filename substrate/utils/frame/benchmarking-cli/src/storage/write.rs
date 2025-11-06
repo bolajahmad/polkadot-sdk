@@ -283,7 +283,8 @@ impl StorageCmd {
 			.map(|(key, new_v)| (key.as_ref(), Some(new_v.as_ref())))
 			.collect::<Vec<_>>();
 		let stx = match child_info {
-			Some(info) => trie.child_storage_root(info, replace.iter().cloned(), version).2,
+			Some(info) =>
+				trie.child_storage_root(info, replace.iter().cloned(), version).unwrap().2,
 			None => trie.storage_root(replace.iter().cloned(), version).1,
 		};
 		// Only the keep the insertions, since we do not want to benchmark pruning.
@@ -422,7 +423,7 @@ fn check_new_value<Block: BlockT>(
 ) -> bool {
 	let new_kv = vec![(key.as_ref(), Some(new_v.as_ref()))];
 	let mut stx = match child_info {
-		Some(info) => trie.child_storage_root(info, new_kv.iter().cloned(), version).2,
+		Some(info) => trie.child_storage_root(info, new_kv.iter().cloned(), version).unwrap().2,
 		None => trie.storage_root(new_kv.iter().cloned(), version).1,
 	};
 

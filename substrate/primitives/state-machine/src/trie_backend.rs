@@ -523,7 +523,7 @@ where
 		child_info: &ChildInfo,
 		delta: impl Iterator<Item = (&'a [u8], Option<&'a [u8]>)>,
 		state_version: StateVersion,
-	) -> (H::Out, bool, BackendTransaction<H>)
+	) -> Option<(H::Out, bool, BackendTransaction<H>)>
 	where
 		H::Out: Ord,
 	{

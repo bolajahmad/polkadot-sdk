@@ -389,7 +389,7 @@ pub trait Backend<H: Hasher>: core::fmt::Debug {
 		child_info: &ChildInfo,
 		delta: impl Iterator<Item = (&'a [u8], Option<&'a [u8]>)>,
 		state_version: StateVersion,
-	) -> (H::Out, bool, BackendTransaction<H>)
+	) -> Option<(H::Out, bool, BackendTransaction<H>)>
 	where
 		H::Out: Ord;
 
@@ -431,12 +431,12 @@ pub trait Backend<H: Hasher>: core::fmt::Debug {
 		let mut txs = BackendTransaction::default();
 		let mut child_roots: Vec<_> = Default::default();
 		// child first
-		// NOTE: Nomt PoC doesn't expect child trie usage.
-		let child_deltas: Vec<_> = child_deltas.collect();
-		assert!(child_deltas.is_empty());
 		for (child_info, child_delta) in child_deltas {
-			let (child_root, empty, child_txs) =
-				self.child_storage_root(child_info, child_delta, state_version);
+			let Some((child_root, empty, child_txs)) =
+				self.child_storage_root(child_info, child_delta, state_version)
+			else {
+				continue
+			};
 			let prefixed_storage_key = child_info.prefixed_storage_key();
 			txs.consolidate(child_txs);
 			if empty {

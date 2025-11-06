@@ -301,8 +301,10 @@ impl Externalities for BasicExternalities {
 		if let Some((data, child_info)) = self.overlay.child_changes_mut(child_info.storage_key()) {
 			let delta =
 				data.into_iter().map(|(k, v)| (k.as_ref(), v.value().map(|v| v.as_slice())));
+			// TODO: I'm not sure where those basic externalities are used.
 			crate::in_memory_backend::new_in_mem::<Blake2Hasher>()
 				.child_storage_root(&child_info, delta, state_version)
+				.unwrap()
 				.0
 		} else {
 			empty_child_trie_root::<LayoutV1<Blake2Hasher>>()

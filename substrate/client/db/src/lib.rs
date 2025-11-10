@@ -1283,7 +1283,7 @@ impl<Block: BlockT> Backend<Block> {
 
 			apply_state_commit(
 				&mut db_init_transaction,
-				sc_state_db::CommitChanges::Trie(state_db_init_commit_set),
+				sc_state_db::CommitChanges::Kvdb(state_db_init_commit_set),
 			);
 			state_db
 		};
@@ -1645,11 +1645,10 @@ impl<Block: BlockT> Backend<Block> {
 						)
 						.map_err(|e: sc_state_db::Error<sp_database::error::DatabaseError>| {
 							sp_blockchain::Error::from_state_db(e)
-						})?
-						.unwrap();
+						})?;
 
 					// meta changes
-					apply_state_commit(&mut transaction, sc_state_db::CommitChanges::Trie(commit));
+					apply_state_commit(&mut transaction, sc_state_db::CommitChanges::Kvdb(commit));
 				} else {
 					let mut changeset: sc_state_db::ChangeSet<Vec<u8>> =
 						sc_state_db::ChangeSet::default();
@@ -1708,14 +1707,13 @@ impl<Block: BlockT> Backend<Block> {
 							&hash,
 							number_u64,
 							pending_block.header.parent_hash(),
-							Changes::Trie(changeset),
+							Changes::Kvdb(changeset),
 						)
 						.map_err(|e: sc_state_db::Error<sp_database::error::DatabaseError>| {
 							sp_blockchain::Error::from_state_db(e)
-						})?
-						.unwrap();
+						})?;
 
-					apply_state_commit(&mut transaction, sc_state_db::CommitChanges::Trie(commit));
+					apply_state_commit(&mut transaction, sc_state_db::CommitChanges::Kvdb(commit));
 				}
 
 				if number <= last_finalized_num {
@@ -2133,7 +2131,7 @@ fn apply_state_commit(
 	commit_changes: sc_state_db::CommitChanges<Vec<u8>>,
 ) {
 	match commit_changes {
-		sc_state_db::CommitChanges::Trie(changes) => {
+		sc_state_db::CommitChanges::Kvdb(changes) => {
 			for (key, val) in changes.data.inserted.into_iter() {
 				transaction.set_from_vec(columns::STATE, &key[..], val);
 			}
@@ -2469,7 +2467,7 @@ impl<Block: BlockT> sc_client_api::backend::Backend<Block> for Backend<Block> {
 					Some(commit) => {
 						apply_state_commit(
 							&mut transaction,
-							sc_state_db::CommitChanges::Trie(commit),
+							sc_state_db::CommitChanges::Kvdb(commit),
 						);
 
 						number_to_revert = prev_number;
@@ -2607,7 +2605,7 @@ impl<Block: BlockT> sc_client_api::backend::Backend<Block> for Backend<Block> {
 
 		let mut transaction = Transaction::new();
 		if let Some(commit) = self.storage.state_db.remove(&hash) {
-			apply_state_commit(&mut transaction, sc_state_db::CommitChanges::Trie(commit));
+			apply_state_commit(&mut transaction, sc_state_db::CommitChanges::Kvdb(commit));
 		}
 		transaction.remove(columns::KEY_LOOKUP, hash.as_ref());
 
@@ -2703,7 +2701,7 @@ impl<Block: BlockT> sc_client_api::backend::Backend<Block> for Backend<Block> {
 				};
 
 				if is_nomt_backend {
-					return build_state_backend()
+					return build_state_backend();
 				}
 
 				if let Ok(()) =

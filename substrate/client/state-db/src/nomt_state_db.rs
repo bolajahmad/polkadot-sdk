@@ -99,7 +99,6 @@ impl<BlockHash: Hash, Key: Hash> StateDb<BlockHash, Key> {
 				for index in 0..MAX_BLOCKS_PER_LEVEL {
 					let journal_key = to_journal_key(block, index);
 					if let Some(record) = db.get_meta(&journal_key).map_err(Error::Db)? {
-						log::info!("found journal key: number {} index {}", block, index);
 						let record: JournalRecord<BlockHash> =
 							Decode::decode(&mut record.as_slice())?;
 
@@ -107,7 +106,6 @@ impl<BlockHash: Hash, Key: Hash> StateDb<BlockHash, Key> {
 							SessionParams::default().witness_mode(WitnessMode::disabled());
 
 						if let Some(prev_overlays) = overlays_map.get(&record.parent_hash) {
-							log::info!("prev_overlays len: {}", prev_overlays.len());
 							params = params
 								.overlay(prev_overlays.iter().rev().map(|o| o.as_ref()))
 								.unwrap();
@@ -133,8 +131,6 @@ impl<BlockHash: Hash, Key: Hash> StateDb<BlockHash, Key> {
 							journal_key,
 							overlay: overlay.clone(),
 						};
-
-						log::info!("hash: {:?}", record.hash);
 
 						let mut overlay_chain =
 							overlays_map.remove(&record.parent_hash).unwrap_or(vec![]);
@@ -228,7 +224,6 @@ impl<BlockHash: Hash, Key: Hash> StateDb<BlockHash, Key> {
 			parent_hash: parent_hash.clone(),
 			changes: overlay.changes(),
 		};
-		log::info!("pushed meta: number {} index {}", number, index);
 		commit.meta.inserted.push((journal_key.clone(), journal_record.encode()));
 
 		let overlay = BlockOverlay {
@@ -282,8 +277,6 @@ impl<BlockHash: Hash, Key: Hash> StateDb<BlockHash, Key> {
 
 		let number = self.front_block_number();
 		let canonicalized = (hash.clone(), number);
-		log::info!("pushed meta canonicalized - number {}", number);
-		log::info!("canonicalized hash: {:?}", hash.clone());
 		commit
 			.meta
 			.inserted
@@ -355,7 +348,6 @@ impl<BlockHash: Hash, Key: Hash> StateDb<BlockHash, Key> {
 	}
 
 	pub fn overlays(&self, hash: &BlockHash) -> Result<Vec<Arc<NomtOverlay>>, StateDbError> {
-		//log::info!("overlays: {:?}", hash);
 		let mut overlays = vec![];
 
 		if self.last_canonicalized.as_ref().map_or(false, |(h, _)| h == hash) {
@@ -373,7 +365,6 @@ impl<BlockHash: Hash, Key: Hash> StateDb<BlockHash, Key> {
 				continue;
 			};
 
-			//log::info!("overlay hash: {:?}", level.blocks[idx].hash);
 			overlays.push(level.blocks[idx].overlay.clone());
 
 			let Some(parent_hash) = self.parents.get(next_hash) else {

@@ -656,15 +656,11 @@ impl<H: Hasher> OverlayedChanges<H> {
 
 		let delta = self.top.changes_mut().map(|(k, v)| (&k[..], v.value().map(|v| &v[..])));
 
-		// NOTE: child tries updates are skipped for now.
-		// This should just be modified to be part of the main delta and the keys being made by
-		// default_child_prefix ++ storage_key ++ key
-		let mut child_delta = self
+		let child_delta = self
 			.children
 			.values_mut()
 			.map(|v| (&v.1, v.0.changes_mut().map(|(k, v)| (&k[..], v.value().map(|v| &v[..])))))
 			.into_iter();
-		assert!(child_delta.next().is_none());
 
 		let (root, transaction) = backend.full_storage_root(delta, child_delta, state_version);
 

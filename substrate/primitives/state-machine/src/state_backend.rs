@@ -223,6 +223,14 @@ where
 	}
 }
 
+fn child_trie_key(child_info: &ChildInfo, key: &[u8]) -> Vec<u8> {
+	let prefix = child_info.prefixed_storage_key();
+	let mut full_key = Vec::with_capacity(prefix.len() + key.len());
+	full_key.extend(prefix.clone().into_inner());
+	full_key.extend(key);
+	full_key
+}
+
 impl<S, H, C, R> crate::backend::Backend<H> for StateBackend<S, H, C, R>
 where
 	S: TrieBackendStorage<H>,
@@ -273,13 +281,7 @@ where
 	) -> Result<Option<Vec<u8>>, Self::Error> {
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) => trie_backend.child_storage(child_info, key),
-			InnerStateBackend::Nomt { .. } => {
-				let prefix = child_info.prefixed_storage_key();
-				let mut full_key = Vec::with_capacity(prefix.len() + key.len());
-				full_key.extend(prefix.clone().into_inner());
-				full_key.extend(key);
-				self.storage(&full_key[..])
-			},
+			InnerStateBackend::Nomt { .. } => self.storage(&child_trie_key(child_info, key)),
 		}
 	}
 
@@ -291,13 +293,7 @@ where
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.child_storage_hash(child_info, key),
-			InnerStateBackend::Nomt { .. } => {
-				let prefix = child_info.prefixed_storage_key();
-				let mut full_key = Vec::with_capacity(prefix.len() + key.len());
-				full_key.extend(prefix.clone().into_inner());
-				full_key.extend(key);
-				self.storage_hash(&full_key[..])
-			},
+			InnerStateBackend::Nomt { .. } => self.storage_hash(&child_trie_key(child_info, key)),
 		}
 	}
 
@@ -327,13 +323,14 @@ where
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) => trie_backend.exists_storage(key),
 			InnerStateBackend::Nomt { session, .. } => {
-				let val = session
+				let exists = session
 					.borrow()
 					.as_ref()
 					.ok_or("Session must be open".to_string())?
-					.read(key.to_vec())
-					.map_err(|e| format!("{e:?}"))?;
-				Ok(val.is_some())
+					.read_hash(key.to_vec())
+					.map_err(|e| format!("{e:?}"))?
+					.is_some();
+				Ok(exists)
 			},
 		}
 	}
@@ -346,13 +343,7 @@ where
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.exists_child_storage(child_info, key),
-			InnerStateBackend::Nomt { .. } => {
-				let prefix = child_info.prefixed_storage_key();
-				let mut full_key = Vec::with_capacity(prefix.len() + key.len());
-				full_key.extend(prefix.clone().into_inner());
-				full_key.extend(key);
-				self.exists_storage(&full_key[..])
-			},
+			InnerStateBackend::Nomt { .. } => self.exists_storage(&child_trie_key(child_info, key)),
 		}
 	}
 
@@ -374,13 +365,8 @@ where
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.next_child_storage_key(child_info, key),
-			InnerStateBackend::Nomt { .. } => {
-				let prefix = child_info.prefixed_storage_key();
-				let mut full_key = Vec::with_capacity(prefix.len() + key.len());
-				full_key.extend(prefix.clone().into_inner());
-				full_key.extend(key);
-				self.next_storage_key(&full_key[..])
-			},
+			InnerStateBackend::Nomt { .. } =>
+				self.next_storage_key(&child_trie_key(child_info, key)),
 		}
 	}
 

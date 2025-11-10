@@ -267,19 +267,19 @@ pub enum LastCanonicalized {
 }
 
 pub enum Changes<Key: Hash> {
-	Trie(ChangeSet<Key>),
+	Kvdb(ChangeSet<Key>),
 	Nomt(NomtOverlay),
 }
 
 pub enum CommitChanges<Key: Hash> {
-	Trie(CommitSet<Key>),
+	Kvdb(CommitSet<Key>),
 	Nomt { nomt_changes: sp_database::NomtChanges, db_changes: CommitSet<Key> },
 }
 
 impl<Key: Hash> Changes<Key> {
 	pub fn trie_changes(self) -> ChangeSet<Key> {
 		match self {
-			Changes::Trie(commit_set) => commit_set,
+			Changes::Kvdb(commit_set) => commit_set,
 			_ => unreachable!(),
 		}
 	}
@@ -391,7 +391,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 		number: u64,
 		parent_hash: &BlockHash,
 		changes: Changes<Key>,
-	) -> Result<Option<CommitSet<Key>>, Error<D::Error>> {
+	) -> Result<CommitSet<Key>, Error<D::Error>> {
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) => {
 				let commit_set = trie_state_db.insert_block(
@@ -400,7 +400,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 					parent_hash,
 					changes.trie_changes(),
 				)?;
-				Ok(Some(commit_set))
+				Ok(commit_set)
 			},
 			InnerStateDb::Nomt(ref mut nomt_state_db) => {
 				let commit = nomt_state_db.insert_block(
@@ -409,7 +409,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 					parent_hash,
 					changes.nomt_changes(),
 				)?;
-				Ok(Some(commit))
+				Ok(commit)
 			},
 		}
 	}
@@ -421,7 +421,7 @@ impl<BlockHash: Hash, Key: Hash, D: MetaDb> StateDb<BlockHash, Key, D> {
 	) -> Result<CommitChanges<Key>, Error<D::Error>> {
 		match *self.db.write() {
 			InnerStateDb::Trie(ref mut trie_state_db) =>
-				Ok(CommitChanges::Trie(trie_state_db.canonicalize_block(hash)?)),
+				Ok(CommitChanges::Kvdb(trie_state_db.canonicalize_block(hash)?)),
 			InnerStateDb::Nomt(ref mut nomt_state_db) => {
 				let (nomt_changes, db_changes) = nomt_state_db.canonicalize_block(hash)?;
 				Ok(CommitChanges::Nomt { nomt_changes, db_changes })

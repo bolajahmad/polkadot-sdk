@@ -36,6 +36,9 @@ use std::{fmt::Debug, path::PathBuf, sync::Arc};
 use super::template::TemplateData;
 use crate::shared::{new_rng, HostInfoParams, WeightParams};
 
+use nomt::{hasher::Blake3Hasher, Nomt};
+use parking_lot::RwLock;
+
 /// The mode in which to run the storage benchmark.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, ValueEnum)]
 pub enum StorageBenchmarkMode {
@@ -179,6 +182,7 @@ impl StorageCmd {
 		cfg: Configuration,
 		client: Arc<C>,
 		db: (Arc<dyn Database<DbHash>>, ColumnId),
+		nomt_db: Option<Arc<RwLock<Nomt<Blake3Hasher>>>>,
 		storage: Arc<dyn Storage<HashingFor<Block>>>,
 		shared_trie_cache: Option<sp_trie::cache::SharedTrieCache<HashingFor<Block>>>,
 	) -> Result<()>
@@ -197,7 +201,7 @@ impl StorageCmd {
 
 		if !self.params.skip_read {
 			self.bench_warmup(&client)?;
-			let record = self.bench_read(client.clone(), shared_trie_cache.clone())?;
+			let record = self.bench_read(client.clone(), nomt_db.clone(), storage.clone(), shared_trie_cache.clone())?;
 			if let Some(path) = &self.params.json_read_path {
 				record.save_json(&cfg, path, "read")?;
 			}
@@ -208,7 +212,7 @@ impl StorageCmd {
 
 		if !self.params.skip_write {
 			self.bench_warmup(&client)?;
-			let record = self.bench_write(client, db, storage, shared_trie_cache)?;
+			let record = self.bench_write(client, db, nomt_db, storage, shared_trie_cache)?;
 			if let Some(path) = &self.params.json_write_path {
 				record.save_json(&cfg, path, "write")?;
 			}

@@ -25,7 +25,7 @@ use sc_client_db::{DbHash, DbState, DbStateBuilder};
 use sp_blockchain::HeaderBackend;
 use sp_database::{ColumnId, Transaction};
 use sp_runtime::traits::{Block as BlockT, HashingFor, Header as HeaderT};
-use sp_state_machine::Backend as StateBackend;
+use sp_state_machine::{Backend as StateBackend, BackendTransaction};
 use sp_storage::{ChildInfo, StateVersion};
 use sp_trie::{recorder::Recorder, PrefixedMemoryDB};
 use std::{
@@ -36,6 +36,9 @@ use std::{
 
 use super::{cmd::StorageCmd, get_wasm_module, MAX_BATCH_SIZE_FOR_BLOCK_VALIDATION};
 use crate::shared::{new_rng, BenchRecord};
+
+use nomt::{hasher::Blake3Hasher, Nomt};
+use parking_lot::{RwLock, Mutex};
 
 impl StorageCmd {
 	/// Benchmarks the time it takes to write a single Storage item.
@@ -49,6 +52,7 @@ impl StorageCmd {
 		&self,
 		client: Arc<C>,
 		(db, state_col): (Arc<dyn sp_database::Database<DbHash>>, ColumnId),
+		nomt_db: Option<Arc<RwLock<Nomt<Blake3Hasher>>>>,
 		storage: Arc<dyn sp_state_machine::Storage<HashingFor<Block>>>,
 		shared_trie_cache: Option<sp_trie::cache::SharedTrieCache<HashingFor<Block>>>,
 	) -> Result<BenchRecord>
@@ -74,15 +78,16 @@ impl StorageCmd {
 		let header = client.header(best_hash)?.ok_or("Header not found")?;
 		let original_root = *header.state_root();
 
-		let (trie, _) = self.create_trie_backend::<Block, H>(
+		let (backend, _) = self.create_state_backend::<Block, H>(
 			original_root,
 			&storage,
+			nomt_db.clone(),
 			shared_trie_cache.as_ref(),
 		);
 
 		info!("Preparing keys from block {}", best_hash);
 		// Load all KV pairs and randomly shuffle them.
-		let mut kvs: Vec<_> = trie.pairs(Default::default())?.collect();
+		let mut kvs: Vec<_> = backend.pairs(Default::default())?.collect();
 		let (mut rng, _) = new_rng(None);
 		kvs.shuffle(&mut rng);
 		if kvs.is_empty() {
@@ -100,10 +105,21 @@ impl StorageCmd {
 		// Generate all random values first; Make sure there are no collisions with existing
 		// db entries, so we can rollback all additions without corrupting existing entries.
 
+		let backend = if nomt_db.is_some() {
+			// Nomt requires the backend session to be dropped before starting
+			//  to modify the underlying database.
+			drop(backend);
+			None
+		} else {
+			Some(backend)
+		};
+
 		for key_value in kvs {
 			let (k, original_v) = key_value?;
 			match (self.params.include_child_trees, self.is_child_key(k.to_vec())) {
 				(true, Some(info)) => {
+					// TODO: handle child tries
+					todo!();
 					let child_keys = client
 						.child_storage_keys(best_hash, info.clone(), None, None)?
 						.collect::<Vec<_>>();
@@ -120,7 +136,8 @@ impl StorageCmd {
 						rng.fill_bytes(&mut new_v[..]);
 						if check_new_value::<Block>(
 							db.clone(),
-							&trie,
+							nomt_db.clone(),
+							backend.as_ref(),
 							&k.to_vec(),
 							&new_v,
 							self.state_version(),
@@ -138,9 +155,12 @@ impl StorageCmd {
 
 					// Write each value in one commit.
 					let (size, duration) = if self.params.is_validate_block_mode() {
+						// TODO: handle validate block mode
+						todo!();
 						self.measure_per_key_amortised_validate_block_write_cost::<Block, H>(
 							original_root,
 							&storage,
+							nomt_db.clone(),
 							shared_trie_cache.as_ref(),
 							batched_keys.clone(),
 							None,
@@ -151,6 +171,7 @@ impl StorageCmd {
 							&storage,
 							shared_trie_cache.as_ref(),
 							db.clone(),
+							nomt_db.clone(),
 							batched_keys.clone(),
 							self.state_version(),
 							state_col,
@@ -163,92 +184,37 @@ impl StorageCmd {
 			}
 		}
 
-		if self.params.include_child_trees && !child_nodes.is_empty() {
-			info!("Writing {} child keys", child_nodes.iter().map(|(c, _)| c.len()).sum::<usize>());
-			for (mut child_keys, info) in child_nodes {
-				if child_keys.len() < self.params.batch_size {
-					warn!(
-						"{} child keys will be skipped because it's less than batch size",
-						child_keys.len()
-					);
-					continue;
-				}
-
-				child_keys.shuffle(&mut rng);
-
-				for key in child_keys {
-					if let Some(original_v) = client
-						.child_storage(best_hash, &info, &key)
-						.expect("Checked above to exist")
-					{
-						let mut new_v = vec![0; original_v.0.len()];
-
-						loop {
-							rng.fill_bytes(&mut new_v[..]);
-							if check_new_value::<Block>(
-								db.clone(),
-								&trie,
-								&key.0,
-								&new_v,
-								self.state_version(),
-								state_col,
-								Some(&info),
-							) {
-								break
-							}
-						}
-						batched_keys.push((key.0, new_v.to_vec()));
-						if batched_keys.len() < self.params.batch_size {
-							continue
-						}
-
-						let (size, duration) = if self.params.is_validate_block_mode() {
-							self.measure_per_key_amortised_validate_block_write_cost::<Block, H>(
-								original_root,
-								&storage,
-								shared_trie_cache.as_ref(),
-								batched_keys.clone(),
-								None,
-							)?
-						} else {
-							self.measure_per_key_amortised_import_block_write_cost::<Block, H>(
-								original_root,
-								&storage,
-								shared_trie_cache.as_ref(),
-								db.clone(),
-								batched_keys.clone(),
-								self.state_version(),
-								state_col,
-								Some(&info),
-							)?
-						};
-						record.append(size, duration)?;
-						batched_keys.clear();
-					}
-				}
-			}
-		}
-
 		Ok(record)
 	}
 
-	fn create_trie_backend<Block, H>(
+	pub fn create_state_backend<Block, H>(
 		&self,
 		original_root: Block::Hash,
 		storage: &Arc<dyn sp_state_machine::Storage<HashingFor<Block>>>,
+		nomt_db: Option<Arc<RwLock<Nomt<Blake3Hasher>>>>,
 		shared_trie_cache: Option<&sp_trie::cache::SharedTrieCache<HashingFor<Block>>>,
 	) -> (DbState<HashingFor<Block>>, Option<Recorder<HashingFor<Block>>>)
 	where
 		Block: BlockT<Header = H, Hash = DbHash> + Debug,
 		H: HeaderT<Hash = DbHash>,
 	{
-		let recorder = (!self.params.disable_pov_recorder).then(|| Default::default());
-		let trie = DbStateBuilder::<HashingFor<Block>>::new_trie(storage.clone(), original_root)
-			.with_trie_optional_cache(shared_trie_cache.map(|c| c.local_cache_trusted()))
-			.with_trie_optional_recorder(recorder.clone())
-			.build();
-
-		(trie, recorder)
+		if nomt_db.is_some() {
+			let nomt_storage = RwLock::read_arc(nomt_db.as_ref().unwrap());
+			let mut nomt_backend_builder =
+				DbStateBuilder::<HashingFor<Block>>::new_nomt(nomt_storage);
+			if !self.params.disable_pov_recorder {
+				nomt_backend_builder = nomt_backend_builder.with_nomt_recorder();
+			}
+			(nomt_backend_builder.build(), None)
+		} else {
+			let recorder = (!self.params.disable_pov_recorder).then(|| Default::default());
+			let trie_backend =
+				DbStateBuilder::<HashingFor<Block>>::new_trie(storage.clone(), original_root)
+					.with_trie_optional_cache(shared_trie_cache.map(|c| c.local_cache_trusted()))
+					.with_trie_optional_recorder(recorder.clone())
+					.build();
+			(trie_backend, recorder)
+		}
 	}
 
 	/// Measures write benchmark
@@ -259,6 +225,7 @@ impl StorageCmd {
 		storage: &Arc<dyn sp_state_machine::Storage<HashingFor<Block>>>,
 		shared_trie_cache: Option<&sp_trie::cache::SharedTrieCache<HashingFor<Block>>>,
 		db: Arc<dyn sp_database::Database<DbHash>>,
+		nomt_db: Option<Arc<RwLock<Nomt<Blake3Hasher>>>>,
 		changes: Vec<(Vec<u8>, Vec<u8>)>,
 		version: StateVersion,
 		col: ColumnId,
@@ -272,8 +239,12 @@ impl StorageCmd {
 		let average_len = changes.iter().map(|(_, v)| v.len()).sum::<usize>() / batch_size;
 		// For every batched write use a different trie instance and recorder, so we
 		// don't benefit from past runs.
-		let (trie, _recorder) =
-			self.create_trie_backend::<Block, H>(original_root, storage, shared_trie_cache);
+		let (backend, _recorder) = self.create_state_backend::<Block, H>(
+			original_root,
+			storage,
+			nomt_db.clone(),
+			shared_trie_cache,
+		);
 
 		let start = Instant::now();
 		// Create a TX that will modify the Trie in the DB and
@@ -283,22 +254,35 @@ impl StorageCmd {
 			.map(|(key, new_v)| (key.as_ref(), Some(new_v.as_ref())))
 			.collect::<Vec<_>>();
 		let stx = match child_info {
-			Some(info) =>
-				trie.child_storage_root(info, replace.iter().cloned(), version).unwrap().2,
-			None => trie.storage_root(replace.iter().cloned(), version).1,
+			Some(info) => {
+				// TOOD: handle child tries
+				todo!();
+			},
+			None => {
+				backend.storage_root(replace.iter().cloned(), version).1
+			},
 		};
+
+		// Free nomt lock
+		drop(backend);
+
 		// Only the keep the insertions, since we do not want to benchmark pruning.
-		// NOTE: NOMT is not yet used within benchmarks.
-		let tx = convert_tx::<Block>(db.clone(), stx.clone().trie_transaction(), false, col);
-		db.commit(tx).map_err(|e| format!("Writing to the Database: {}", e))?;
-		let result = (average_len, start.elapsed() / batch_size as u32);
-
-		// Now undo the changes by removing what was added.
-		// NOTE: NOMT is not yet used within benchmarks.
-		let tx = convert_tx::<Block>(db.clone(), stx.clone().trie_transaction(), true, col);
-		db.commit(tx).map_err(|e| format!("Writing to the Database: {}", e))?;
-
-		Ok(result)
+		if nomt_db.is_some() {
+			let tx = convert_tx::<Block>(db.clone(), nomt_db.clone(), stx, false, col);
+			let nomt_db = nomt_db.as_ref().unwrap().write();
+			let overlay = std::sync::Arc::into_inner(tx.nomt_changes.unwrap().overlay).unwrap();
+			overlay.try_commit_nonblocking(&nomt_db ).unwrap();
+			let result = (average_len, start.elapsed() / batch_size as u32);
+			nomt_db.rollback(1);
+			Ok(result)
+		} else {
+			let tx = convert_tx::<Block>(db.clone(), nomt_db.clone(), stx.clone(), false, col);
+			db.commit(tx).map_err(|e| format!("Writing to the Database: {}", e))?;
+			let result = (average_len, start.elapsed() / batch_size as u32);
+			let tx = convert_tx::<Block>(db.clone(), nomt_db.clone(), stx.clone(), true, col);
+			db.commit(tx).map_err(|e| format!("Writing to the Database: {}", e))?;
+			Ok(result)
+		}
 	}
 
 	/// Measures write benchmark on block validation
@@ -307,6 +291,7 @@ impl StorageCmd {
 		&self,
 		original_root: Block::Hash,
 		storage: &Arc<dyn sp_state_machine::Storage<HashingFor<Block>>>,
+		nomt_db: Option<Arc<RwLock<Nomt<Blake3Hasher>>>>,
 		shared_trie_cache: Option<&sp_trie::cache::SharedTrieCache<HashingFor<Block>>>,
 		changes: Vec<(Vec<u8>, Vec<u8>)>,
 		maybe_child_info: Option<&ChildInfo>,
@@ -317,10 +302,14 @@ impl StorageCmd {
 	{
 		let batch_size = changes.len();
 		let average_len = changes.iter().map(|(_, v)| v.len()).sum::<usize>() / batch_size;
-		let (trie, recorder) =
-			self.create_trie_backend::<Block, H>(original_root, storage, shared_trie_cache);
+		let (backend, recorder) = self.create_state_backend::<Block, H>(
+			original_root,
+			storage,
+			nomt_db.clone(),
+			shared_trie_cache,
+		);
 		for (key, _) in changes.iter() {
-			let _v = trie
+			let _v = backend
 				.storage(key)
 				.expect("Checked above to exist")
 				.ok_or("Value unexpectedly empty")?;
@@ -328,7 +317,7 @@ impl StorageCmd {
 		let storage_proof = recorder
 			.map(|r| r.drain_storage_proof())
 			.expect("Storage proof must exist for block validation");
-		let root = trie.root();
+		let root = backend.root();
 		debug!(
 			"POV: len {:?} {:?}",
 			storage_proof.len(),
@@ -388,13 +377,29 @@ impl StorageCmd {
 /// `invert_inserts` replaces all inserts with removals.
 fn convert_tx<B: BlockT>(
 	db: Arc<dyn sp_database::Database<DbHash>>,
-	mut tx: PrefixedMemoryDB<HashingFor<B>>,
+	nomt_db: Option<Arc<RwLock<Nomt<Blake3Hasher>>>>,
+	mut tx: BackendTransaction<HashingFor<B>>,
 	invert_inserts: bool,
 	col: ColumnId,
 ) -> Transaction<DbHash> {
 	let mut ret = Transaction::<DbHash>::default();
 
-	for (mut k, (v, rc)) in tx.drain().into_iter() {
+	if nomt_db.is_some() {
+		if invert_inserts {
+			unreachable!("Nomt should be rolled back");
+		}
+
+		let mut lock = Arc::new(Mutex::new(()));
+		let guard = lock.lock_arc();
+		let nomt_overlay = tx.nomt_transaction();
+		let nomt_changes =
+			sp_database::NomtChanges { overlay: Arc::new(nomt_overlay.transaction), _canonicalization_guard: guard  };
+		ret.set_nomt_changes(nomt_changes);
+
+		return ret
+	}
+
+	for (mut k, (v, rc)) in tx.trie_transaction().drain().into_iter() {
 		if rc > 0 {
 			db.sanitize_key(&mut k);
 			if invert_inserts {
@@ -414,20 +419,29 @@ fn convert_tx<B: BlockT>(
 /// if `child_info` exist then it means this is a child tree key
 fn check_new_value<Block: BlockT>(
 	db: Arc<dyn sp_database::Database<DbHash>>,
-	trie: &DbState<HashingFor<Block>>,
+	nomt_db: Option<Arc<RwLock<Nomt<Blake3Hasher>>>>,
+	trie_backend: Option<&DbState<HashingFor<Block>>>,
 	key: &Vec<u8>,
 	new_v: &Vec<u8>,
 	version: StateVersion,
 	col: ColumnId,
 	child_info: Option<&ChildInfo>,
 ) -> bool {
+
+	// This function makes sure that a new inserted value
+	// will not touch already existing trie nodes.
+	// This is not a thing in nomt, given its disruptive nature.
+	if let Some(ref nomt) = nomt_db {
+		return true;
+	};
+
+	let trie = trie_backend.unwrap();
 	let new_kv = vec![(key.as_ref(), Some(new_v.as_ref()))];
 	let mut stx = match child_info {
 		Some(info) => trie.child_storage_root(info, new_kv.iter().cloned(), version).unwrap().2,
 		None => trie.storage_root(new_kv.iter().cloned(), version).1,
 	};
 
-	// NOTE: NOMT is not yet used within benchmarks.
 	for (mut k, (_, rc)) in stx.trie_transaction().drain().into_iter() {
 		if rc > 0 {
 			db.sanitize_key(&mut k);

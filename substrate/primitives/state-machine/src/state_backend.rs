@@ -375,7 +375,9 @@ where
 		delta: impl Iterator<Item = (&'a [u8], Option<&'a [u8]>)>,
 		state_version: StateVersion,
 	) -> (H::Out, BackendTransaction<H>) {
-		let init_time = std::time::Instant::now();
+		// NOTE: used to benchmark how much time did it take to calculate the storage root
+		// and copute the required db changes.
+		// let init_time = std::time::Instant::now();
 		let res = match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.storage_root(delta, state_version),
@@ -427,6 +429,20 @@ where
 
 				actual_access.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
+				// NOTE: Used for debugging
+				// {
+	    		// 	use std::io::Write;
+	    		// 	let serialization = serde_json::to_string(&actual_access).unwrap();
+	    		// 	let mut n = 0;
+	    		// 	let mut path_name = format!("actual{}", n);
+	    		// 	while std::fs::exists(&path_name).unwrap() {
+				// 		n += 1;
+				// 		path_name = format!("actual{}", n);
+				// 	}
+ 	    		// 	let mut output = std::fs::File::create(path_name).unwrap();
+				//     write!(output, "{}", serialization);
+				// }
+
 				// UNWRAP: Session is expected to be open.
 				let mut finished = std::mem::take(&mut *session.borrow_mut())
 					.unwrap()
@@ -446,7 +462,7 @@ where
 			},
 		};
 
-		log::info!("storage root took: {}ms", init_time.elapsed().as_millis());
+		//log::info!("storage root took: {}ms", init_time.elapsed().as_millis());
 		res
 	}
 
@@ -543,7 +559,7 @@ where
 				assert!(start_at.starts_with(prefix));
 				start_at.to_vec()
 			},
-			_ => unreachable!(),
+			(None, None) => vec![0],
 		};
 
 		let end = if let Some(prefix) = &args.prefix {
@@ -561,12 +577,16 @@ where
 
 		let nomt_iter = RefCell::new(nomt_session.iterator(start.clone(), end).peekable());
 
-		match nomt_iter.borrow_mut().peek().map(|(key, val)| key) {
-			Some(first_key) if args.start_at_exclusive && *first_key == start => {
-				let _ = nomt_iter.borrow_mut().next();
-			},
-			_ => (),
+		{
+			let mut nomt_iter_mut = nomt_iter.borrow_mut();
+			match nomt_iter_mut.peek().map(|(key, val)| key) {
+				Some(first_key) if args.start_at_exclusive && *first_key == start => {
+					let _ = nomt_iter_mut.next();
+				},
+				_ => (),
+			}
 		}
+
 
 		Self { inner: InnerRawIter::Nomt(nomt_iter) }
 	}

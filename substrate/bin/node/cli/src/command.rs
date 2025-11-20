@@ -120,20 +120,21 @@ pub fn run() -> Result<()> {
 						let partial = new_partial(&config, None)?;
 						cmd.run(partial.client)
 					},
-					#[cfg(not(feature = "runtime-benchmarks"))]
-					BenchmarkCmd::Storage(_) => Err(
-						"Storage benchmarking can be enabled with `--features runtime-benchmarks`."
-							.into(),
-					),
-					#[cfg(feature = "runtime-benchmarks")]
+					//#[cfg(not(feature = "runtime-benchmarks"))]
+					//BenchmarkCmd::Storage(_) => Err(
+					//	"Storage benchmarking can be enabled with `--features runtime-benchmarks`."
+					//		.into(),
+					//),
+					//#[cfg(feature = "runtime-benchmarks")]
 					BenchmarkCmd::Storage(cmd) => {
 						// ensure that we keep the task manager alive
 						let partial = new_partial(&config, None)?;
-						let db = partial.backend.expose_db();
+						let kvdb = partial.backend.expose_kvdb();
+						let nomt_db = partial.backend.expose_nomt();
 						let storage = partial.backend.expose_storage();
 						let shared_trie_cache = partial.backend.expose_shared_trie_cache();
 
-						cmd.run(config, partial.client, db, storage, shared_trie_cache)
+						cmd.run(config, partial.client, kvdb, nomt_db, storage, shared_trie_cache)
 					},
 					BenchmarkCmd::Overhead(cmd) => {
 						// ensure that we keep the task manager alive

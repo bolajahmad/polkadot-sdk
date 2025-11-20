@@ -1047,6 +1047,24 @@ impl<Block: BlockT> StorageDb<Block> {
 				if let Some(_overlay) = commit_result {
 					unreachable!("Nomt is locked, should")
 				};
+
+				// NOTE: Used for debugging
+				// {
+	    		// 	let mut n = 0;
+	    		// 	let mut new_path_name = format!("committed_actual{}", n);
+	    		// 	while std::fs::exists(&new_path_name).unwrap() {
+				// 		n += 1;
+				// 		new_path_name = format!("committed_actual{}", n);
+				// 	}
+				// 	let path_name = format!("actual{}", n);
+				//     std::process::Command::new("sh")
+				//         .arg("-c")
+				//         .arg(format!("cp {} {}", path_name, new_path_name))
+				//         .output()
+				//         .expect("failed to change name");
+			    // }
+
+
 			}
 		}
 
@@ -1234,15 +1252,17 @@ impl<Block: BlockT> Backend<Block> {
 	/// The second argument is the Column that stores the State.
 	///
 	/// Should only be needed for benchmarking.
-	#[cfg(feature = "runtime-benchmarks")]
-	pub fn expose_db(&self) -> (Arc<dyn sp_database::Database<DbHash>>, sp_database::ColumnId) {
+	pub fn expose_kvdb(&self) -> (Arc<dyn sp_database::Database<DbHash>>, sp_database::ColumnId) {
 		(self.storage.db.clone(), columns::STATE)
+	}
+
+	pub fn expose_nomt(&self) -> Option<Arc<RwLock<Nomt<Blake3Hasher>>>> {
+		self.storage.nomt_db.clone()
 	}
 
 	/// Expose the Storage that is used by this backend.
 	///
 	/// Should only be needed for benchmarking.
-	#[cfg(feature = "runtime-benchmarks")]
 	pub fn expose_storage(&self) -> Arc<dyn sp_state_machine::Storage<HashingFor<Block>>> {
 		self.storage.clone()
 	}
@@ -1250,7 +1270,6 @@ impl<Block: BlockT> Backend<Block> {
 	/// Expose the shared trie cache that is used by this backend.
 	///
 	/// Should only be needed for benchmarking.
-	#[cfg(feature = "runtime-benchmarks")]
 	pub fn expose_shared_trie_cache(
 		&self,
 	) -> Option<sp_trie::cache::SharedTrieCache<HashingFor<Block>>> {

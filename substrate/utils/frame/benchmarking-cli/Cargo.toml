@@ -74,6 +74,8 @@ subxt = { workspace = true, features = ["native"] }
 subxt-signer = { workspace = true, features = ["unstable-eth"] }
 thiserror = { workspace = true }
 thousands = { workspace = true }
+nomt = { workspace = true }
+parking_lot = { workspace = true }
 
 [dev-dependencies]
 cumulus-test-runtime = { workspace = true, default-features = true }

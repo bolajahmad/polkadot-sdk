@@ -38,7 +38,7 @@ use super::{cmd::StorageCmd, get_wasm_module, MAX_BATCH_SIZE_FOR_BLOCK_VALIDATIO
 use crate::shared::{new_rng, BenchRecord};
 
 use nomt::{hasher::Blake3Hasher, Nomt};
-use parking_lot::{RwLock, Mutex};
+use parking_lot::{Mutex, RwLock};
 
 impl StorageCmd {
 	/// Benchmarks the time it takes to write a single Storage item.
@@ -114,6 +114,10 @@ impl StorageCmd {
 			Some(backend)
 		};
 
+		let mut storage_root_duration_sum = Duration::new(0, 0);
+		let mut commit_duration_sum = Duration::new(0, 0);
+		let mut n_batches = 0;
+
 		for key_value in kvs {
 			let (k, original_v) = key_value?;
 			match (self.params.include_child_trees, self.is_child_key(k.to_vec())) {
@@ -154,34 +158,43 @@ impl StorageCmd {
 					}
 
 					// Write each value in one commit.
-					let (size, duration) = if self.params.is_validate_block_mode() {
-						// TODO: handle validate block mode
-						todo!();
-						self.measure_per_key_amortised_validate_block_write_cost::<Block, H>(
-							original_root,
-							&storage,
-							nomt_db.clone(),
-							shared_trie_cache.as_ref(),
-							batched_keys.clone(),
-							None,
-						)?
-					} else {
-						self.measure_per_key_amortised_import_block_write_cost::<Block, H>(
-							original_root,
-							&storage,
-							shared_trie_cache.as_ref(),
-							db.clone(),
-							nomt_db.clone(),
-							batched_keys.clone(),
-							self.state_version(),
-							state_col,
-							None,
-						)?
-					};
-					record.append(size, duration)?;
+					let ((size, full_duration), storage_root_duration, commit_duration) =
+						if self.params.is_validate_block_mode() {
+							// TODO: handle validate block mode
+							todo!();
+						} else {
+							self.measure_per_key_amortised_import_block_write_cost::<Block, H>(
+								original_root,
+								&storage,
+								shared_trie_cache.as_ref(),
+								db.clone(),
+								nomt_db.clone(),
+								batched_keys.clone(),
+								self.state_version(),
+								state_col,
+								None,
+							)?
+						};
+
+					storage_root_duration_sum += storage_root_duration;
+					commit_duration_sum += commit_duration;
+					n_batches += 1;
+
+					record.append(size, full_duration)?;
 					batched_keys.clear();
+
+					// NOTE: To make benchmarks a lot faster while still being really close to
+					// reality, just stop after collecting over 50 measurements.
+					if n_batches > 50 {
+						break
+					}
 				},
 			}
+		}
+
+		if n_batches > 0 {
+			log::info!("storage root: {} [us]", storage_root_duration_sum.as_micros() / n_batches);
+			log::info!("commit: {} [us]", commit_duration_sum.as_micros() / n_batches);
 		}
 
 		Ok(record)
@@ -230,7 +243,7 @@ impl StorageCmd {
 		version: StateVersion,
 		col: ColumnId,
 		child_info: Option<&ChildInfo>,
-	) -> Result<(usize, Duration)>
+	) -> Result<((usize, Duration), Duration, Duration)>
 	where
 		Block: BlockT<Header = H, Hash = DbHash> + Debug,
 		H: HeaderT<Hash = DbHash>,
@@ -246,7 +259,26 @@ impl StorageCmd {
 			shared_trie_cache,
 		);
 
+		let priors = if nomt_db.is_some() {
+			let nomt_db = nomt_db.as_ref().unwrap().read();
+			let session = nomt_db.begin_session(nomt::SessionParams::default());
+			let mut priors = vec![];
+			for (key, _) in changes.iter() {
+				priors.push((
+					key.to_vec(),
+					nomt::KeyReadWrite::Write(session.read(key.to_vec()).unwrap()),
+				));
+			}
+			priors.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+			Some(priors)
+		} else {
+			None
+		};
+
 		let start = Instant::now();
+		let storage_root_duration;
+		let commit_duration;
+
 		// Create a TX that will modify the Trie in the DB and
 		// calculate the root hash of the Trie after the modification.
 		let replace = changes
@@ -259,7 +291,10 @@ impl StorageCmd {
 				todo!();
 			},
 			None => {
-				backend.storage_root(replace.iter().cloned(), version).1
+				let time = Instant::now();
+				let res = backend.storage_root(replace.iter().cloned(), version).1;
+				storage_root_duration = time.elapsed();
+				res
 			},
 		};
 
@@ -268,20 +303,38 @@ impl StorageCmd {
 
 		// Only the keep the insertions, since we do not want to benchmark pruning.
 		if nomt_db.is_some() {
-			let tx = convert_tx::<Block>(db.clone(), nomt_db.clone(), stx, false, col);
+			let result = {
+				let nomt_db = nomt_db.as_ref().unwrap().write();
+
+				let overlay = stx.nomt_transaction().transaction;
+
+				let time = Instant::now();
+				overlay.try_commit_nonblocking(&nomt_db).unwrap();
+				commit_duration = time.elapsed();
+				(average_len, start.elapsed() / batch_size as u32)
+			};
+
+			let finished_prior_session = {
+				let nomt_db = nomt_db.as_ref().unwrap().write();
+				let mut session = nomt_db.begin_session(nomt::SessionParams::default());
+				session.finish(priors.unwrap()).unwrap()
+			};
+
 			let nomt_db = nomt_db.as_ref().unwrap().write();
-			let overlay = std::sync::Arc::into_inner(tx.nomt_changes.unwrap().overlay).unwrap();
-			overlay.try_commit_nonblocking(&nomt_db ).unwrap();
-			let result = (average_len, start.elapsed() / batch_size as u32);
-			nomt_db.rollback(1);
-			Ok(result)
+			finished_prior_session.commit(&nomt_db);
+
+			Ok((result, storage_root_duration, commit_duration))
 		} else {
 			let tx = convert_tx::<Block>(db.clone(), nomt_db.clone(), stx.clone(), false, col);
+
+			let time = Instant::now();
 			db.commit(tx).map_err(|e| format!("Writing to the Database: {}", e))?;
+			commit_duration = time.elapsed();
+
 			let result = (average_len, start.elapsed() / batch_size as u32);
 			let tx = convert_tx::<Block>(db.clone(), nomt_db.clone(), stx.clone(), true, col);
 			db.commit(tx).map_err(|e| format!("Writing to the Database: {}", e))?;
-			Ok(result)
+			Ok((result, storage_root_duration, commit_duration))
 		}
 	}
 
@@ -392,8 +445,10 @@ fn convert_tx<B: BlockT>(
 		let mut lock = Arc::new(Mutex::new(()));
 		let guard = lock.lock_arc();
 		let nomt_overlay = tx.nomt_transaction();
-		let nomt_changes =
-			sp_database::NomtChanges { overlay: Arc::new(nomt_overlay.transaction), _canonicalization_guard: guard  };
+		let nomt_changes = sp_database::NomtChanges {
+			overlay: Arc::new(nomt_overlay.transaction),
+			_canonicalization_guard: guard,
+		};
 		ret.set_nomt_changes(nomt_changes);
 
 		return ret
@@ -427,7 +482,6 @@ fn check_new_value<Block: BlockT>(
 	col: ColumnId,
 	child_info: Option<&ChildInfo>,
 ) -> bool {
-
 	// This function makes sure that a new inserted value
 	// will not touch already existing trie nodes.
 	// This is not a thing in nomt, given its disruptive nature.

@@ -216,9 +216,6 @@ fn open_database_at<Block: BlockT>(
 			opts.page_cache_size(2048);
 			opts.leaf_cache_size(1024);
 
-			opts.rollback(true);
-			opts.max_rollback_log_len(1);
-
 			// Open nomt database.
 			let nomt_db = Arc::new(
 				Nomt::<Blake3Hasher>::open(opts)

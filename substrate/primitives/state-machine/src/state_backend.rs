@@ -397,8 +397,11 @@ where
 					delta
 						.into_iter()
 						.map(|(key, maybe_val)| {
+							let key = key.to_vec();
+							// NOTE: use in case of rollbacks enabled.
+							// session.borrow().as_ref().unwrap().preserve_prior_value(key.clone());
 							(
-								key.to_vec(),
+								key,
 								KeyReadWrite::Write(
 									maybe_val.as_ref().map(|inner_val| inner_val.to_vec()),
 								),
@@ -412,6 +415,8 @@ where
 					for (key, maybe_val) in delta.into_iter() {
 						let maybe_val = maybe_val.as_ref().map(|inner_val| inner_val.to_vec());
 						let key = key.to_vec();
+						// NOTE: use in case of rollbacks enabled.
+						// session.borrow().as_ref().unwrap().preserve_prior_value(key.clone());
 						let key_read_write = match reads.remove(&key) {
 							Some(prev_val) => KeyReadWrite::ReadThenWrite(prev_val, maybe_val),
 							None => KeyReadWrite::Write(maybe_val),
@@ -431,15 +436,15 @@ where
 
 				// NOTE: Used for debugging
 				// {
-	    		// 	use std::io::Write;
-	    		// 	let serialization = serde_json::to_string(&actual_access).unwrap();
-	    		// 	let mut n = 0;
-	    		// 	let mut path_name = format!("actual{}", n);
-	    		// 	while std::fs::exists(&path_name).unwrap() {
+				// 	use std::io::Write;
+				// 	let serialization = serde_json::to_string(&actual_access).unwrap();
+				// 	let mut n = 0;
+				// 	let mut path_name = format!("actual{}", n);
+				// 	while std::fs::exists(&path_name).unwrap() {
 				// 		n += 1;
 				// 		path_name = format!("actual{}", n);
 				// 	}
- 	    		// 	let mut output = std::fs::File::create(path_name).unwrap();
+				// 	let mut output = std::fs::File::create(path_name).unwrap();
 				//     write!(output, "{}", serialization);
 				// }
 
@@ -586,7 +591,6 @@ where
 				_ => (),
 			}
 		}
-
 
 		Self { inner: InnerRawIter::Nomt(nomt_iter) }
 	}

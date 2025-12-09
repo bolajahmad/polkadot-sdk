@@ -153,6 +153,11 @@ pub fn run() -> Result<()> {
 					BenchmarkCmd::Extrinsic(cmd) => {
 						// ensure that we keep the task manager alive
 						let partial = service::new_partial(&config, None)?;
+
+						// NOTE: To allow the Extrinsic benchmark to work over an already initialized
+						// state, canonicalize all pending overlays.
+						partial.backend.canonizalize_pendings_overlays();
+
 						// Register the *Remark* and *TKA* builders.
 						let ext_factory = ExtrinsicFactory(vec![
 							Box::new(RemarkBuilder::new(partial.client.clone())),

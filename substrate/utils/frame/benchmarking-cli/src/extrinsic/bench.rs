@@ -191,7 +191,9 @@ where
 	/// Measures the time that it take to execute a block or an extrinsic.
 	fn measure_block(&self, block: &Block) -> Result<BenchRecord> {
 		let mut record = BenchRecord::new();
-		let genesis = self.client.info().genesis_hash;
+		// NOTE: use best hash to allow perforing benchmarks over alredy initialized state.
+		// let genesis = self.client.info().genesis_hash;
+		let best_hash = self.client.usage_info().chain.best_hash;
 
 		let measure_block = || -> Result<u128> {
 			let block = block.clone();
@@ -206,7 +208,7 @@ where
 			let start = Instant::now();
 
 			runtime_api
-				.execute_block(genesis, block.into())
+				.execute_block(best_hash, block.into())
 				.map_err(|e| Error::Client(RuntimeApiError(e)))?;
 
 			Ok(start.elapsed().as_nanos())

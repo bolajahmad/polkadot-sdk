@@ -1050,9 +1050,9 @@ impl<Block: BlockT> StorageDb<Block> {
 
 				// NOTE: Used for debugging
 				// {
-	    		// 	let mut n = 0;
-	    		// 	let mut new_path_name = format!("committed_actual{}", n);
-	    		// 	while std::fs::exists(&new_path_name).unwrap() {
+				// 	let mut n = 0;
+				// 	let mut new_path_name = format!("committed_actual{}", n);
+				// 	while std::fs::exists(&new_path_name).unwrap() {
 				// 		n += 1;
 				// 		new_path_name = format!("committed_actual{}", n);
 				// 	}
@@ -1062,9 +1062,7 @@ impl<Block: BlockT> StorageDb<Block> {
 				//         .arg(format!("cp {} {}", path_name, new_path_name))
 				//         .output()
 				//         .expect("failed to change name");
-			    // }
-
-
+				// }
 			}
 		}
 
@@ -1265,6 +1263,54 @@ impl<Block: BlockT> Backend<Block> {
 	/// Should only be needed for benchmarking.
 	pub fn expose_storage(&self) -> Arc<dyn sp_state_machine::Storage<HashingFor<Block>>> {
 		self.storage.clone()
+	}
+
+	pub fn canonizalize_pendings_overlays(&self) {
+		let best_canonical = match self.storage.state_db.last_canonicalized() {
+			LastCanonicalized::None => 0,
+			LastCanonicalized::Block(b) => b,
+			// Nothing needs to be done when canonicalization is not happening.
+			LastCanonicalized::NotCanonicalizing => return,
+		};
+
+		let info = self.blockchain.info();
+		let best_number: u64 = self.blockchain.info().best_number.saturated_into();
+
+		for to_canonicalize in best_canonical + 1..=best_number {
+			let hash_to_canonicalize = sc_client_api::blockchain::HeaderBackend::hash(
+				&self.blockchain,
+				to_canonicalize.saturated_into(),
+			).unwrap()
+			.ok_or_else(|| {
+				let best_hash = info.best_hash;
+
+				sp_blockchain::Error::Backend(format!(
+					"Can't canonicalize missing block number #{to_canonicalize} when for best block {best_hash:?} (#{best_number})",
+				))
+			}).unwrap();
+
+			if !sc_client_api::Backend::have_state_at(
+				self,
+				hash_to_canonicalize,
+				to_canonicalize.saturated_into(),
+			) {
+				return
+			}
+
+			let commit = self
+				.storage
+				.state_db
+				.canonicalize_block(&hash_to_canonicalize)
+				.map_err(
+					sp_blockchain::Error::from_state_db::<
+						sc_state_db::Error<sp_database::error::DatabaseError>,
+					>,
+				)
+				.unwrap();
+			let mut transaction = Transaction::new();
+			apply_state_commit(&mut transaction, commit);
+			self.storage.commit(transaction).unwrap();
+		}
 	}
 
 	/// Expose the shared trie cache that is used by this backend.

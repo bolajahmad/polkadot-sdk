@@ -66,7 +66,7 @@ async fn weights_test() -> Result<(), anyhow::Error> {
 	log::info!("Accounts ready");
 
 	let contract_address = instantiate_contract(&para_client, &alice).await?;
-	log::info!("Contract instantiated: {:?}", contract_address);
+	log::info!("Contract instantiated: {contract_address:?}");
 
 	log::info!("Minting...");
 	let mint_100 = sp_core::hex2array!(
@@ -268,7 +268,7 @@ async fn instantiate_contract(
 	// We need a nonce before instantiating the contract
 	let account_id = caller.public_key().0.into();
 	let caller_h160 = <AHWRuntime as pallet_revive::Config>::AddressMapper::to_address(&account_id);
-	log::info!("H160 Account: {:?}", caller_h160);
+	log::info!("H160 Account: {caller_h160:?}");
 	let caller_revive_nonce = client
 		.runtime_api()
 		.at_latest()
@@ -357,7 +357,7 @@ async fn call_contract(
 			.at(block)
 			.fetch(&ahw::storage().system().block_weight())
 			.await?;
-		log::info!("Weight of block {:?}: {:?}", block, weight);
+		log::info!("Weight of block {block:?}: {weight:?}");
 	}
 
 	Ok(())

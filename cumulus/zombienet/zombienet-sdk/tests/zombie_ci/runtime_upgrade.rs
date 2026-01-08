@@ -45,7 +45,7 @@ async fn runtime_upgrade() -> Result<(), anyhow::Error> {
 	let dave_client: OnlineClient<PolkadotConfig> = dave.wait_client().await?;
 	let expected_spec_version = current_spec_version + 1;
 
-	log::info!("Waiting for parachain runtime upgrade to version {}", expected_spec_version);
+	log::info!("Waiting for parachain runtime upgrade to version {expected_spec_version}");
 	wait_for_runtime_upgrade(&dave_client).await?;
 
 	let spec_version_from_charlie =

@@ -71,8 +71,14 @@ pub async fn assert_para_throughput(
 	let expected_candidate_ranges = expected_candidate_ranges.into();
 	let valid_para_ids: Vec<ParaId> = expected_candidate_ranges.keys().cloned().collect();
 
+	log::info!(
+		"Asserting parachain throughput for para_ids: {valid_para_ids:?}. Wait for the first session change"
+	);
 	// Wait for the first session, block production on the parachain will start after that.
 	wait_for_first_session_change(&mut blocks_sub).await?;
+	log::info!(
+		"First session change detected. Counting {stop_after} finalized relay chain blocks."
+	);
 
 	while let Some(block) = blocks_sub.next().await {
 		let block = block?;
@@ -81,7 +87,7 @@ pub async fn assert_para_throughput(
 
 		// Do not count blocks with session changes, no backed blocks there.
 		if is_session_change(&block).await? {
-			continue
+			continue;
 		}
 
 		current_block_count += 1;
@@ -97,7 +103,7 @@ pub async fn assert_para_throughput(
 			log::debug!("Block backed for para_id {para_id}");
 
 			if !valid_para_ids.contains(&para_id) {
-				return Err(anyhow!("Invalid ParaId detected: {}", para_id));
+				return Err(anyhow!("Invalid ParaId detected: {para_id}"));
 			};
 
 			*(candidate_count.entry(para_id).or_default()) += 1;
@@ -116,12 +122,12 @@ pub async fn assert_para_throughput(
 	for (para_id, expected_candidate_range) in expected_candidate_ranges {
 		let actual = candidate_count
 			.get(&para_id)
-			.ok_or_else(|| anyhow!("ParaId did not have any backed candidates"))?;
+			.ok_or_else(|| anyhow!("ParaId {para_id} did not have any backed candidates"))?;
 
 		if !expected_candidate_range.contains(actual) {
 			return Err(anyhow!(
 				"Candidate count {actual} not within range {expected_candidate_range:?}"
-			))
+			));
 		}
 	}
 
@@ -240,8 +246,9 @@ fn identifier_matches_header(
 			let header_hash = BlakeTwo256::hash(&header.encode());
 			header_hash == *hash
 		},
-		RelayBlockIdentifier::ByStorageRoot { storage_root, .. } =>
-			header.state_root == *storage_root,
+		RelayBlockIdentifier::ByStorageRoot { storage_root, .. } => {
+			header.state_root == *storage_root
+		},
 	}
 }
 
@@ -358,7 +365,7 @@ pub async fn submit_extrinsic_and_wait_for_finalization_success<S: Signer<Polkad
 			TxStatus::InFinalizedBlock(ref tx_in_block) => {
 				tx_in_block.wait_for_success().await?;
 				log::info!("[Finalized] In block: {:#?}", tx_in_block.block_hash());
-				return Ok(tx_in_block.block_hash())
+				return Ok(tx_in_block.block_hash());
 			},
 			TxStatus::Error { message } |
 			TxStatus::Invalid { message } |
@@ -393,7 +400,7 @@ pub async fn submit_extrinsic_and_wait_for_finalization_success_with_timeout<
 
 	match res {
 		Ok(Ok(_)) => Ok(()),
-		Ok(Err(e)) => Err(anyhow!("Error waiting for metric: {}", e)),
+		Ok(Err(e)) => Err(anyhow!("Error waiting for metric: {e}")),
 		// timeout
 		Err(_) => Err(anyhow!("Timeout ({secs}), waiting for extrinsic finalization")),
 	}
@@ -422,7 +429,7 @@ pub async fn assert_para_is_registered(
 			None => vec![],
 		};
 
-		log::debug!("Registered para_ids: {:?}", parachains);
+		log::debug!("Registered para_ids: {parachains:?}");
 
 		if parachains.iter().any(|p| para_id.eq(p)) {
 			log::debug!("para_id {para_id} registered");
@@ -471,7 +478,7 @@ pub async fn assign_cores(
 	para_id: u32,
 	cores: Vec<u32>,
 ) -> Result<(), anyhow::Error> {
-	log::info!("Assigning {:?} cores to parachain {}", cores, para_id);
+	log::info!("Assigning {cores:?} cores to parachain {para_id}");
 
 	let assign_cores_call =
 		create_assign_core_call(&cores.into_iter().map(|core| (core, para_id)).collect::<Vec<_>>());
@@ -546,7 +553,7 @@ pub async fn wait_for_runtime_upgrade(
 		{
 			log::info!("Runtime upgraded in block {:?}", block.hash());
 
-			return Ok(block.hash())
+			return Ok(block.hash());
 		}
 	}
 

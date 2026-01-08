@@ -561,7 +561,7 @@ pub mod pallet {
 			let op_res = with_storage_layer::<(), DispatchError, _>(|| Self::onboard_people());
 			weight_meter.consume(onboard_people_weight);
 			if let Err(e) = op_res {
-				log::debug!(target: LOG_TARGET, "failed to onboard people: {:?}", e);
+				log::debug!(target: LOG_TARGET, "failed to onboard people: {e:?}");
 			}
 
 			let current_ring = CurrentRingIndex::<T>::get();
@@ -583,7 +583,7 @@ pub mod pallet {
 				});
 				weight_meter.consume(build_ring_weight);
 				if let Err(e) = op_res {
-					log::error!(target: LOG_TARGET, "failed to build ring: {:?}", e);
+					log::error!(target: LOG_TARGET, "failed to build ring: {e:?}");
 				}
 			}
 
@@ -1082,8 +1082,9 @@ pub mod pallet {
 					People::<T>::insert(id, record);
 				},
 				// This call accepts migrations only for included keys.
-				RingPosition::Onboarding { .. } =>
-					return Err(Error::<T>::InvalidKeyMigration.into()),
+				RingPosition::Onboarding { .. } => {
+					return Err(Error::<T>::InvalidKeyMigration.into())
+				},
 				// Suspended people shouldn't be able to call this, but protect against this case
 				// anyway.
 				RingPosition::Suspended => return Err(Error::<T>::Suspended.into()),
@@ -1496,7 +1497,7 @@ pub mod pallet {
 						let mut suspended_indices = PendingSuspensions::<T>::get(ring_index);
 						let Err(insert_idx) = suspended_indices.binary_search(&ring_position)
 						else {
-							return Err(Error::<T>::KeyAlreadySuspended.into())
+							return Err(Error::<T>::KeyAlreadySuspended.into());
 						};
 						suspended_indices
 							.try_insert(insert_idx, ring_position)
@@ -1636,8 +1637,9 @@ pub mod pallet {
 				}
 
 				let op_res = with_storage_layer::<bool, DispatchError, _>(|| match drain.next() {
-					Some((id, new_key)) =>
-						Self::migrate_keys_single_included_key(id, new_key).map(|_| false),
+					Some((id, new_key)) => {
+						Self::migrate_keys_single_included_key(id, new_key).map(|_| false)
+					},
 					None => {
 						let rings_state = RingsState::<T>::get()
 							.end_key_migration()
@@ -1652,11 +1654,11 @@ pub mod pallet {
 					Ok(true) => {
 						// Read on `KeyMigrationQueue`.
 						meter.consume(T::DbWeight::get().reads(1));
-						break
+						break;
 					},
 					Err(e) => {
 						meter.consume(weight);
-						log::error!(target: LOG_TARGET, "failed to migrate keys: {:?}", e);
+						log::error!(target: LOG_TARGET, "failed to migrate keys: {e:?}");
 						break;
 					},
 				}
@@ -1677,11 +1679,11 @@ pub mod pallet {
 				} = record.position
 				else {
 					Keys::<T>::remove(new_key);
-					return Ok(())
+					return Ok(());
 				};
 				let mut suspended_indices = PendingSuspensions::<T>::get(ring_index);
 				let Err(insert_idx) = suspended_indices.binary_search(&ring_position) else {
-					log::info!(target: LOG_TARGET, "key migration for person {} skipped as the person's key was already suspended", id);
+					log::info!(target: LOG_TARGET, "key migration for person {id} skipped as the person's key was already suspended");
 					return Ok(());
 				};
 				suspended_indices
@@ -1691,7 +1693,7 @@ pub mod pallet {
 				Keys::<T>::remove(&record.key);
 				Self::push_to_onboarding_queue(id, new_key, record.account)?;
 			} else {
-				log::info!(target: LOG_TARGET, "key migration for person {} skipped as no record was found", id);
+				log::info!(target: LOG_TARGET, "key migration for person {id} skipped as no record was found");
 			}
 			Ok(())
 		}
@@ -1776,7 +1778,7 @@ pub mod pallet {
 				Ok(())
 			});
 			if let Err(e) = op_res {
-				log::error!(target: LOG_TARGET, "failed to merge queue pages: {:?}", e);
+				log::error!(target: LOG_TARGET, "failed to merge queue pages: {e:?}");
 			}
 		}
 	}
@@ -2037,8 +2039,9 @@ pub mod pallet {
 
 		fn try_origin(o: OriginFor<T>, arg: &Context) -> Result<Self::Success, OriginFor<T>> {
 			match ensure_revised_personal_alias(o.clone().into_caller()) {
-				Ok(ca) if &ca.ca.context == arg =>
-					Ok(RevisedAlias { revision: ca.revision, ring: ca.ring, alias: ca.ca.alias }),
+				Ok(ca) if &ca.ca.context == arg => {
+					Ok(RevisedAlias { revision: ca.revision, ring: ca.ring, alias: ca.ca.alias })
+				},
 				_ => Err(o),
 			}
 		}

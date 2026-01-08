@@ -388,7 +388,7 @@ async fn coretime_revenue_test() -> Result<(), anyhow::Error> {
 
 	let sale: coretime_api::broker::events::SaleInitialized =
 		wait_for_event(para_events.clone(), "Broker", "SaleInitialized", |_| true).await;
-	log::info!("{:?}", sale);
+	log::info!("{sale:?}");
 
 	// Alice buys a region
 

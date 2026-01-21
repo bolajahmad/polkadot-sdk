@@ -30,7 +30,6 @@ use frame_support::{
 use pallet_staking::{BalanceOf, StakerStatus};
 use sp_runtime::{curve::PiecewiseLinear, testing::UintAuthorityId, traits::Zero, BuildStorage};
 use sp_staking::{EraIndex, SessionIndex};
-use sp_state_machine::BasicExternalities;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 type AccountId = u64;
@@ -261,11 +260,12 @@ impl ExtBuilder {
 		}
 		.assimilate_storage(&mut storage);
 
-		BasicExternalities::execute_with_storage(&mut storage, || {
+		let mut ext = sp_io::TestExternalities::from(storage);
+		ext.execute_with(|| {
 			<pallet_session::Pallet<Test> as OnGenesis>::on_genesis();
 		});
 
-		storage.into()
+		ext
 	}
 
 	pub fn build_and_execute(self, test: impl FnOnce() -> ()) {

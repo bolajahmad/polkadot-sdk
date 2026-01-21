@@ -39,7 +39,6 @@ use sp_staking::{
 	offence::{OffenceDetails, OnOffenceHandler},
 	Agent, DelegationInterface, EraIndex, SessionIndex, StakingInterface,
 };
-use sp_state_machine::BasicExternalities;
 use std::collections::BTreeMap;
 
 use codec::Decode;
@@ -630,15 +629,12 @@ impl ExtBuilder {
 		}
 		.assimilate_storage(&mut storage);
 
-		BasicExternalities::execute_with_storage(&mut storage, || {
-			<pallet_session::Pallet<Runtime> as OnGenesis>::on_genesis();
-		});
-
 		let mut ext = sp_io::TestExternalities::from(storage);
 
 		// We consider all test to start after timestamp is initialized This must be ensured by
 		// having `timestamp::on_initialize` called before `staking::on_initialize`.
 		ext.execute_with(|| {
+			<pallet_session::Pallet<Runtime> as OnGenesis>::on_genesis();
 			System::set_block_number(1);
 			Session::on_initialize(1);
 			<Staking as Hooks<u32>>::on_initialize(1);

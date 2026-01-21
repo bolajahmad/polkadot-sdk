@@ -42,7 +42,6 @@ use sp_runtime::{
 	BuildStorage, DigestItem, Perbill,
 };
 use sp_staking::{EraIndex, SessionIndex};
-use sp_state_machine::BasicExternalities;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -274,11 +273,12 @@ pub fn new_test_ext_raw_authorities(authorities: AuthorityList) -> sp_io::TestEx
 
 	staking_config.assimilate_storage(&mut t).unwrap();
 
-	BasicExternalities::execute_with_storage(&mut t, || {
+	let mut ext = sp_io::TestExternalities::from(t);
+	ext.execute_with(|| {
 		<pallet_session::Pallet<Test> as OnGenesis>::on_genesis();
 	});
 
-	t.into()
+	ext
 }
 
 pub fn start_session(session_index: SessionIndex) {

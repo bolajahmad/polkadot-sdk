@@ -42,7 +42,6 @@ use sp_runtime::{
 	BuildStorage, DispatchError, Perbill,
 };
 use sp_staking::{EraIndex, SessionIndex};
-use sp_state_machine::BasicExternalities;
 
 type DummyValidatorId = u64;
 
@@ -358,10 +357,11 @@ pub fn new_test_ext_raw_authorities(authorities: Vec<AuthorityId>) -> sp_io::Tes
 
 	staking_config.assimilate_storage(&mut t).unwrap();
 
-	BasicExternalities::execute_with_storage(&mut t, || {
+	let mut ext = sp_io::TestExternalities::from(t);
+	ext.execute_with(|| {
 		<pallet_session::Pallet<Test> as OnGenesis>::on_genesis();
 	});
-	t.into()
+	ext
 }
 
 /// Creates an equivocation at the current block, by generating two headers.

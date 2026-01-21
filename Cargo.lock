@@ -11758,7 +11758,6 @@ dependencies = [
  "sp-runtime",
  "sp-session",
  "sp-staking",
- "sp-state-machine",
  "sp-tracing 16.0.0",
 ]
 
@@ -12377,7 +12376,6 @@ dependencies = [
  "sp-npos-elections",
  "sp-runtime",
  "sp-staking",
- "sp-state-machine",
  "sp-tracing 16.0.0",
 ]
 
@@ -12698,7 +12696,6 @@ dependencies = [
  "sp-runtime",
  "sp-session",
  "sp-staking",
- "sp-state-machine",
  "sp-tracing 16.0.0",
 ]
 
@@ -13481,7 +13478,6 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-staking",
- "sp-state-machine",
 ]
 
 [[package]]
@@ -13668,7 +13664,6 @@ dependencies = [
  "sp-npos-elections",
  "sp-runtime",
  "sp-staking",
- "sp-state-machine",
  "sp-tracing 16.0.0",
  "substrate-test-utils",
 ]

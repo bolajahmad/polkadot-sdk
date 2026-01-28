@@ -53,6 +53,8 @@ This document provides a comprehensive test plan for the pub-sub system, includi
 | `publish_max_keys_reached` | Publish when `MaxStoredKeys` reached | Error: `TooManyKeys` |
 | `publish_total_storage_exceeded` | Publish when `MaxTotalStorageSize` would be exceeded | Error: `TotalStorageSizeExceeded` |
 | `publish_update_existing_key` | Update value for existing key | Value updated, storage size adjusted |
+| `child_trie_key_derivation` | Verify child trie key format | Key equals `(b"pubsub", ParaId).encode()` |
+| `ttl_data_stored_separately` | Verify TtlData exists independently | TtlData queryable without child trie access |
 
 ### 1.4 TTL Logic
 
@@ -147,6 +149,8 @@ This document provides a comprehensive test plan for the pub-sub system, includi
 | `subscriptions_multiple_publishers` | Subscribe to multiple publishers | All publishers' keys returned |
 | `subscriptions_deduplicated` | Same key subscribed multiple times | Deduplicated in processing |
 | `subscriptions_combined_by_publisher` | Multiple handlers subscribe to same publisher | Keys combined per publisher |
+| `subscriptions_empty_returns_zero_weight` | No subscriptions configured | Empty vec, `Weight::zero()` |
+| `subscriptions_multiple_handlers_same_key` | Two handlers subscribe to same (publisher, key) | Key processed only once |
 
 ### 3.2 Relay Key Collection
 
@@ -175,6 +179,10 @@ This document provides a comprehensive test plan for the pub-sub system, includi
 | `value_change_detected` | Leaf value changed | `on_data_updated` called |
 | `key_not_in_trie` | Subscribed key doesn't exist | No callback, no error |
 | `external_data_not_cached` | Value > 32 bytes (external) | Trie node cached, data not cached |
+| `value_32_bytes_inlined` | Value exactly 32 bytes | Inlined in trie node (no external fetch) |
+| `value_33_bytes_external` | Value exactly 33 bytes | Stored externally (hash reference in node) |
+| `cached_node_size_bounded` | Verify BoundedVec<u8, 750> enforced | Nodes stored within size limit |
+| `published_entry_decoded_correctly` | Decode PublishedEntry from proof | value, ttl, when_inserted all populated |
 
 ### 3.5 Trie Depth Limit
 
@@ -202,6 +210,15 @@ This document provides a comprehensive test plan for the pub-sub system, includi
 | `clear_publisher_cache_removes_nodes` | Call clear_publisher_cache | All CachedTrieNodes for publisher removed |
 | `clear_publisher_cache_clears_root` | Clear cache also clears root | PreviousPublishedDataRoots removed |
 | `clear_cache_origin_check` | Unauthorized origin tries to clear | Error based on ClearCacheOrigin config |
+| `cached_trie_nodes_db_get_existing` | CachedTrieNodesDB::get() for cached hash | Returns cached node bytes |
+| `cached_trie_nodes_db_get_missing` | CachedTrieNodesDB::get() for uncached hash | Returns None |
+
+### 3.8 No-op RelayProofExtender
+
+| Test Case | Description | Expected Outcome |
+|-----------|-------------|------------------|
+| `noop_extender_relay_keys_empty` | `()` impl returns no keys | Empty `RelayProofRequest` |
+| `noop_extender_process_proof_complete` | `()` impl returns Complete | `ProofProcessingResult::Complete` |
 
 ---
 
@@ -258,6 +275,9 @@ This document provides a comprehensive test plan for the pub-sub system, includi
 | `prune_verify_same_cursor` | Same proof, same budget | Same cursor position |
 | `prune_no_state_changes` | Prune mode execution | No storage writes |
 | `verify_applies_state_changes` | Verify mode execution | Cache updated, roots updated |
+| `prune_no_cache_writes` | Prune mode doesn't touch CachedTrieNodes | Storage unchanged |
+| `prune_no_root_updates` | Prune mode doesn't touch PreviousPublishedDataRoots | Storage unchanged |
+| `prune_no_cursor_writes` | Prune mode doesn't write RelayProofProcessingCursor | Storage unchanged |
 
 ### 4.5 Proof Validation
 
@@ -317,6 +337,8 @@ This document provides a comprehensive test plan for the pub-sub system, includi
 | `heavy_block_small_budget` | Many HRMP messages, small pub-sub budget | Partial processing, cursor set |
 | `full_block_no_budget` | Block at 85% limit | Pub-sub gracefully skipped |
 | `budget_split_across_blocks` | Large dataset processed over multiple blocks | Eventually all data received |
+| `zero_budget_only_static_keys` | DMQ + HRMP consume entire budget | Proof contains only static relay keys, no pub-sub child trie data |
+| `budget_after_dmq_hrmp_correct` | Verify remaining budget after message filtering | `size_limit` reflects actual remaining space |
 
 ### 6.4 Cache Behavior
 
@@ -422,6 +444,9 @@ This document provides a comprehensive test plan for the pub-sub system, includi
 - [ ] Exactly `MaxTrieDepth` traversal depth
 - [ ] Weight budget exactly sufficient for one more key
 - [ ] Weight budget exactly zero remaining
+- [ ] Trie node exactly 750 bytes (max cached size)
+- [ ] Subscription to publisher with exactly 1 key
+- [ ] Proof with exactly 1 node (root only)
 
 ### 10.2 Empty/Null Conditions
 

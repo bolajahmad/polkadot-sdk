@@ -1758,14 +1758,15 @@ impl pallet_identity::Config for Runtime {
 impl pallet_recovery::Config for Runtime {
 	type RuntimeCall = RuntimeCall;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BlockNumberProvider = System;
+	type BlockNumberProvider = frame_system::Pallet<Runtime>;
 	type Currency = Balances;
 	type FriendGroupsConsideration = ();
 	type AttemptConsideration = ();
 	type InheritorConsideration = ();
 	type SecurityDeposit = ();
-	type MaxFriendsPerConfig = ConstU32<16>;
+	type MaxFriendsPerConfig = ConstU32<100>;
 	type WeightInfo = ();
+	type SlashReceiver = (); // burn
 }
 
 parameter_types! {

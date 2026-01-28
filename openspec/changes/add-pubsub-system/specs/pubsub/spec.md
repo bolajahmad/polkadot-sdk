@@ -86,6 +86,69 @@ The XCM executor SHALL support a `Publish` instruction for storing key-value dat
 - **WHEN** the parachain sends a `Publish` instruction
 - **THEN** the instruction fails with `TotalStorageSizeExceeded`
 
+### Requirement: AllowPublishFrom Barrier
+
+The XCM barrier `AllowPublishFrom<T, MaxPublishInstructions>` SHALL allow free execution of messages containing only `Publish` instructions from allowed origins, up to a configurable maximum count.
+
+#### Scenario: Barrier allows single Publish instruction
+
+- **GIVEN** `AllowPublishFrom<Everything, ConstU32<16>>` is configured as a barrier
+- **AND** parachain 2000 sends XCM containing only `Publish { data }`
+- **WHEN** the barrier evaluates the message
+- **THEN** execution is allowed without requiring fee payment
+
+#### Scenario: Barrier allows multiple Publish instructions within limit
+
+- **GIVEN** `AllowPublishFrom<Everything, ConstU32<16>>` is configured as a barrier
+- **AND** parachain 2000 sends XCM containing `[Publish { data1 }, Publish { data2 }, Publish { data3 }]`
+- **WHEN** the barrier evaluates the message
+- **THEN** execution is allowed without requiring fee payment
+- **AND** all three Publish instructions are executed
+
+#### Scenario: Barrier rejects too many Publish instructions
+
+- **GIVEN** `AllowPublishFrom<Everything, ConstU32<4>>` is configured with max 4 instructions
+- **AND** parachain 2000 sends XCM containing 5 `Publish` instructions
+- **WHEN** the barrier evaluates the message
+- **THEN** the barrier rejects with `StackLimitReached` error
+
+#### Scenario: Barrier allows exactly max Publish instructions
+
+- **GIVEN** `AllowPublishFrom<Everything, ConstU32<4>>` is configured with max 4 instructions
+- **AND** parachain 2000 sends XCM containing exactly 4 `Publish` instructions
+- **WHEN** the barrier evaluates the message
+- **THEN** execution is allowed without requiring fee payment
+
+#### Scenario: Barrier rejects Publish mixed with other instructions
+
+- **GIVEN** `AllowPublishFrom<Everything, ConstU32<16>>` is configured as a barrier
+- **AND** parachain 2000 sends XCM containing `Publish { data }` followed by `DepositAsset`
+- **WHEN** the barrier evaluates the message
+- **THEN** the barrier rejects with `BadFormat` error
+- **AND** the message requires a different barrier (e.g., `AllowTopLevelPaidExecutionFrom`)
+
+#### Scenario: Barrier rejects non-Publish messages
+
+- **GIVEN** `AllowPublishFrom<Everything, ConstU32<16>>` is configured as a barrier
+- **AND** parachain 2000 sends XCM containing only `TransferAsset`
+- **WHEN** the barrier evaluates the message
+- **THEN** the barrier rejects with `BadFormat` error
+
+#### Scenario: Barrier filters by origin
+
+- **GIVEN** `AllowPublishFrom<Equals<Parachain(1000)>, ConstU32<16>>` is configured
+- **AND** parachain 2000 sends XCM containing only `Publish { data }`
+- **WHEN** the barrier evaluates the message
+- **THEN** the barrier rejects with `Unsupported` error (origin not in filter)
+
+#### Scenario: Barrier combined with other barriers
+
+- **GIVEN** barrier chain: `AllowPublishFrom<Everything, ConstU32<16>>`, `AllowTopLevelPaidExecutionFrom<Everything>`
+- **AND** parachain 2000 sends XCM containing only `Publish { data }`
+- **WHEN** the barrier chain evaluates the message
+- **THEN** `AllowPublishFrom` matches and allows free execution
+- **AND** subsequent barriers are not evaluated
+
 ### Requirement: Data Storage Limits
 
 The broadcaster pallet SHALL enforce per-publisher storage limits.
@@ -379,12 +442,6 @@ The broadcaster pallet SHALL automatically delete expired keys via `on_idle`. TT
 - **WHEN** any number of blocks pass
 - **THEN** key K is NOT auto-deleted
 - **AND** no entry exists in `TtlData` for this key
-
-#### Scenario: TTL capping
-
-- **GIVEN** a publisher sends TTL value greater than `MaxTTL` (432,000 blocks)
-- **WHEN** the publish operation is processed
-- **THEN** the TTL is capped to `MaxTTL`
 
 #### Scenario: TTL reset on update
 

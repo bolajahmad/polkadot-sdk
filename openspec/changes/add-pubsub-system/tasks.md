@@ -18,7 +18,7 @@
 - [ ] 1.12 Add storage limit enforcement (keys, value size, total size)
 - [ ] 1.13 Add `TtlData` storage: `StorageDoubleMap<ParaId, [u8; 32], (u32, BlockNumber)>`
 - [ ] 1.14 Add `TtlScanCursor` storage: `StorageValue<(ParaId, [u8; 32])>`
-- [ ] 1.15 Implement TTL capping at `MaxTTL` (432,000 blocks)
+
 - [ ] 1.16 Implement `on_idle` TTL cleanup:
   - Scan `TtlData` for expired keys
   - Delete up to `MaxTtlScansPerIdle` (500) keys per block
@@ -35,13 +35,21 @@
 
 ## 2. XCM Publish Instruction
 
-- [ ] 2.1 Add `Publish { key, value, ttl }` to `polkadot/xcm/src/v5/instruction.rs`
-- [ ] 2.2 Add `MaxPublishValueLength` parameter type
-- [ ] 2.3 Implement `Publish` instruction handler in XCM executor
-- [ ] 2.4 Add origin validation (must be Parachain junction)
-- [ ] 2.5 Integrate with broadcaster pallet via `Config::Broadcaster` trait
-- [ ] 2.6 Write unit tests for XCM instruction execution
-- [ ] 2.7 Add benchmarks for `Publish` instruction weight
+- [ ] 2.1 Add `Publish { data: PublishData }` to `polkadot/xcm/src/v5/instruction.rs`
+- [ ] 2.2 Add `PublishData` type (bounded vec of key-value pairs)
+- [ ] 2.3 Add `MaxPublishValueLength` and `MaxPublishKeys` parameter types
+- [ ] 2.4 Implement `Publish` instruction handler in XCM executor
+- [ ] 2.5 Add origin validation (must be Parachain junction)
+- [ ] 2.6 Integrate with broadcaster pallet via `Config::BroadcastHandler` trait
+- [ ] 2.7 Add `AllowPublishFrom<T, MaxPublishInstructions>` barrier in `xcm-builder/src/barriers.rs`:
+  - Only allows messages containing just `Publish` instructions
+  - `MaxPublishInstructions: Get<u32>` - configurable limit on number of Publish instructions per message
+  - Similar pattern to `AllowSubscriptionsFrom`
+  - Enables free execution for Publish without opening up all instructions
+  - Returns `StackLimitReached` if instruction count exceeds max
+- [ ] 2.8 Write unit tests for XCM instruction execution
+- [ ] 2.9 Write unit tests for `AllowPublishFrom` barrier
+- [ ] 2.10 Add benchmarks for `Publish` instruction weight
 
 ## 3. Subscriber Pallet (Parachains)
 
@@ -141,17 +149,53 @@
 
 ## 6. Integration and Testing
 
-- [ ] 6.1 Add broadcaster pallet to relay chain runtime
-- [ ] 6.2 Add subscriber pallet to test parachain runtime (Penpal)
-- [ ] 6.3 Implement example `SubscriptionHandler` in test parachain
-- [ ] 6.4 Write integration test: basic publish-subscribe flow
-- [ ] 6.5 Write integration test: multiple publishers and subscribers
-- [ ] 6.6 Write integration test: PoV limit enforcement and cursor resumption
-- [ ] 6.7 Write integration test: TTL expiration and cleanup
-- [ ] 6.8 Write integration test: subscription changes and cache clearing
-- [ ] 6.9 Write integration test: malicious collator detection
-- [ ] 6.10 Create zombienet test: two relay nodes + publisher + subscriber
-- [ ] 6.11 Create zombienet test: PoV budget under HRMP load
+See `test-plan.md` for comprehensive test plan with all edge cases.
+
+### 6.1 Runtime Integration
+- [ ] 6.1.1 Add broadcaster pallet to relay chain runtime
+- [ ] 6.1.2 Add subscriber pallet to test parachain runtime (Penpal)
+- [ ] 6.1.3 Implement example `SubscriptionHandler` in test parachain
+- [ ] 6.1.4 Configure `KeyToIncludeInRelayProof` runtime API in test parachain
+
+### 6.2 Integration Tests (BlockTests Framework)
+- [ ] 6.2.1 Basic publish-subscribe flow (single publisher, single subscriber)
+- [ ] 6.2.2 Multiple publishers, single subscriber
+- [ ] 6.2.3 Single publisher, multiple keys
+- [ ] 6.2.4 Unchanged publisher root skipped (no callbacks)
+- [ ] 6.2.5 Cache populated on first access
+- [ ] 6.2.6 Cache updated on trie structure change
+- [ ] 6.2.7 Unchanged subtree skipped (matching node hash)
+- [ ] 6.2.8 PoV budget exhausted mid-processing (cursor set)
+- [ ] 6.2.9 Cursor resumption with wrap-around
+- [ ] 6.2.10 Light block (large pub-sub budget)
+- [ ] 6.2.11 Heavy block (small pub-sub budget from HRMP)
+- [ ] 6.2.12 Full block (no pub-sub budget, graceful skip)
+- [ ] 6.2.13 TTL expiration and cleanup
+- [ ] 6.2.14 Subscription removal and cache clearing
+
+### 6.3 Proof Validation Tests
+- [ ] 6.3.1 All proof nodes accessed - valid
+- [ ] 6.3.2 Extraneous nodes in proof - invalid
+- [ ] 6.3.3 Incomplete at budget limit - valid
+- [ ] 6.3.4 Incomplete below budget limit - invalid (collator cheating)
+- [ ] 6.3.5 Prune and Verify modes produce same weight consumption
+
+### 6.4 Edge Case Tests
+- [ ] 6.4.1 Trie depth exceeds MaxTrieDepth (publisher disabled)
+- [ ] 6.4.2 Re-enable disabled publisher
+- [ ] 6.4.3 System parachain priority in processing order
+- [ ] 6.4.4 Boundary: value exactly 32 bytes (inline threshold)
+- [ ] 6.4.5 Boundary: value exactly 33 bytes (external storage)
+- [ ] 6.4.6 Empty child trie (publisher has no data)
+- [ ] 6.4.7 Subscription to non-existent publisher
+
+### 6.5 Zombienet End-to-End Tests
+- [ ] 6.5.1 Basic: 2 relay validators + publisher parachain + subscriber parachain
+- [ ] 6.5.2 TTL expiration observed from subscriber
+- [ ] 6.5.3 PoV budget under HRMP load
+- [ ] 6.5.4 Multiple publishers (5+) with single subscriber
+- [ ] 6.5.5 Large dataset (1000+ keys) eventual delivery
+- [ ] 6.5.6 Collator restart with cursor recovery
 
 ## 7. Documentation
 

@@ -726,7 +726,7 @@ RelayProofExtender::prune_proof(proof, root, size_limit)
 
 ### Decision 5: TTL with on_idle Cleanup
 
-Keys can have finite TTL (expire after N blocks) or infinite TTL (0 = never expires). TTL is capped at `MaxTTL` (432,000 blocks ≈ 30 days).
+Keys can have finite TTL (expire after N blocks) or infinite TTL (0 = never expires).
 
 **Storage structures:**
 
@@ -763,14 +763,68 @@ pub type TtlScanCursor<T: Config> = StorageValue<_, (ParaId, [u8; 32])>;
 - Uses `TtlScanCursor` for incremental processing across blocks
 - Best-effort expiration (may be delayed 1-2 blocks if weight exhausted)
 
-### Decision 6: Single-Key Publish Instruction
+### Decision 6: Publish Instruction with Dedicated Barrier
 
-XCM `Publish { key, value, ttl }` publishes one key at a time. Batch via multiple instructions.
+XCM `Publish { data: PublishData }` publishes key-value pairs to the relay chain.
+
+**Fee Model:** Uses a dedicated `AllowPublishFrom<T>` barrier (similar to `AllowSubscriptionsFrom`) that:
+- Only allows messages containing just the `Publish` instruction
+- Enables free execution for publishing without allowing unpaid execution for arbitrary XCM programs
+- Filters which origins (parachains) can publish
+
+```rust
+/// Allows execution from `origin` if the message contains only `Publish` instructions,
+/// up to a configurable maximum count.
+/// 
+/// - `T`: Filter for allowed origins
+/// - `MaxPublishInstructions`: Maximum number of `Publish` instructions allowed per message
+pub struct AllowPublishFrom<T, MaxPublishInstructions>(PhantomData<(T, MaxPublishInstructions)>);
+impl<T: Contains<Location>, MaxPublishInstructions: Get<u32>> ShouldExecute 
+    for AllowPublishFrom<T, MaxPublishInstructions> 
+{
+    fn should_execute<RuntimeCall>(
+        origin: &Location,
+        instructions: &mut [Instruction<RuntimeCall>],
+        _max_weight: Weight,
+        _properties: &mut Properties,
+    ) -> Result<(), ProcessMessageError> {
+        ensure!(T::contains(origin), ProcessMessageError::Unsupported);
+        ensure!(!instructions.is_empty(), ProcessMessageError::BadFormat);
+        ensure!(
+            instructions.len() <= MaxPublishInstructions::get() as usize,
+            ProcessMessageError::StackLimitReached
+        );
+        
+        // All instructions must be Publish
+        for inst in instructions.iter() {
+            match inst {
+                Publish { .. } => {},
+                _ => return Err(ProcessMessageError::BadFormat),
+            }
+        }
+        Ok(())
+    }
+}
+```
+
+**Example configuration:**
+```rust
+parameter_types! {
+    pub const MaxPublishInstructions: u32 = 16;
+}
+
+type Barrier = (
+    AllowPublishFrom<Everything, MaxPublishInstructions>,
+    AllowTopLevelPaidExecutionFrom<Everything>,
+    // ... other barriers
+);
+```
 
 **Rationale:**
-- Simpler instruction semantics
-- Predictable weight calculation
-- Aligns with XCM instruction granularity
+- Parachains already pay for relay chain resources via coretime/slots
+- Dedicated barrier prevents abuse (can't execute arbitrary XCM for free)
+- Storage limits in broadcaster pallet provide additional protection
+- Follows established pattern (`AllowSubscriptionsFrom`, `AllowHrmpNotificationsFromRelayChain`)
 
 ## Risks / Trade-offs
 

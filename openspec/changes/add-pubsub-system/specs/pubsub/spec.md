@@ -120,6 +120,21 @@ The subscriber pallet SHALL provide a trait for declaring subscriptions and rece
 - **AND** each `SubscribedKey` wraps an H256 hash
 - **AND** the Weight represents the cost of computing subscriptions
 
+#### Scenario: Adding subscriptions
+
+- **GIVEN** a parachain subscribes to new keys
+- **WHEN** `subscriptions()` includes the new keys
+- **THEN** the subscriber pallet automatically fetches and caches data for new keys
+- **AND** `on_data_updated` is called when data is received
+
+#### Scenario: Removing subscriptions requires cache clear
+
+- **GIVEN** a parachain removes a subscription to publisher 1000
+- **WHEN** the subscription is removed from `subscriptions()` return value
+- **THEN** stale cached nodes remain in storage (not automatically cleaned)
+- **AND** an authorized origin MUST call `clear_publisher_cache(1000)` to free storage
+- **AND** subsequent blocks will rebuild the cache with current subscriptions only
+
 #### Scenario: Data update callback
 
 - **GIVEN** a subscription exists for publisher 1000, key K
@@ -149,19 +164,19 @@ The subscriber pallet SHALL provide a trait for declaring subscriptions and rece
 
 ### Requirement: Change Detection
 
-The `RelayProofPruner` SHALL skip processing unchanged publishers using root comparison against `PreviousPublishedDataRoots`.
+The `RelayProofExtender` SHALL skip processing unchanged publishers using root comparison against `PreviousPublishedDataRoots`.
 
 #### Scenario: Root unchanged
 
 - **GIVEN** publisher 1000's child trie root is cached in `PreviousPublishedDataRoots` as R
-- **WHEN** `RelayProofPruner::prune_relay_proofs()` processes a new block with the same root R
-- **THEN** the child trie is removed entirely from the relay chain proof
+- **WHEN** `RelayProofExtender::process_proof()` processes a new block with the same root R
+- **THEN** the child trie is skipped entirely (no proof/cache reads needed)
 - **AND** `on_data_updated` is NOT called for any keys from publisher 1000
 
 #### Scenario: Root changed
 
 - **GIVEN** publisher 1000's cached root in `PreviousPublishedDataRoots` is R1
-- **WHEN** `RelayProofPruner::prune_relay_proofs()` processes a new block with root R2 (different from R1)
+- **WHEN** `RelayProofExtender::process_proof()` processes a new block with root R2 (different from R1)
 - **THEN** subscribed keys are extracted and processed
 - **AND** `on_data_updated` is called for each subscribed key with data
 - **AND** `PreviousPublishedDataRoots` is updated with R2
@@ -190,9 +205,9 @@ The subscriber pallet SHALL enforce a maximum trie depth (`MaxTrieDepth`) when p
 #### Scenario: Disabled publisher is skipped
 
 - **GIVEN** publisher 1000 is in `DisabledPublishers` storage
-- **WHEN** `RelayProofPruner::prune_relay_proofs()` runs
-- **THEN** publisher 1000 is skipped entirely
-- **AND** no proof data is included for publisher 1000
+- **WHEN** `RelayProofExtender::relay_keys()` is called (via `ParachainSystem::relay_keys_to_prove()`)
+- **THEN** publisher 1000's child trie is excluded from the key list
+- **AND** no proof data is collected for publisher 1000
 
 #### Scenario: Re-enable disabled publisher
 
@@ -256,13 +271,13 @@ The subscriber pallet SHALL cache trie nodes (structure only, not data) needed t
 
 ### Requirement: PoV Budget Constraint
 
-The subscriber pallet SHALL respect PoV budget limits during proof pruning. Pub-sub uses remaining PoV space after message filtering in `provide_inherent`.
+The subscriber pallet SHALL respect PoV budget limits during proof processing. PoV budget includes BOTH proof data AND cache reads. A `WeightMeter` tracks combined usage to ensure the same logic runs off-chain (pruning in `provide_inherent`) and on-chain (verification in `set_validation_data`).
 
 #### Scenario: Budget calculation
 
 - **GIVEN** `allowed_pov_size = validation_data.max_pov_size * 85%`
 - **AND** messages have been filtered via `into_abridged(&mut size_limit)`
-- **WHEN** pub-sub proof pruning begins
+- **WHEN** pub-sub proof processing begins
 - **THEN** pub-sub uses the remaining `size_limit` after message filtering
 - **AND** no minimum budget is guaranteed (pub-sub gets what's left)
 
@@ -287,31 +302,54 @@ The subscriber pallet SHALL respect PoV budget limits during proof pruning. Pub-
 - **THEN** 0 bytes are available for pub-sub
 - **AND** pub-sub gracefully skips this block and retries next block
 
-#### Scenario: Budget exhausted mid-processing
+#### Scenario: WeightMeter tracks ref_time and proof_size
 
-- **GIVEN** available budget and more nodes than fit
-- **WHEN** pruning exhausts the budget
-- **THEN** remaining nodes are removed from the proof
-- **AND** `RelayProofProcessingCursor` is set on-chain to (ParaId, SubscribedKey)
+- **GIVEN** a `WeightMeter` with weight limit
+- **WHEN** processing reads from parachain storage (cache) AND relay proof nodes
+- **THEN** parachain storage reads are tracked automatically via host function + `StorageWeightReclaimer`
+- **AND** relay proof reads consume weight: `T::DbWeight::get().reads(1) + Weight::from_parts(0, node_size)`
+- **AND** `meter.remaining()` reflects available weight for both `ref_time` and `proof_size`
+- **AND** the same meter behavior occurs in both off-chain (Prune) and on-chain (Verify) modes
 
-#### Scenario: Cursor resumption
+#### Scenario: Weight exhausted mid-processing
 
-- **GIVEN** `RelayProofProcessingCursor` was set in the previous block
-- **WHEN** the next block begins pruning
-- **THEN** pruning resumes from the cursor position
-- **AND** cursor is cleared when all keys are processed
+- **GIVEN** available weight budget and operations exceeding it
+- **WHEN** `!meter.can_consume(next_weight)` returns true
+- **THEN** processing stops at current key
+- **AND** remaining nodes are removed from the proof (off-chain) or not accessed (on-chain)
+- **AND** `RelayProofProcessingCursor` is set to (ParaId, SubscribedKey)
 
-#### Scenario: Malicious collator detection
+#### Scenario: Cursor resumption with wrap-around
 
-- **GIVEN** a trie node is missing from the proof
-- **WHEN** the proof size is below the budget limit
-- **THEN** the block panics (collator is cheating by omitting data)
+- **GIVEN** `RelayProofProcessingCursor` was set to (Publisher B, Key 2) in the previous block
+- **AND** subscriptions are ordered as: [(Publisher A, [K1, K2]), (Publisher B, [K1, K2, K3]), (Publisher C, [K1])]
+- **WHEN** the next block begins processing
+- **THEN** processing starts from (Publisher B, Key 2)
+- **AND** continues through (Publisher B, Key 3), (Publisher C, Key 1)
+- **AND** wraps around to (Publisher A, Key 1), (Publisher A, Key 2), (Publisher B, Key 1)
+- **AND** cursor is cleared when all keys have been processed
 
-#### Scenario: Missing node at budget limit
+#### Scenario: Proof validation - all nodes accessed
 
-- **GIVEN** a trie node is missing from the proof
-- **WHEN** the proof size equals the budget limit
-- **THEN** this is valid (budget was exhausted, cursor should be set)
+- **GIVEN** a relay proof is provided to `set_validation_data`
+- **WHEN** all `RelayProofExtender` implementations have processed the proof
+- **THEN** `AccessedNodesTracker::ensure_no_unused_nodes()` MUST succeed
+- **AND** if any nodes were not accessed, the block panics (extraneous data in proof)
+
+#### Scenario: Proof validation - incomplete at weight limit
+
+- **GIVEN** processing returns `ProofProcessingResult::Incomplete`
+- **AND** `!meter.can_consume(min_weight)` where `min_weight` is one read + max node/value size
+- **WHEN** the proof is validated
+- **THEN** this is valid (weight budget was exhausted)
+- **AND** `RelayProofProcessingCursor` is set for next block
+
+#### Scenario: Proof validation - incomplete below weight limit
+
+- **GIVEN** processing returns `ProofProcessingResult::Incomplete`
+- **AND** `meter.can_consume(min_weight)` is true (weight remains)
+- **WHEN** the proof is validated
+- **THEN** the block panics (collator is cheating by omitting data that would have fit)
 
 ### Requirement: Publisher Prioritization
 
@@ -405,42 +443,46 @@ The parachain collator SHALL collect relay state proofs for subscribed keys.
 - **THEN** it equals `(b"pubsub", ParaId(1000)).encode()`
 - **AND** both broadcaster and subscriber use identical derivation
 
-### Requirement: Proof Pruning
+### Requirement: Proof Processing
 
-The `RelayProofPruner` SHALL prune pub-sub proofs in `provide_inherent` based on cache, subscriptions, and depth limits.
+The `RelayProofExtender::process_proof()` SHALL process pub-sub proofs with unified logic for both off-chain (pruning in `provide_inherent`) and on-chain (verification in `set_validation_data`).
 
-#### Scenario: Unchanged child tries removed
+#### Scenario: Unchanged child tries skipped
 
 - **GIVEN** publisher 1000's child trie root has not changed (per `PreviousPublishedDataRoots`)
-- **WHEN** `RelayProofPruner::prune_relay_proofs()` runs
-- **THEN** the entire child trie for publisher 1000 is removed from the proof
+- **WHEN** `RelayProofExtender::process_proof()` runs
+- **THEN** the entire child trie for publisher 1000 is skipped (no reads)
+- **AND** off-chain: the child trie is removed from the proof
 
-#### Scenario: Cached nodes pruned
+#### Scenario: Cached nodes read from storage
 
 - **GIVEN** nodes [N1, N2, N3] are cached in `CachedTrieNodes` for publisher 1000
-- **WHEN** `RelayProofPruner::prune_relay_proofs()` runs on a changed child trie
-- **THEN** nodes N1, N2, N3 are removed from the proof
-- **AND** only new/changed nodes are included
+- **WHEN** `RelayProofExtender::process_proof()` traverses a changed child trie
+- **THEN** cached nodes are read from storage (tracked automatically via host function)
+- **AND** off-chain: matching cached nodes are removed from the proof
+- **AND** only new/changed nodes are read from the proof
 
-#### Scenario: Unsubscribed key paths pruned
+#### Scenario: Unsubscribed key paths not accessed
 
 - **GIVEN** publisher 1000 has keys [A, B, C, D, E] but subscriber only subscribes to [A, B]
-- **WHEN** `RelayProofPruner::prune_relay_proofs()` runs
-- **THEN** nodes leading only to keys [C, D, E] are removed from the proof
+- **WHEN** `RelayProofExtender::process_proof()` runs
+- **THEN** only paths to keys [A, B] are accessed
+- **AND** off-chain: nodes leading only to keys [C, D, E] are removed from the proof
 
-#### Scenario: Depth limit enforced during pruning
+#### Scenario: Depth limit enforced during processing
 
 - **GIVEN** `MaxTrieDepth` is 8
 - **AND** publisher 1000 has a key path requiring traversal depth of 10
-- **WHEN** `RelayProofPruner::prune_relay_proofs()` runs
+- **WHEN** `RelayProofExtender::process_proof()` runs
 - **THEN** traversal stops at depth 8
 - **AND** the entire publisher 1000 is disabled
 - **AND** publisher 1000 is added to `DisabledPublishers` storage
 
-#### Scenario: Budget limit enforced
+#### Scenario: Budget limit enforced with combined tracking
 
-- **GIVEN** 1 MiB budget for pub-sub
-- **WHEN** pruning would include 1.5 MiB of new nodes
-- **THEN** only 1 MiB of nodes are included
-- **AND** remaining nodes are removed from the proof
-- **AND** `PubSubProcessingCursor` is set for resumption
+- **GIVEN** 1 MiB budget for pub-sub (proof + cache reads combined)
+- **AND** processing would read 600 KB from proof and 600 KB from cache
+- **WHEN** `meter.consumed()` exceeds 1 MiB in `proof_size`
+- **THEN** processing stops at current key
+- **AND** off-chain: remaining nodes are removed from the proof
+- **AND** `RelayProofProcessingCursor` is set for resumption

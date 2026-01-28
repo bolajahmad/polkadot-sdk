@@ -59,6 +59,7 @@
 - [ ] 3.10 Define `SubscriptionHandler` trait:
   - `subscriptions() -> (Vec<(ParaId, Vec<SubscribedKey>)>, Weight)`
   - `on_data_updated(ParaId, SubscribedKey, &[u8], TtlState) -> Weight`
+- [ ] 3.11 Implement `clear_publisher_cache(origin, ParaId)` dispatchable for cache cleanup after subscription removal
 - [ ] 3.11 Add `PreviousPublishedDataRoots` storage for change detection
 - [ ] 3.12 Add `CachedTrieNodes` storage: `StorageDoubleMap<ParaId, H256, BoundedVec<u8, 512>>` (trie nodes only, no external data)
 - [ ] 3.13 Add `RelayProofProcessingCursor` storage: `StorageValue<(ParaId, SubscribedKey)>`
@@ -71,45 +72,72 @@
 
 ## 4. Proof Collection (Collator)
 
-- [ ] 4.1 Add `RelayStorageKey` enum to `cumulus/primitives/core/src/lib.rs`
-- [ ] 4.2 Add `RelayProofRequest` type for proof request specification
-- [ ] 4.3 Implement `KeyToIncludeInRelayProofApi` runtime API
-- [ ] 4.4 Update `collect_relay_storage_proof` in `cumulus/client/parachain-inherent/src/lib.rs`
-- [ ] 4.5 Add child trie key collection for subscriptions
+- [ ] 4.1 Add `RelayProofExtender` trait to `cumulus/pallets/parachain-system/src/lib.rs`:
+  - `fn relay_keys() -> RelayProofRequest`
+  - `fn process_proof(...) -> ProofProcessingResult`
+  - No-op impl for `()`
+- [ ] 4.2 Add `RelayProofExtender` as Config parameter in parachain-system pallet (default `()`)
+- [ ] 4.3 Add `ParachainSystem::relay_keys_to_prove()` helper that calls `T::RelayProofExtender::relay_keys()`
+- [ ] 4.4 Document runtime integration: implement `KeyToIncludeInRelayProof` calling `ParachainSystem::relay_keys_to_prove()`
+- [ ] 4.5 Add example implementation to test parachain (Penpal)
 - [ ] 4.6 Write unit tests for proof collection
 
-## 5. Proof Pruning (RelayProofPruner)
+## 5. RelayProofExtender, WeightMeter, and AccessedNodesTracker
 
-- [ ] 5.1 Define `RelayProofPruner` trait in subscriber pallet:
-  - `prune_relay_proofs(StorageProof, H256, &mut usize) -> StorageProof`
-- [ ] 5.2 Implement `RelayProofPruner` with all pruning logic:
+- [ ] 5.1 Use `WeightMeter` from `sp_weights` for weight tracking:
+  - Tracks both `ref_time` (computation) and `proof_size` (storage)
+  - Parachain storage reads tracked automatically via host function + `StorageWeightReclaimer`
+  - Relay proof reads: consume `T::DbWeight::get().reads(1) + Weight::from_parts(0, node_size)`
+  - Use `meter.try_consume()` for safe consumption, `meter.can_consume()` for checks
+- [ ] 5.2 Use `AccessedNodesTracker` from `sp_trie::accessed_nodes_tracker`:
+  - Implements `TrieRecorder` for automatic node access tracking
+  - Use with `TrieDBBuilder::with_recorder()` for trie operations
+  - `ensure_no_unused_nodes()` validates all proof nodes were read
+- [ ] 5.3 Define `ProcessingMode` enum: `Prune` (off-chain), `Verify` (on-chain)
+- [ ] 5.4 Define `RelayProofExtender` trait:
+  - `extra_keys() -> Vec<RelayStorageKey>` (returns keys to include in proof)
+  - `process_proof(&MemoryDB, H256, &mut AccessedNodesTracker, &mut WeightMeter, ProcessingMode) -> ProofProcessingResult`
+- [ ] 5.5 Implement `RelayProofExtender` for pub-sub pallet:
+  - `extra_keys()`: Return child trie keys for subscribed publishers
+  - `process_proof()`: Unified logic for Prune/Verify modes
+- [ ] 5.6 Implement proof processing logic with WeightMeter:
   - Detect unchanged child tries via `PreviousPublishedDataRoots` comparison
-  - Remove unchanged child tries entirely from proof
-  - Implement `CachedHashDB` custom HashDB that checks cache before including nodes
-  - Remove cached nodes from changed child tries
-  - Remove nodes leading to unsubscribed keys
-  - Enforce `MaxTrieDepth` limit during traversal
-  - Enforce `size_limit` budget constraint
-  - Set `RelayProofProcessingCursor` when budget exhausted
-  - Resume from `RelayProofProcessingCursor` if set from previous block
-- [ ] 5.3 Implement dual-trie traversal for cache synchronization:
-  - Add new nodes to `CachedTrieNodes`
-  - Remove outdated nodes from cache
+  - Skip unchanged child tries entirely (no reads needed)
+  - Consume weight for each relay proof node read: `ref_time` + `proof_size`
+  - Parachain proof (cache reads) tracked automatically via host function
+  - Stop when `!meter.can_consume(next_weight)` and set cursor
+  - Priority ordering: system chains first, then randomized for others
+- [ ] 5.7 Implement dual-trie traversal:
+  - Old trie via `CachedTrieNodesDB` (cache reads tracked by host function)
+  - New trie via proof `MemoryDB` with `AccessedNodesTracker` recorder
+  - Add new nodes to cache (Verify mode only)
+  - Remove outdated nodes from cache (Verify mode only)
   - Stop at unchanged nodes (subtree same)
   - Abort if depth exceeds `MaxTrieDepth`
-- [ ] 5.4 Implement `clear_cache_for_publisher()` on subscription change
-- [ ] 5.5 Integrate pruner in `do_create_inherent` after message filtering:
-  - Use remaining `size_limit` after `into_abridged()` calls
-  - No minimum budget guarantee (pub-sub gets what's left)
-- [ ] 5.6 Implement malicious collator detection in `set_validation_data`:
-  - Panic if missing node but budget not exhausted
-- [ ] 5.7 Write unit tests for proof pruning (unchanged tries, cached nodes, unsubscribed keys)
-- [ ] 5.8 Write unit tests for budget enforcement and cursor handling
-- [ ] 5.9 Write unit tests for trie depth limit enforcement
-- [ ] 5.10 Write unit tests for light block (large pub-sub budget)
-- [ ] 5.11 Write unit tests for heavy block (small pub-sub budget)
-- [ ] 5.12 Write unit tests for full block (no pub-sub budget, graceful skip)
-- [ ] 5.13 Write unit tests for cache synchronization and subscription change clearing
+- [ ] 5.8 Implement `clear_publisher_cache(ParaId)` dispatchable for subscription removal
+- [ ] 5.9 Integrate in `provide_inherent` (collator, off-chain):
+  - Call `process_proof()` with `ProcessingMode::Prune`
+  - WeightMeter simulates cache reads that will happen on-chain
+  - Removes unprocessed data from proof after weight exhausted
+- [ ] 5.10 Integrate in `set_validation_data` (on-chain):
+  - Create `WeightMeter::with_limit(weight_limit)`
+  - Create `AccessedNodesTracker::new(proof.len())`
+  - Process static keys automatically
+  - Call `process_proof()` with `ProcessingMode::Verify`
+  - Call `tracker.ensure_no_unused_nodes()` to validate no extraneous data
+  - If result is `Incomplete`, verify `!meter.can_consume(min_weight)` (weight exhausted)
+  - Panic if proof invalid
+- [ ] 5.11 Write unit tests for weight tracking (ref_time + proof_size)
+- [ ] 5.12 Write unit tests for `AccessedNodesTracker` access tracking
+- [ ] 5.13 Write unit tests for proof processing (unchanged tries, cached nodes)
+- [ ] 5.14 Write unit tests for budget enforcement with combined proof+cache usage
+- [ ] 5.15 Write unit tests for trie depth limit enforcement
+- [ ] 5.16 Write unit tests for light block (large pub-sub budget)
+- [ ] 5.17 Write unit tests for heavy block (small pub-sub budget)
+- [ ] 5.18 Write unit tests for full block (no pub-sub budget, graceful skip)
+- [ ] 5.19 Write unit tests for proof validation (all nodes accessed, missing at limit only)
+- [ ] 5.20 Write unit tests for invalid proof detection (missing below limit, extraneous nodes)
+- [ ] 5.21 Write unit tests verifying Prune and Verify modes produce same WeightMeter results
 
 ## 6. Integration and Testing
 

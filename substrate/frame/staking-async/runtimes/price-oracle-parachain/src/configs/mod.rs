@@ -427,10 +427,6 @@ impl frame_system::offchain::AppCrypto<<Signature as Verify>::Signer, Signature>
 	type GenericSignature = sp_core::sr25519::Signature;
 }
 
-parameter_types! {
-	pub const MaxBump: FixedU128 = FixedU128::from_rational(1, 10);
-}
-
 impl price_oracle::oracle::Config for Runtime {
 	type AuthorityId = OracleId;
 	type PriceUpdateInterval = ConstU32<3>;
@@ -446,7 +442,7 @@ impl price_oracle::oracle::Config for Runtime {
 	type TallyManager = price_oracle::tally::SimpleAverage<Self>;
 	type WeightInfo = price_oracle::oracle::weights::SubstrateWeight<Self>;
 	type OnPriceUpdate = ();
-	type DefaultRequestDeadline = ConstU64<1000>;
+	type DefaultRequestDeadline = ConstU64<2000>;
 }
 
 impl price_oracle::client::Config for Runtime {

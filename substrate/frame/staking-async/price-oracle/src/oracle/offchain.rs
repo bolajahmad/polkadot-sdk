@@ -76,6 +76,7 @@ use sp_runtime::{
 	traits::Zero,
 	BoundedVec, FixedU128,
 };
+use alloc::vec;
 
 /// Abstraction type around the functionality of the offchain worker.
 pub struct OracleOffchainWorker<T>(core::marker::PhantomData<T>);
@@ -379,10 +380,12 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 			}
 		};
 
-		let deadline = sp_io::offchain::timestamp()
-			.add(Duration::from_millis(endpoint.deadline.unwrap_or(T::DefaultRequestDeadline::get())));
+		let timeout_ms = endpoint.deadline.unwrap_or(T::DefaultRequestDeadline::get());
+		let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(timeout_ms));
 		let url =
 			core::str::from_utf8(&endpoint.url).map_err(|_| OffchainError::InvalidEndpoint)?;
+
+		ocw_log!(debug, "fetch_endpoint: url={:?}, method={:?}, timeout={}ms", url, endpoint.method, timeout_ms);
 
 		// Resolve body data.
 		let body_bytes = resolve_data(&endpoint.body)?;
@@ -401,12 +404,14 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 			request = request.add_header(name_str, value_str);
 		}
 
-		// Send the request. Handle body if present.
-		if !body_bytes.is_empty() {
-			request = request.body([body_bytes]);
-		}
-
-		let pending = request.send().map_err(OffchainError::CoreHttpError)?;
+		// Send the request.
+		let pending = if !body_bytes.is_empty() {
+			ocw_log!(debug, "fetch_endpoint: sending with body ({} bytes)", body_bytes.len());
+			request.body(vec![body_bytes]).send().map_err(OffchainError::CoreHttpError)?
+		} else {
+			ocw_log!(debug, "fetch_endpoint: sending without body");
+			request.send().map_err(OffchainError::CoreHttpError)?
+		};
 
 		let response = pending
 			.try_wait(deadline)

@@ -60,7 +60,7 @@ lots of other TODOs are left in the code. Notably:
 - [x] TEST-VAL-disable: test setup where RC removes one validator from the set
 - [ ] OPERATIONAL: Bump should be operational.
 - [ ] SEND-TO-AH: Mechanism to send update to AH
-- [ ] MORE-PARSERS + async Tests for them
+- [x] MORE-PARSERS + async Tests for them
 - [ ] UNIT-TEST-SETUP: Unit test setup, we can use ahm-test, but it would be very good to mimic the runtime level stuff like signed tx
   generation, so better write it in the runtime.
 - [ ] DESIGN: Who else should be able to transact on this chain? should we have a signed ext that will block all other origins
@@ -75,5 +75,6 @@ lots of other TODOs are left in the code. Notably:
   - If feasible: All validators send and wait till it is included, then repeat
   - All validators can send at all blocks, but default OCW settings is such that they converge to one per block.
     - Or we can enforce this.
-- [ ] Confidence on endpoints should be dropped and reported.
+- [x] Confidence on endpoints should be dropped and reported.
 - [x] How to represent price and bumps: FixedU128?
+- [ ] Maybe the OCW should include the block has on top of which it is built, such that we are sure we won't include a transaction from an OCW instance running on a fork on the main chain?

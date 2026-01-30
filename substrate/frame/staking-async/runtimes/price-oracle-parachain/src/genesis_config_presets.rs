@@ -13,6 +13,7 @@ use polkadot_sdk::{
 use serde_json::Value;
 use sp_genesis_builder::PresetId;
 use sp_keyring::Sr25519Keyring;
+use pallet_staking_async_price_oracle::oracle::offchain::{Method, ParsingMethod, Endpoint};
 
 /// The default XCM version to set in genesis config.
 const SAFE_XCM_VERSION: u32 = xcm::prelude::XCM_VERSION;
@@ -59,9 +60,49 @@ fn testnet_genesis(
 		price_oracle: PriceOracleConfig {
 			tracked_assets: vec![(
 				1,
-				vec!["https://min-api.cryptocompare.com/data/price?fsym=DOT&tsyms=USD"
-					.to_string().into_bytes()],
-			)]
+				vec![
+					Endpoint {
+						body: Default::default(),
+						deadline: None,
+						headers: Default::default(),
+						method: Method::Get,
+						parsing_method: ParsingMethod::CryptoCompareFree,
+						requires_api_key: false,
+						url: "https://min-api.cryptocompare.com/data/price?fsym=DOT&tsyms=USD"
+							.to_string()
+							.into_bytes()
+							.try_into()
+							.unwrap(),
+					},
+					Endpoint {
+						body: Default::default(),
+						deadline: None,
+						headers: Default::default(),
+						method: Method::Get,
+						parsing_method: ParsingMethod::BinanceFree,
+						requires_api_key: false,
+						url: "https://data-api.binance.vision/api/v3/ticker/price?symbol=DOTUSDT"
+							.to_string()
+							.into_bytes()
+							.try_into()
+							.unwrap(),
+					},
+					Endpoint {
+						body: Default::default(),
+						deadline: None,
+						headers: Default::default(),
+						method: Method::Get,
+						parsing_method: ParsingMethod::CoinLoreFree,
+						requires_api_key: false,
+						url: "https://api.coinlore.net/api/ticker/?id=45219"
+							.to_string()
+							.into_bytes()
+							.try_into()
+							.unwrap(),
+					}
+					],
+				)
+			],
 		}
 	})
 }

@@ -15,7 +15,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// TODO: why time is the way it is.
+/*
+Doc: why time is the way it is. We record 3 points, but the voting stuff is all around local block number. This will work best with dual-core. in general, single-core in mind for now.
+Next:
+
+V0: next week
+
+- [ ] Add confidence to the endpoint, last over-engineering!
+- Tests for OCW struct actually running:
+	- [ ] local http server running, recoding incoming requests.
+	- [ ] test all sorts of endpoint params: body, header, method,
+	- [ ] test offchain data-base key being fetched if needed.
+	- [ ] Test that apis that require ocw key, but is is not present are skipped.
+	- [ ] OCW lock to prevent overlaps
+	- e2e tests where pallet moves forward, and 1 OCW is submitting stuff (stretch)
+- [ ] Benchmarking for on_init
+- New tx extension to:
+	- [ ] Should also read the authorities, and block any tx from other than these folks, if signed origin
+	- [ ] tests
+- [ ] Tests for existing tx-extension (minimal)
+- [ ] vote should be operational
+- [ ] Cleanup test runtime (remove tx-extension, make it more realistic)
+- [ ] Westend integration
+- [ ] Cleanup and have a minimal simulation crate.
+- [ ] vibe code a simple UI in PJS
+
+V1:
+- [ ] Add all the other transactions to manage and have a manager origin.
+- [ ] Prep for final integration: How to properly prevent this chain from being accessed? tx-extension/block teleportation? both?
+
+
+ */
+
+
+
 
 pub mod offchain;
 pub mod weights;
@@ -223,18 +256,12 @@ pub mod pallet {
 	pub(crate) struct StorageManager<T: Config>(core::marker::PhantomData<T>);
 
 	impl<T: Config> StorageManager<T> {
-		/// Current best price of an asset.
-		pub(crate) fn current_price(
-			asset_id: T::AssetId,
-		) -> Option<PriceData<BlockNumberFor<T>, MomentOf<T>>> {
-			Price::<T>::get(&asset_id)
-		}
 
 		/// All of the assets that we are tracking and their list of feeds.
 		pub(crate) fn tracked_assets_with_endpoints() -> Vec<(T::AssetId, Vec<Endpoint>)> {
 			Endpoints::<T>::iter()
-				.map(|(asset_id, endpoints)| (asset_id, endpoints.into_inner()))
-				.collect()
+			.map(|(asset_id, endpoints)| (asset_id, endpoints.into_inner()))
+			.collect()
 		}
 
 		/// All of the assets that we are tracking.
@@ -257,6 +284,7 @@ pub mod pallet {
 		}
 
 		/// Deregister an asset from being tracked.
+		#[allow(unused)]
 		fn deregister_asset(asset_id: T::AssetId) -> DispatchResult {
 			ensure!(Self::is_tracked(asset_id), Error::<T>::AssetNotTracked);
 			Endpoints::<T>::remove(asset_id);
@@ -269,6 +297,7 @@ pub mod pallet {
 		}
 
 		/// Add an endpoint to an already tracked asset.
+		#[allow(unused)]
 		fn add_endpoint(asset_id: T::AssetId, endpoint: Endpoint) -> DispatchResult {
 			let mut stored = Endpoints::<T>::get(&asset_id).ok_or(Error::<T>::AssetNotTracked)?;
 			stored.try_push(endpoint).map_err(|_| Error::<T>::TooManyEndpoints)?;
@@ -277,6 +306,7 @@ pub mod pallet {
 		}
 
 		/// Remove an endpoint from an already tracked asset.
+		#[allow(unused)]
 		fn remove_endpoint_at(asset_id: T::AssetId, index: usize) -> DispatchResult {
 			let mut stored = Endpoints::<T>::get(&asset_id).ok_or(Error::<T>::AssetNotTracked)?;
 			ensure!(index < stored.len(), Error::<T>::EndpointNotFound);
@@ -366,7 +396,15 @@ pub mod pallet {
 	}
 
 	#[cfg(any(test, feature = "std", feature = "try-runtime"))]
+	#[allow(unused)]
 	impl<T: Config> StorageManager<T> {
+		/// Current best price of an asset.
+		pub(crate) fn current_price(
+			asset_id: T::AssetId,
+		) -> Option<PriceData<BlockNumberFor<T>, MomentOf<T>>> {
+			Price::<T>::get(&asset_id)
+		}
+
 		/// Ensure all storage items tracked by this type are valid.
 		///
 		/// We look into 4 mappings and their keys:
@@ -661,7 +699,6 @@ pub mod pallet {
 	}
 
 	#[pallet::call]
-	#[allow(unused)] // TODO: remove later
 	impl<T: Config> Pallet<T> {
 		/// A new opinion from `origin` about the `price` of `asset_id`.
 		#[pallet::call_index(0)]
@@ -699,63 +736,63 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight({1000})]
 		pub fn register_asset(
-			origin: OriginFor<T>,
-			asset_id: T::AssetId,
-			endpoints: Vec<Endpoint>,
+			_origin: OriginFor<T>,
+			_asset_id: T::AssetId,
+			_endpoints: Vec<Endpoint>,
 		) -> DispatchResult {
-			todo!();
+			Ok(())
 		}
 
 		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
-		pub fn deregister_asset(origin: OriginFor<T>, asset_id: T::AssetId) -> DispatchResult {
-			todo!();
+		#[pallet::weight({1000})]
+		pub fn deregister_asset(_origin: OriginFor<T>, _asset_id: T::AssetId) -> DispatchResult {
+			Ok(())
 		}
 
 		#[pallet::call_index(3)]
-		#[pallet::weight(0)]
+		#[pallet::weight({1000})]
 		pub fn add_endpoint(
-			origin: OriginFor<T>,
-			asset_id: T::AssetId,
-			endpoint: Vec<u8>,
+			_origin: OriginFor<T>,
+			_asset_id: T::AssetId,
+			_endpoint: Vec<u8>,
 		) -> DispatchResult {
-			todo!();
+			Ok(())
 		}
 
 		#[pallet::call_index(4)]
-		#[pallet::weight(0)]
+		#[pallet::weight({1000})]
 		pub fn remove_endpoint(
-			origin: OriginFor<T>,
-			asset_id: T::AssetId,
-			index: u32,
+			_origin: OriginFor<T>,
+			_asset_id: T::AssetId,
+			_index: u32,
 		) -> DispatchResult {
-			todo!();
+			Ok(())
 		}
 
 		#[pallet::call_index(5)]
-		#[pallet::weight(0)]
-		pub fn force_set_authorities(origin: OriginFor<T>) -> DispatchResult {
-			todo!();
+		#[pallet::weight({1000})]
+		pub fn force_set_authorities(_origin: OriginFor<T>) -> DispatchResult {
+			Ok(())
 		}
 
 		#[pallet::call_index(6)]
-		#[pallet::weight(0)]
-		pub fn set_invulnerables(origin: OriginFor<T>) -> DispatchResult {
-			todo!();
+		#[pallet::weight({1000})]
+		pub fn set_invulnerables(_origin: OriginFor<T>) -> DispatchResult {
+			Ok(())
 		}
 
 		#[pallet::call_index(7)]
-		#[pallet::weight(0)]
-		pub fn ban_authority(origin: OriginFor<T>) -> DispatchResult {
-			todo!();
+		#[pallet::weight({1000})]
+		pub fn ban_authority(_origin: OriginFor<T>) -> DispatchResult {
+			Ok(())
 		}
 
 		#[pallet::call_index(8)]
-		#[pallet::weight(0)]
-		pub fn unban_authority(origin: OriginFor<T>) -> DispatchResult {
-			todo!();
+		#[pallet::weight({1000})]
+		pub fn unban_authority(_origin: OriginFor<T>) -> DispatchResult {
+			Ok(())
 		}
 	}
 

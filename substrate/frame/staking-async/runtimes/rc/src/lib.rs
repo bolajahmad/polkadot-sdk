@@ -451,7 +451,6 @@ impl pallet_balances::Config for Runtime {
 	type FreezeIdentifier = RuntimeFreezeReason;
 	type MaxFreezes = VariantCountOf<RuntimeFreezeReason>;
 	type DoneSlashHandler = ();
-	type BurnHandler = pallet_balances::DirectBurn<Balances>;
 }
 
 parameter_types! {

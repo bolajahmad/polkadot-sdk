@@ -25,8 +25,8 @@ use frame_support::{
 		BuildStorage, SaturatedConversion,
 	},
 	traits::{
-		tokens::DirectBurn, AsEnsureOriginWithArg, ConstU128, ConstU32, Contains, ContainsPair,
-		Disabled, Everything, Nothing, OriginTrait,
+		AsEnsureOriginWithArg, ConstU128, ConstU32, Contains, ContainsPair, Disabled, Everything,
+		Nothing, OriginTrait,
 	},
 	weights::WeightToFee as WeightToFeeT,
 };
@@ -88,7 +88,6 @@ impl pallet_balances::Config for TestRuntime {
 	type AccountStore = System;
 	type Balance = Balance;
 	type ExistentialDeposit = ExistentialDeposit;
-	type BurnHandler = DirectBurn<Balances>;
 }
 
 // Assets instance

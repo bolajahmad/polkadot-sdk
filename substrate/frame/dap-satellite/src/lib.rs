@@ -17,49 +17,27 @@
 
 //! # DAP Satellite Pallet
 //!
-//! This pallet is meant to be used on **system chains other than AssetHub** (e.g., Coretime,
-//! People, BridgeHub) or on the **Relay Chain**. It should NOT be deployed on AssetHub, which
-//! hosts the central DAP pallet (`pallet-dap`).
+//! Collects funds into a satellite buffer on non-AssetHub chains for eventual transfer to the
+//! central DAP on AssetHub.
 //!
-//! The DAP Satellite collects funds that would otherwise be burned (e.g., transaction fees and
-//! coretime revenue) into a local satellite account. These funds are accumulated
-//! locally and will eventually be transferred via XCM to the central DAP buffer on AssetHub.
-//!
-//! ## Implementation
-//!
-//! This is a minimal implementation that only accumulates funds locally. The periodic XCM
-//! transfer to AssetHub is NOT yet implemented.
-//!
-//! In this first iteration, the pallet provides the following trait implementations:
-//! - `BurnHandler`: Called by `pallet_balances::burn_from` to redirect burned funds to satellite.
-//! - `OnUnbalanced`: For the `fungible::Balanced` trait, useful for coretime revenue and fee
-//!   splits.
-//!
-//! `BurnHandler`: frame_support::traits::tokens::BurnHandler
-//! `OnUnbalanced`: frame_support::traits::OnUnbalanced
-//!
-//! For existing chains adding DAP Satellite, include
-//! `dap_satellite::migrations::v1::InitSatelliteAccount` in your migrations tuple.
-//!
-//! **TODO:**
-//! - Periodic XCM transfer to AssetHub DAP buffer
-//! - Configuration for XCM period and destination
+//! Use on: Relay Chain, Coretime, People, BridgeHub. Do NOT use on AssetHub (use `pallet-dap`).
 //!
 //! ## Usage
 //!
-//! On system chains (not AssetHub) or Relay Chain, configure pallets to use the satellite:
+//! - **Fees**: Use [`DealWithFeesSplit`] to split fees between DAP satellite and other handlers
+//! - **Slashes/revenue**: Use `DapSatellite` as `OnUnbalanced` handler
+//! - **Burn redirection**: Use [`currency::SatelliteCurrency<T>`] as `type Currency` in pallets
 //!
-//! ```ignore
-//! // In runtime configuration for Coretime/People/BridgeHub/RelayChain
-//! impl pallet_balances::Config for Runtime {
-//!     type BurnHandler = DapSatellite;
-//! }
+//! Note: Direct calls to `pallet_balances::Pallet::burn()` extrinsic bypass the wrapper.
 //!
-//! // For coretime revenue (pallet-broker)
-//! impl pallet_broker::Config for Runtime {
-//!     type OnRevenue = DapSatellite;
-//! }
-//! ```
+//! ## Setup
+//!
+//! The satellite account is created at genesis with ED. For existing chains, include
+//! `dap_satellite::migrations::v1::InitSatelliteAccount` in migrations.
+//!
+//! ## TODO
+//!
+//! - Periodic XCM transfer to AssetHub DAP buffer
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -74,12 +52,12 @@ use frame_support::{
 	pallet_prelude::*,
 	traits::{
 		fungible::{Balanced, Credit, Inspect, Mutate, Unbalanced},
-		tokens::{BurnHandler, Fortitude, Precision, Precision::BestEffort, Preservation},
+		tokens::{Fortitude, Precision, Precision::BestEffort, Preservation},
 		Imbalance, OnUnbalanced,
 	},
 	PalletId,
 };
-use sp_runtime::{Percent, Saturating, TokenError};
+use sp_runtime::{Percent, Saturating};
 
 pub use pallet::*;
 
@@ -283,39 +261,6 @@ where
 	}
 }
 
-/// Implementation of BurnHandler for pallet.
-///
-/// Moves burned funds to the satellite account instead of reducing total issuance.
-/// Total issuance remains unchanged; funds are marked as inactive for governance.
-impl<T: Config> BurnHandler<T::AccountId, BalanceOf<T>> for Pallet<T> {
-	fn burn_from(
-		who: &T::AccountId,
-		amount: BalanceOf<T>,
-		preservation: Preservation,
-		precision: Precision,
-		force: Fortitude,
-	) -> Result<BalanceOf<T>, DispatchError> {
-		let actual = T::Currency::reducible_balance(who, preservation, force).min(amount);
-		ensure!(actual == amount || precision == BestEffort, TokenError::FundsUnavailable);
-		let actual = T::Currency::decrease_balance(who, actual, BestEffort, preservation, force)?;
-
-		// Credit the satellite account instead of reducing total issuance.
-		let satellite = Self::satellite_account();
-		let _ = T::Currency::increase_balance(&satellite, actual, BestEffort).inspect_err(|_| {
-			frame_support::defensive!(
-				"Failed to credit DAP satellite - Loss of funds due to overflow"
-			);
-		});
-
-		// Mark funds as inactive so they don't participate in governance voting.
-		// TODO: When implementing XCM transfer to AssetHub, call `reactivate(amount)` before
-		// sending. On AssetHub, DAP will call `deactivate` again with AssetHub's own accounting.
-		T::Currency::deactivate(actual);
-
-		Ok(actual)
-	}
-}
-
 /// Implementation of `OnUnbalanced` for the `fungible::Balanced` trait.
 ///
 /// Use this on system chains (not AssetHub) or Relay Chain to collect imbalances
@@ -353,5 +298,139 @@ impl<T: Config> OnUnbalanced<CreditOf<T>> for Pallet<T> {
 		// TODO: When implementing XCM transfer to AssetHub, call `reactivate(amount)` before
 		// sending.
 		T::Currency::deactivate(numeric_amount);
+	}
+}
+
+/// Fungible currency adapter module.
+pub mod currency {
+	use super::*;
+	use frame_support::traits::{
+		fungible::Dust,
+		tokens::{DepositConsequence, Provenance, WithdrawConsequence},
+	};
+	use sp_runtime::TokenError;
+
+	/// Fungible currency wrapper that redirects burns to the DAP satellite account.
+	///
+	/// Use this as `type NativeBalance =
+	/// pallet_dap_satellite::currency::SatelliteCurrency<Runtime>` in runtimes that want to
+	/// redirect burns to the satellite instead of reducing total issuance.
+	///
+	/// All fungible trait methods delegate to the inner currency except `burn_from`,
+	/// which transfers funds to the satellite account.
+	pub struct SatelliteCurrency<T>(core::marker::PhantomData<T>);
+
+	impl<T: Config> Inspect<T::AccountId> for SatelliteCurrency<T> {
+		type Balance = BalanceOf<T>;
+
+		fn total_issuance() -> Self::Balance {
+			T::Currency::total_issuance()
+		}
+		fn active_issuance() -> Self::Balance {
+			T::Currency::active_issuance()
+		}
+		fn minimum_balance() -> Self::Balance {
+			T::Currency::minimum_balance()
+		}
+		fn total_balance(who: &T::AccountId) -> Self::Balance {
+			T::Currency::total_balance(who)
+		}
+		fn balance(who: &T::AccountId) -> Self::Balance {
+			T::Currency::balance(who)
+		}
+		fn reducible_balance(
+			who: &T::AccountId,
+			preservation: Preservation,
+			force: Fortitude,
+		) -> Self::Balance {
+			T::Currency::reducible_balance(who, preservation, force)
+		}
+		fn can_deposit(
+			who: &T::AccountId,
+			amount: Self::Balance,
+			provenance: Provenance,
+		) -> DepositConsequence {
+			T::Currency::can_deposit(who, amount, provenance)
+		}
+		fn can_withdraw(
+			who: &T::AccountId,
+			amount: Self::Balance,
+		) -> WithdrawConsequence<Self::Balance> {
+			T::Currency::can_withdraw(who, amount)
+		}
+	}
+
+	impl<T: Config> Unbalanced<T::AccountId> for SatelliteCurrency<T> {
+		fn handle_dust(dust: Dust<T::AccountId, Self>) {
+			T::Currency::handle_dust(Dust(dust.0));
+		}
+		fn write_balance(
+			who: &T::AccountId,
+			amount: Self::Balance,
+		) -> Result<Option<Self::Balance>, DispatchError> {
+			T::Currency::write_balance(who, amount)
+		}
+		fn set_total_issuance(amount: Self::Balance) {
+			T::Currency::set_total_issuance(amount)
+		}
+		fn decrease_balance(
+			who: &T::AccountId,
+			amount: Self::Balance,
+			precision: Precision,
+			preservation: Preservation,
+			force: Fortitude,
+		) -> Result<Self::Balance, DispatchError> {
+			T::Currency::decrease_balance(who, amount, precision, preservation, force)
+		}
+		fn increase_balance(
+			who: &T::AccountId,
+			amount: Self::Balance,
+			precision: Precision,
+		) -> Result<Self::Balance, DispatchError> {
+			T::Currency::increase_balance(who, amount, precision)
+		}
+		fn deactivate(amount: Self::Balance) {
+			T::Currency::deactivate(amount)
+		}
+		fn reactivate(amount: Self::Balance) {
+			T::Currency::reactivate(amount)
+		}
+	}
+
+	impl<T: Config> Mutate<T::AccountId> for SatelliteCurrency<T> {
+		fn burn_from(
+			who: &T::AccountId,
+			amount: Self::Balance,
+			preservation: Preservation,
+			precision: Precision,
+			force: Fortitude,
+		) -> Result<Self::Balance, DispatchError> {
+			let actual = T::Currency::reducible_balance(who, preservation, force).min(amount);
+			frame_support::ensure!(
+				actual == amount || precision == BestEffort,
+				TokenError::FundsUnavailable
+			);
+			let actual =
+				T::Currency::decrease_balance(who, actual, BestEffort, preservation, force)?;
+
+			// Credit the satellite account instead of reducing total issuance.
+			let satellite = Pallet::<T>::satellite_account();
+			let _ =
+				T::Currency::increase_balance(&satellite, actual, BestEffort).inspect_err(|_| {
+					frame_support::defensive!(
+						"Failed to credit DAP satellite - Loss of funds due to overflow"
+					);
+				});
+
+			// Mark funds as inactive so they don't participate in governance voting.
+			T::Currency::deactivate(actual);
+
+			Ok(actual)
+		}
+	}
+
+	impl<T: Config> Balanced<T::AccountId> for SatelliteCurrency<T> {
+		type OnDropCredit = <T::Currency as Balanced<T::AccountId>>::OnDropCredit;
+		type OnDropDebt = <T::Currency as Balanced<T::AccountId>>::OnDropDebt;
 	}
 }

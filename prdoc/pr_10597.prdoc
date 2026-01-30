@@ -1,4 +1,4 @@
-title: 'Introduce pallet-dap-satellite and BurnHandler trait to control burn_from operation'
+title: 'Introduce pallet-dap-satellite with fungible currency wrappers'
 doc:
 - audience: Runtime Dev
   description: |-
@@ -8,86 +8,43 @@ doc:
 
     **Changes:**
 
-    - **pallet-dap-satellite**: New pallet that implements `BurnHandler` and `OnUnbalanced`
-      by accumulating funds in a satellite account.
+    - **pallet-dap-satellite**: New pallet with `SatelliteCurrency<T>` wrapper that implements
+      all fungible traits, delegating to the inner currency but redirecting `burn_from` to the
+      satellite account.
+    - **pallet-dap**: Added `DapCurrency<T>` wrapper (same pattern) for AssetHub.
     - DAP and DAP satellite funds are excluded from `active_issuance`.
-    - **[breaking change] pallet-balances**: new `BurnHandler` trait which controls the entire burn operation including
-      balance reduction and issuance handling.
-      Runtimes must explicitly configure this:
-      - Non-DAP runtimes should use `pallet_balances::DirectBurn<Balances>`
-      - DAP-integrated runtimes use `pallet_dap::Pallet<Runtime>` (on AssetHub) or
-        `pallet_dap_satellite::Pallet<Runtime>` (on other system chains)
-      Note that non-native asset burns via pallet-assets do not use pallet-balances's implementation
-      of BurnHandler but they rely on the default one: each asset in pallet-assets has its own supply
-      that should decrease when burned.
-
-    - **frame-support**: New `BurnHandler` trait and `DirectBurn` struct. `DirectBurn` implements
-      `BurnHandler::on_burned` to reduce total issuance.
-
     - Redirect all burns to DAP or DAP satellite on Westend chains
     - Fee split set to 100% DAP on Westend chains
+
+    **Usage:**
+
+    Runtimes that want burns redirected to DAP/satellite should use the currency wrapper:
+    ```rust
+    // On AssetHub:
+    type NativeBalance = pallet_dap::currency::DapCurrency<Runtime>;
+
+    // On other system chains (Coretime, Collective, People, BridgeHub, RelayChain):
+    type NativeBalance = pallet_dap_satellite::currency::SatelliteCurrency<Runtime>;
+    ```
+
+    Other pallets using `T::Currency::burn_from` will use the wrapper's redirected behavior.
+    The pallet-balances extrinsics (like `burn`) continue to use standard burn semantics.
 crates:
-- name: frame-support
-  bump: minor
-- name: pallet-balances
-  bump: major
 - name: pallet-dap-satellite
+  bump: minor
+- name: pallet-dap
   bump: minor
 - name: polkadot-sdk
   bump: minor
 - name: asset-hub-westend-runtime
   bump: minor
 - name: westend-runtime
-  bump: major
+  bump: minor
 - name: bridge-hub-westend-runtime
   bump: minor
 - name: collectives-westend-runtime
-  bump: major
+  bump: minor
 - name: coretime-westend-runtime
-  bump: major
+  bump: minor
 - name: people-westend-runtime
-  bump: major
-- name: rococo-runtime
   bump: minor
-- name: asset-hub-rococo-runtime
-  bump: minor
-- name: bridge-hub-rococo-runtime
-  bump: minor
-- name: kitchensink-runtime
-  bump: minor
-- name: polkadot-test-runtime
-  bump: minor
-- name: cumulus-test-runtime
-  bump: minor
-- name: penpal-runtime
-  bump: minor
-- name: yet-another-parachain-runtime
-  bump: minor
-- name: pallet-asset-rewards
-  bump: patch
-- name: pallet-assets-freezer
-  bump: patch
-- name: pallet-nis
-  bump: patch
-- name: pallet-contracts-mock-network
-  bump: minor
-- name: pallet-staking-async
-  bump: patch
-- name: pallet-staking-async-rc-runtime
-  bump: minor
-- name: pallet-staking-async-parachain-runtime
-  bump: minor
-- name: pallet-dap
-  bump: minor
-- name: staging-xcm-builder
-  bump: patch
-- name: solochain-template-runtime
-  bump: minor
-- name: parachain-template-runtime
-  bump: minor
-- name: pallet-asset-conversion-ops
-  bump: patch
-- name: polkadot-runtime-parachains
-  bump: patch
-- name: pallet-revive
-  bump: patch

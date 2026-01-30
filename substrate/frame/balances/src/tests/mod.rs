@@ -46,7 +46,6 @@ use sp_runtime::{
 };
 use std::collections::BTreeSet;
 
-mod burn_handler_tests;
 mod consumer_limit_tests;
 mod currency_tests;
 mod dispatchable_tests;
@@ -131,7 +130,6 @@ impl Config for Test {
 	type RuntimeFreezeReason = TestId;
 	type FreezeIdentifier = TestId;
 	type MaxFreezes = VariantCountOf<TestId>;
-	type BurnHandler = crate::DirectBurn<Pallet<Test>>;
 }
 
 #[derive(Clone)]

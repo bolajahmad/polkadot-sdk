@@ -19,7 +19,7 @@
 use codec::{Decode, Encode};
 use frame_support::{
 	construct_runtime, derive_impl, parameter_types,
-	traits::{tokens::DirectBurn, Disabled, Everything, Nothing},
+	traits::{Disabled, Everything, Nothing},
 	weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 };
 
@@ -78,7 +78,6 @@ impl pallet_balances::Config for Runtime {
 	type Balance = Balance;
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = System;
-	type BurnHandler = DirectBurn<Balances>;
 }
 
 parameter_types! {

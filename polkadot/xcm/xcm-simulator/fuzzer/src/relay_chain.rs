@@ -18,7 +18,7 @@
 
 use frame_support::{
 	construct_runtime, derive_impl, parameter_types,
-	traits::{tokens::DirectBurn, Disabled, Everything, Nothing, ProcessMessage, ProcessMessageError},
+	traits::{Disabled, Everything, Nothing, ProcessMessage, ProcessMessageError},
 	weights::{Weight, WeightMeter},
 };
 
@@ -79,7 +79,6 @@ impl pallet_balances::Config for Runtime {
 	type Balance = Balance;
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = System;
-	type BurnHandler = DirectBurn<Balances>;
 }
 
 impl shared::Config for Runtime {

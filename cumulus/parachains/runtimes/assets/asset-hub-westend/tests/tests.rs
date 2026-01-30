@@ -47,9 +47,14 @@ use frame_support::{
 		fungibles::{
 			self, Create, Inspect as FungiblesInspect, InspectEnumerable, Mutate as FungiblesMutate,
 		},
-		tokens::asset_ops::{
-			common_strategies::{Bytes, Owner},
-			Inspect as InspectUniqueAsset,
+		tokens::{
+			asset_ops::{
+				common_strategies::{Bytes, Owner},
+				Inspect as InspectUniqueAsset,
+			},
+			Fortitude::Polite,
+			Precision::Exact,
+			Preservation::Expendable,
 		},
 		ContainsPair,
 	},
@@ -98,6 +103,7 @@ type AssetIdForTrustBackedAssetsConvert =
 	assets_common::AssetIdForTrustBackedAssetsConvert<TrustBackedAssetsPalletLocation>;
 
 type RuntimeHelper = asset_test_utils::RuntimeHelper<Runtime, AllPalletsWithoutSystem>;
+type DapCurrency = pallet_dap::currency::DapCurrency<Runtime>;
 
 fn collator_session_key(account: [u8; 32]) -> CollatorSessionKey<Runtime> {
 	CollatorSessionKey::new(
@@ -2091,34 +2097,43 @@ fn session_keys_are_compatible_between_ah_and_rc() {
 	);
 }
 
+/// Tests the two burn paths:
+/// 1. `Balances::burn()` extrinsic → classic burn (reduces total issuance)
+/// 2. `DapCurrency::burn_from()` → redirects to DAP buffer (preserves total issuance)
 #[test]
-fn burn_redirects_to_dap_buffer() {
+fn burn_behaviors_classic_vs_dap_wrapper() {
 	ExtBuilder::<Runtime>::default().build().execute_with(|| {
 		let user: AccountId = BOB.into();
 		let initial_balance = 100 * UNITS;
 		let burn_amount = 10 * UNITS;
 
-		// Given: user has initial balance and DAP buffer exists with ED.
 		assert_ok!(Balances::mint_into(&user, initial_balance));
 
 		let dap_buffer = Dap::buffer_account();
 		let initial_dap_balance = Balances::free_balance(&dap_buffer);
 		let initial_issuance = Balances::total_issuance();
-		let initial_active_issuance = Balances::active_issuance();
 
-		// When: user burns some tokens.
+		// 1. Direct Balances::burn() → classic burn (reduces total issuance)
 		assert_ok!(Balances::burn(RuntimeOrigin::signed(user.clone()), burn_amount, false));
 
-		// Then: DAP buffer receives the burned amount.
-		assert_eq!(Balances::free_balance(&dap_buffer), initial_dap_balance + burn_amount);
-
-		// And: user's balance is reduced.
 		assert_eq!(Balances::free_balance(&user), initial_balance - burn_amount);
+		assert_eq!(Balances::total_issuance(), initial_issuance - burn_amount);
+		assert_eq!(Balances::free_balance(&dap_buffer), initial_dap_balance);
 
-		// And: total issuance is unchanged (funds redirected, not destroyed).
-		assert_eq!(Balances::total_issuance(), initial_issuance);
+		// 2. DapCurrency::burn_from() → redirects to DAP buffer
+		let issuance_after_classic_burn = Balances::total_issuance();
+		assert_ok!(<DapCurrency as Mutate<_>>::burn_from(
+			&user,
+			burn_amount,
+			Expendable,
+			Exact,
+			Polite
+		));
 
-		// And: active issuance is reduced (funds deactivated, excluded from governance).
-		assert_eq!(Balances::active_issuance(), initial_active_issuance - burn_amount);
+		assert_eq!(Balances::free_balance(&user), initial_balance - 2 * burn_amount);
+		// Total issuance unchanged (redirected, not burned)
+		assert_eq!(Balances::total_issuance(), issuance_after_classic_burn);
+		// DAP buffer received the funds
+		assert_eq!(Balances::free_balance(&dap_buffer), initial_dap_balance + burn_amount);
 	});
 }

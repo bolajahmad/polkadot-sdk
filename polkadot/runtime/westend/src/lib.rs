@@ -408,7 +408,6 @@ impl pallet_balances::Config for Runtime {
 	type FreezeIdentifier = RuntimeFreezeReason;
 	type MaxFreezes = VariantCountOf<RuntimeFreezeReason>;
 	type DoneSlashHandler = ();
-	type BurnHandler = DapSatellite;
 }
 
 parameter_types! {

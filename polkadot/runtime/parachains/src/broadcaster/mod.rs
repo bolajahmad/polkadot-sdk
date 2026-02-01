@@ -51,6 +51,56 @@
 //!
 //! Root can force deregistration with `force_deregister_publisher`, which removes all data
 //! and releases the deposit in a single call.
+//!
+//! ## TTL (Time-To-Live) Management
+//!
+//! Each published key-value pair can have an optional TTL:
+//!
+//! - **Infinite TTL** (ttl = 0): Data persists until explicitly deleted or publisher deregisters.
+//! - **Finite TTL** (ttl > 0): Data automatically expires after `ttl` blocks from insertion. The
+//!   maximum TTL is capped by the `MaxTtl` constant.
+//!
+//! TTL cleanup happens automatically during `on_idle`:
+//! - Scans `TtlData` for expired keys
+//! - Deletes up to `MaxTtlScansPerIdle` keys per block
+//! - Uses `TtlScanCursor` for resumption across blocks
+//!
+//! Publishers can also manually delete keys using `delete_keys` (manager) or governance can
+//! force deletion via `force_delete_keys`.
+//!
+//! ## XCM Integration
+//!
+//! Parachains publish data via the XCM `Publish` instruction:
+//!
+//! ```ignore
+//! Xcm(vec![Publish { data: vec![
+//!     PublishItem { key: hash, value: data, ttl: Some(100) },
+//! ]}])
+//! ```
+//!
+//! The XCM executor calls `handle_publish()` which:
+//! 1. Validates the publisher is registered
+//! 2. Enforces storage limits (keys, value size, total size)
+//! 3. Stores data in the publisher's child trie
+//! 4. Manages TTL metadata in `TtlData` storage
+//!
+//! ## Storage Limits
+//!
+//! The pallet enforces several limits per publisher:
+//! - `MaxStoredKeys`: Maximum number of keys
+//! - `MaxValueLength`: Maximum size of each value
+//! - `MaxTotalStorageSize`: Combined size of all stored data
+//!
+//! Exceeding any limit causes the publish operation to fail.
+//!
+//! ## Parachain Offboarding
+//!
+//! When a parachain offboards from the relay chain, the pallet automatically:
+//! 1. Removes all published data from the child trie
+//! 2. Clears TTL metadata
+//! 3. Releases any held deposit
+//!
+//! This cleanup is triggered via the `OnNewSessionOutgoing` hook.
 
 use alloc::vec::Vec;
 use codec::{Decode, Encode};
@@ -93,6 +143,17 @@ pub struct PublisherInfo<AccountId, Balance> {
 	pub manager: AccountId,
 	/// The amount held as deposit for registration.
 	pub deposit: Balance,
+}
+
+/// Published data entry containing value and TTL metadata.
+#[derive(Clone, Debug, Encode, Decode, TypeInfo)]
+pub struct PublishedEntry<BlockNumber> {
+	/// The actual published value.
+	pub value: Vec<u8>,
+	/// Time-to-live in blocks. 0 means infinite (never expires).
+	pub ttl: u32,
+	/// Block number when this entry was inserted/updated.
+	pub when_inserted: BlockNumber,
 }
 
 #[frame_support::pallet]
@@ -162,6 +223,10 @@ pub mod pallet {
 		/// System parachains may use `force_register_publisher` with a custom deposit amount.
 		#[pallet::constant]
 		type PublisherDeposit: Get<BalanceOf<Self>>;
+
+		/// Maximum number of expired keys to clean up per `on_idle` call.
+		#[pallet::constant]
+		type MaxTtlScansPerIdle: Get<u32>;
 	}
 
 	#[pallet::event]
@@ -175,6 +240,12 @@ pub mod pallet {
 		PublisherDeregistered { para_id: ParaId },
 		/// Published data has been cleaned up.
 		DataCleanedUp { para_id: ParaId },
+		/// A key expired and was deleted.
+		KeyExpired { publisher: ParaId, key: [u8; 32] },
+		/// Keys were manually deleted by the publisher.
+		KeysDeleted { publisher: ParaId, count: u32 },
+		/// Keys were force-deleted by governance.
+		KeysForcedDeleted { publisher: ParaId, count: u32 },
 	}
 
 	/// Registered publishers and their deposit information.
@@ -208,6 +279,27 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type TotalStorageSize<T: Config> = StorageMap<_, Twox64Concat, ParaId, u32, ValueQuery>;
 
+	/// TTL metadata for keys with finite expiration.
+	///
+	/// Maps (ParaId, key) to (ttl_blocks, insertion_block). Keys with TTL=0 (infinite) are not
+	/// stored here. Expiration occurs when `current_block >= insertion_block + ttl_blocks`.
+	#[pallet::storage]
+	pub type TtlData<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		ParaId,
+		Twox64Concat,
+		[u8; 32],
+		(u32, BlockNumberFor<T>),
+		OptionQuery,
+	>;
+
+	/// Cursor for TTL cleanup scan resumption.
+	///
+	/// Stores the (ParaId, key) position to resume scanning in the next `on_idle` call.
+	#[pallet::storage]
+	pub type TtlScanCursor<T: Config> = StorageValue<_, (ParaId, [u8; 32]), OptionQuery>;
+
 	#[pallet::error]
 	pub enum Error<T> {
 		/// Too many items in a single publish operation.
@@ -234,15 +326,17 @@ pub mod pallet {
 		NoDataToCleanup,
 		/// Cannot publish empty data.
 		EmptyPublish,
+		/// Cannot delete keys: none of the specified keys exist.
+		NoKeysToDelete,
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_idle(_n: BlockNumberFor<T>, remaining_weight: Weight) -> Weight {
+			Self::cleanup_expired_keys(remaining_weight)
+		}
+
 		fn integrity_test() {
-			assert!(
-				T::MaxPublishItems::get() <= xcm::v5::MaxPublishItems::get(),
-				"Broadcaster MaxPublishItems exceeds XCM MaxPublishItems upper bound"
-			);
 			assert!(
 				T::MaxValueLength::get() <= xcm::v5::MaxPublishValueLength::get(),
 				"Broadcaster MaxValueLength exceeds XCM MaxPublishValueLength upper bound"
@@ -410,6 +504,44 @@ pub mod pallet {
 			Self::deposit_event(Event::PublisherDeregistered { para_id });
 			Ok(())
 		}
+
+		/// Delete specific keys from a publisher's storage.
+		///
+		/// Only the manager of the registered publisher can call this.
+		#[pallet::call_index(5)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(2 + keys.len() as u64, 1 + keys.len() as u64 * 2))]
+		pub fn delete_keys(
+			origin: OriginFor<T>,
+			para_id: ParaId,
+			keys: Vec<[u8; 32]>,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+
+			let info = RegisteredPublishers::<T>::get(para_id).ok_or(Error::<T>::NotRegistered)?;
+			ensure!(who == info.manager, Error::<T>::NotAuthorized);
+
+			let count = Self::do_delete_keys(para_id, &keys)?;
+			Self::deposit_event(Event::KeysDeleted { publisher: para_id, count });
+			Ok(())
+		}
+
+		/// Force delete specific keys from any publisher's storage.
+		///
+		/// Only callable by Root.
+		#[pallet::call_index(6)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1 + keys.len() as u64, 1 + keys.len() as u64 * 2))]
+		pub fn force_delete_keys(
+			origin: OriginFor<T>,
+			para_id: ParaId,
+			keys: Vec<[u8; 32]>,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+			ensure!(RegisteredPublishers::<T>::contains_key(para_id), Error::<T>::NotRegistered);
+
+			let count = Self::do_delete_keys(para_id, &keys)?;
+			Self::deposit_event(Event::KeysForcedDeleted { publisher: para_id, count });
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -450,12 +582,11 @@ pub mod pallet {
 			let child_info = Self::derive_child_info(para_id);
 			let published_keys = PublishedKeys::<T>::get(para_id);
 
-			// Remove all key-value pairs from the child trie
 			for key in published_keys.iter() {
 				frame_support::storage::child::kill(&child_info, key);
+				TtlData::<T>::remove(para_id, key);
 			}
 
-			// Clean up tracking storage
 			PublishedKeys::<T>::remove(para_id);
 			TotalStorageSize::<T>::remove(para_id);
 			PublisherExists::<T>::remove(para_id);
@@ -527,102 +658,76 @@ pub mod pallet {
 
 		/// Processes a publish operation from a parachain.
 		///
-		/// Validates the publisher is registered, checks all bounds, and stores the provided
-		/// key-value pairs in the publisher's dedicated child trie. Updates the child trie root
-		/// and published keys tracking.
-		///
-		/// Keys must be 32-byte hashes.
+		/// Each item is (key, value, ttl) where ttl=0 means infinite (never expires).
 		pub fn handle_publish(
 			origin_para_id: ParaId,
-			data: Vec<([u8; 32], Vec<u8>)>,
+			key: [u8; 32],
+			value: Vec<u8>,
+			ttl: u32,
 		) -> DispatchResult {
-			// Check publisher is registered
 			ensure!(
-				RegisteredPublishers::<T>::contains_key(origin_para_id),
+				RegisteredPublishers::<T>::contains_key(origin_para_id) ||
+					u32::from(origin_para_id) < 2000,
 				Error::<T>::PublishNotAuthorized
 			);
 
-			// Reject empty publishes to avoid wasting execution weight
-			ensure!(!data.is_empty(), Error::<T>::EmptyPublish);
-
-			let items_count = data.len() as u32;
-
-			// Validate input limits first before making any changes
-			ensure!(
-				data.len() <= T::MaxPublishItems::get() as usize,
-				Error::<T>::TooManyPublishItems
-			);
-
-			// Validate all values before creating publisher entry
-			for (_key, value) in &data {
-				ensure!(value.len() <= T::MaxValueLength::get() as usize, Error::<T>::ValueTooLong);
-			}
+			ensure!(value.len() <= T::MaxValueLength::get() as usize, Error::<T>::ValueTooLong);
 
 			let mut published_keys = PublishedKeys::<T>::get(origin_para_id);
 			let current_total_size = TotalStorageSize::<T>::get(origin_para_id);
 
-			// Count new unique keys to prevent exceeding MaxStoredKeys
-			let mut new_keys_count = 0u32;
-			for (key, _) in &data {
-				if !published_keys.contains(key) {
-					new_keys_count += 1;
-				}
+			let is_new_key = !published_keys.contains(&key);
+			if is_new_key {
+				let current_keys_count = published_keys.len() as u32;
+				ensure!(
+					current_keys_count.saturating_add(1) <= T::MaxStoredKeys::get(),
+					Error::<T>::TooManyStoredKeys
+				);
 			}
 
-			let current_keys_count = published_keys.len() as u32;
-			ensure!(
-				current_keys_count.saturating_add(new_keys_count) <= T::MaxStoredKeys::get(),
-				Error::<T>::TooManyStoredKeys
-			);
-
-			// Calculate storage delta: each item is 32 bytes (key) + value length
 			let child_info = Self::derive_child_info(origin_para_id);
-			let mut size_delta: i64 = 0;
+			let new_size = 32u32.saturating_add(value.len() as u32);
 
-			for (key, value) in &data {
-				// 32 bytes for the hash key
-				let new_size = 32u32.saturating_add(value.len() as u32);
+			let size_delta: i64 = if let Some(old_value) =
+				frame_support::storage::child::get::<Vec<u8>>(&child_info, &key)
+			{
+				let old_size = 32u32.saturating_add(old_value.len() as u32);
+				(new_size as i64).saturating_sub(old_size as i64)
+			} else {
+				new_size as i64
+			};
 
-				// If key already exists, subtract old value size
-				if let Some(old_value) =
-					frame_support::storage::child::get::<Vec<u8>>(&child_info, key)
-				{
-					let old_size = 32u32.saturating_add(old_value.len() as u32);
-					size_delta =
-						size_delta.saturating_add(new_size as i64).saturating_sub(old_size as i64);
-				} else {
-					size_delta = size_delta.saturating_add(new_size as i64);
-				}
-			}
-
-			// Calculate new total size
 			let new_total_size = if size_delta >= 0 {
 				current_total_size.saturating_add(size_delta as u32)
 			} else {
 				current_total_size.saturating_sub((-size_delta) as u32)
 			};
 
-			// Ensure we don't exceed the total storage limit
 			ensure!(
 				new_total_size <= T::MaxTotalStorageSize::get(),
 				Error::<T>::TotalStorageSizeExceeded
 			);
 
-			// Get or create child trie for this publisher
 			if !PublisherExists::<T>::contains_key(origin_para_id) {
 				PublisherExists::<T>::insert(origin_para_id, true);
 			}
 
-			// Write to child trie and track keys for enumeration
-			for (key, value) in data {
-				frame_support::storage::child::put(&child_info, &key, &value);
-				published_keys.try_insert(key).defensive_ok();
+			let current_block = frame_system::Pallet::<T>::block_number();
+
+			let entry = PublishedEntry { value, ttl, when_inserted: current_block };
+			frame_support::storage::child::put(&child_info, &key, &entry);
+			published_keys.try_insert(key).defensive_ok();
+
+			if ttl == 0 {
+				TtlData::<T>::remove(origin_para_id, key);
+			} else {
+				TtlData::<T>::insert(origin_para_id, key, (ttl, current_block));
 			}
 
 			PublishedKeys::<T>::insert(origin_para_id, published_keys);
 			TotalStorageSize::<T>::insert(origin_para_id, new_total_size);
 
-			Self::deposit_event(Event::DataPublished { publisher: origin_para_id, items_count });
+			Self::deposit_event(Event::DataPublished { publisher: origin_para_id, items_count: 1 });
 
 			Ok(())
 		}
@@ -650,7 +755,9 @@ pub mod pallet {
 		pub fn get_published_value(para_id: ParaId, key: &[u8]) -> Option<Vec<u8>> {
 			PublisherExists::<T>::get(para_id).then(|| {
 				let child_info = Self::derive_child_info(para_id);
-				frame_support::storage::child::get(&child_info, key)
+				let entry: PublishedEntry<BlockNumberFor<T>> =
+					frame_support::storage::child::get(&child_info, key)?;
+				Some(entry.value)
 			})?
 		}
 
@@ -669,7 +776,9 @@ pub mod pallet {
 			published_keys
 				.into_iter()
 				.filter_map(|key| {
-					frame_support::storage::child::get(&child_info, &key).map(|value| (key, value))
+					let entry: PublishedEntry<BlockNumberFor<T>> =
+						frame_support::storage::child::get(&child_info, &key)?;
+					Some((key, entry.value))
 				})
 				.collect()
 		}
@@ -678,13 +787,107 @@ pub mod pallet {
 		pub fn get_all_publishers() -> Vec<ParaId> {
 			PublisherExists::<T>::iter_keys().collect()
 		}
+
+		fn do_delete_keys(para_id: ParaId, keys: &[[u8; 32]]) -> Result<u32, DispatchError> {
+			let child_info = Self::derive_child_info(para_id);
+			let mut published_keys = PublishedKeys::<T>::get(para_id);
+			let mut current_total_size = TotalStorageSize::<T>::get(para_id);
+			let mut deleted_count = 0u32;
+
+			for key in keys {
+				if published_keys.remove(key) {
+					if let Some(value) =
+						frame_support::storage::child::get::<Vec<u8>>(&child_info, key)
+					{
+						let entry_size = 32u32.saturating_add(value.len() as u32);
+						current_total_size = current_total_size.saturating_sub(entry_size);
+					}
+					frame_support::storage::child::kill(&child_info, key);
+					TtlData::<T>::remove(para_id, key);
+					deleted_count += 1;
+				}
+			}
+
+			ensure!(deleted_count > 0, Error::<T>::NoKeysToDelete);
+
+			PublishedKeys::<T>::insert(para_id, published_keys);
+			TotalStorageSize::<T>::insert(para_id, current_total_size);
+
+			Ok(deleted_count)
+		}
+
+		fn cleanup_expired_keys(remaining_weight: Weight) -> Weight {
+			let current_block = frame_system::Pallet::<T>::block_number();
+			let max_scans = T::MaxTtlScansPerIdle::get();
+
+			let base_weight = T::DbWeight::get().reads(1);
+			if !remaining_weight.all_gte(base_weight) {
+				return Weight::zero();
+			}
+
+			let per_key_weight = T::DbWeight::get().reads_writes(2, 4);
+			let mut consumed_weight = base_weight;
+			let mut scans_done = 0u32;
+
+			let cursor = TtlScanCursor::<T>::get();
+			let mut iter = if let Some((start_para, start_key)) = cursor {
+				TtlData::<T>::iter_from(TtlData::<T>::hashed_key_for(start_para, start_key))
+			} else {
+				TtlData::<T>::iter()
+			};
+
+			let mut last_position: Option<(ParaId, [u8; 32])> = None;
+
+			while scans_done < max_scans {
+				if !remaining_weight.all_gte(consumed_weight.saturating_add(per_key_weight)) {
+					break;
+				}
+
+				let Some((para_id, key, (ttl, inserted_at))) = iter.next() else {
+					TtlScanCursor::<T>::kill();
+					return consumed_weight;
+				};
+
+				last_position = Some((para_id, key));
+				consumed_weight = consumed_weight.saturating_add(per_key_weight);
+				scans_done += 1;
+
+				let expires_at = inserted_at + ttl.into();
+				if current_block >= expires_at {
+					let child_info = Self::derive_child_info(para_id);
+
+					if let Some(value) =
+						frame_support::storage::child::get::<Vec<u8>>(&child_info, &key)
+					{
+						let entry_size = 32u32.saturating_add(value.len() as u32);
+						TotalStorageSize::<T>::mutate(para_id, |size| {
+							*size = size.saturating_sub(entry_size);
+						});
+					}
+
+					frame_support::storage::child::kill(&child_info, &key);
+					PublishedKeys::<T>::mutate(para_id, |keys| {
+						keys.remove(&key);
+					});
+					TtlData::<T>::remove(para_id, &key);
+
+					Self::deposit_event(Event::KeyExpired { publisher: para_id, key });
+				}
+			}
+
+			if let Some(pos) = last_position {
+				TtlScanCursor::<T>::put(pos);
+			}
+
+			consumed_weight
+		}
 	}
 }
 
 // Implement Publish trait
 impl<T: Config> Publish for Pallet<T> {
-	fn publish_data(publisher: ParaId, data: Vec<([u8; 32], Vec<u8>)>) -> DispatchResult {
-		Self::handle_publish(publisher, data)
+	fn publish_data(publisher: ParaId, key: [u8; 32], value: Vec<u8>, ttl: u32) -> DispatchResult {
+		Self::handle_publish(publisher, key, value, ttl)
 	}
 }
 

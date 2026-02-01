@@ -4598,6 +4598,7 @@ dependencies = [
  "sp-tracing 16.0.0",
  "sp-trie",
  "sp-version",
+ "sp-weights",
  "staging-xcm",
  "staging-xcm-builder",
  "trie-db",
@@ -4652,13 +4653,16 @@ dependencies = [
  "hash-db",
  "parity-scale-codec",
  "polkadot-primitives",
+ "polkadot-runtime-parachains",
  "scale-info",
  "sp-core 28.0.0",
+ "sp-crypto-hashing 0.1.0",
  "sp-io",
  "sp-runtime",
  "sp-state-machine",
  "sp-std 14.0.0",
  "sp-trie",
+ "sp-weights",
  "trie-db",
 ]
 
@@ -14596,6 +14600,7 @@ dependencies = [
  "cumulus-pallet-aura-ext",
  "cumulus-pallet-parachain-system",
  "cumulus-pallet-session-benchmarking",
+ "cumulus-pallet-subscriber",
  "cumulus-pallet-xcm",
  "cumulus-pallet-xcmp-queue",
  "cumulus-primitives-aura",
@@ -14656,6 +14661,28 @@ dependencies = [
  "testnet-parachains-constants",
  "tracing",
  "xcm-runtime-apis",
+]
+
+[[package]]
+name = "penpal-westend-pubsub-integration-tests"
+version = "1.0.0"
+dependencies = [
+ "cumulus-pallet-subscriber",
+ "emulated-integration-tests-common",
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "pallet-xcm",
+ "parachains-common",
+ "parity-scale-codec",
+ "polkadot-runtime-parachains",
+ "sp-core 28.0.0",
+ "sp-crypto-hashing 0.1.0",
+ "sp-runtime",
+ "sp-tracing 16.0.0",
+ "staging-xcm",
+ "staging-xcm-executor",
+ "westend-system-emulated-network",
 ]
 
 [[package]]

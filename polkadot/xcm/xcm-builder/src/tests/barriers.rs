@@ -1380,3 +1380,314 @@ fn assert_deny_instructions_recursively<Barrier: ShouldExecute>() {
 		Err(ProcessMessageError::StackLimitReached),
 	);
 }
+
+use crate::AllowPublishFrom;
+use frame_support::traits::Everything;
+use sp_runtime::BoundedVec;
+use xcm::latest::{MaxPublishValueLength, PublishKey};
+
+fn test_publish_data(items: Vec<(PublishKey, &[u8])>) -> PublishData {
+	items
+		.into_iter()
+		.map(|(k, v)| {
+			(k, BoundedVec::<u8, MaxPublishValueLength>::try_from(v.to_vec()).unwrap(), 0)
+		})
+		.collect::<Vec<_>>()
+		.try_into()
+		.unwrap()
+}
+
+#[test]
+fn allow_publish_from_allows_system_parachain() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<16>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	let key = [1u8; 32];
+	let data = test_publish_data(vec![(key, b"value")]);
+	assert_should_execute(vec![Publish { data }], Parachain(1000).into(), Ok(()));
+}
+
+#[test]
+fn allow_publish_from_allows_non_system_parachain() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<16>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	let key = [2u8; 32];
+	let data = test_publish_data(vec![(key, b"value")]);
+	assert_should_execute(vec![Publish { data }], Parachain(2000).into(), Ok(()));
+}
+
+#[test]
+fn allow_publish_from_allows_single_publish() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<16>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	let key = [3u8; 32];
+	let data = test_publish_data(vec![(key, b"value")]);
+	assert_should_execute(vec![Publish { data }], Parachain(1000).into(), Ok(()));
+}
+
+#[test]
+fn allow_publish_from_allows_multiple_publish_within_limit() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<16>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	let data1 = test_publish_data(vec![([1u8; 32], b"value1")]);
+	let data2 = test_publish_data(vec![([2u8; 32], b"value2")]);
+	let data3 = test_publish_data(vec![([3u8; 32], b"value3")]);
+	assert_should_execute(
+		vec![Publish { data: data1 }, Publish { data: data2 }, Publish { data: data3 }],
+		Parachain(1000).into(),
+		Ok(()),
+	);
+}
+
+#[test]
+fn allow_publish_from_allows_exactly_max_publish() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<4>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	let data1 = test_publish_data(vec![([1u8; 32], b"v1")]);
+	let data2 = test_publish_data(vec![([2u8; 32], b"v2")]);
+	let data3 = test_publish_data(vec![([3u8; 32], b"v3")]);
+	let data4 = test_publish_data(vec![([4u8; 32], b"v4")]);
+	assert_should_execute(
+		vec![
+			Publish { data: data1 },
+			Publish { data: data2 },
+			Publish { data: data3 },
+			Publish { data: data4 },
+		],
+		Parachain(1000).into(),
+		Ok(()),
+	);
+}
+
+#[test]
+fn allow_publish_from_rejects_exceeding_max_publish() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<4>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	let data1 = test_publish_data(vec![([1u8; 32], b"v1")]);
+	let data2 = test_publish_data(vec![([2u8; 32], b"v2")]);
+	let data3 = test_publish_data(vec![([3u8; 32], b"v3")]);
+	let data4 = test_publish_data(vec![([4u8; 32], b"v4")]);
+	let data5 = test_publish_data(vec![([5u8; 32], b"v5")]);
+	assert_should_execute(
+		vec![
+			Publish { data: data1 },
+			Publish { data: data2 },
+			Publish { data: data3 },
+			Publish { data: data4 },
+			Publish { data: data5 },
+		],
+		Parachain(1000).into(),
+		Err(ProcessMessageError::StackLimitReached),
+	);
+}
+
+#[test]
+fn allow_publish_from_rejects_empty_message() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<16>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	assert_should_execute(vec![], Parachain(1000).into(), Err(ProcessMessageError::BadFormat));
+}
+
+#[test]
+fn allow_publish_from_rejects_publish_with_other_instructions() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<16>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	let key = [1u8; 32];
+	let data = test_publish_data(vec![(key, b"value")]);
+	assert_should_execute(
+		vec![Publish { data }, SetTopic([0u8; 32])],
+		Parachain(1000).into(),
+		Err(ProcessMessageError::BadFormat),
+	);
+}
+
+#[test]
+fn allow_publish_from_rejects_other_before_publish() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<16>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	let key = [1u8; 32];
+	let data = test_publish_data(vec![(key, b"value")]);
+	assert_should_execute(
+		vec![ClearOrigin, Publish { data }],
+		Parachain(1000).into(),
+		Err(ProcessMessageError::BadFormat),
+	);
+}
+
+#[test]
+fn allow_publish_from_rejects_non_publish() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<16>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	assert_should_execute(
+		vec![ClearOrigin],
+		Parachain(1000).into(),
+		Err(ProcessMessageError::BadFormat),
+	);
+}
+
+#[test]
+fn allow_publish_from_rejects_non_parachain_origin() {
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<Everything, ConstU32<16>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	let key = [1u8; 32];
+	let data = test_publish_data(vec![(key, b"value")]);
+	assert_should_execute(vec![Publish { data }], Location::parent(), Ok(()));
+}
+
+#[test]
+fn allow_publish_from_filters_specific_parachains() {
+	parameter_types! {
+		pub Para1000Only: Location = Parachain(1000).into();
+	}
+
+	struct OnlyPara1000;
+	impl Contains<Location> for OnlyPara1000 {
+		fn contains(loc: &Location) -> bool {
+			matches!(loc.unpack(), (0, [Parachain(1000)]))
+		}
+	}
+
+	let assert_should_execute =
+		|mut xcm: Vec<Instruction<()>>, origin: Location, expected_result| {
+			assert_eq!(
+				AllowPublishFrom::<OnlyPara1000, ConstU32<16>>::should_execute(
+					&origin,
+					&mut xcm,
+					Weight::from_parts(10, 10),
+					&mut props(Weight::zero()),
+				),
+				expected_result
+			);
+		};
+
+	let key = [1u8; 32];
+	let data1 = test_publish_data(vec![(key, b"value")]);
+	let data2 = test_publish_data(vec![(key, b"value")]);
+
+	assert_should_execute(vec![Publish { data: data1 }], Parachain(1000).into(), Ok(()));
+	assert_should_execute(
+		vec![Publish { data: data2 }],
+		Parachain(2000).into(),
+		Err(ProcessMessageError::Unsupported),
+	);
+}

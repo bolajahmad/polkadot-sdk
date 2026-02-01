@@ -229,6 +229,10 @@ parameter_types! {
 	pub const PublisherDeposit: Balance = 100;
 }
 
+parameter_types! {
+	pub const MaxTtlScansPerIdle: u32 = 500;
+}
+
 impl crate::broadcaster::Config for Test {
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -239,6 +243,7 @@ impl crate::broadcaster::Config for Test {
 	type MaxTotalStorageSize = MaxTotalStorageSize;
 	type MaxPublishers = MaxPublishers;
 	type PublisherDeposit = PublisherDeposit;
+	type MaxTtlScansPerIdle = MaxTtlScansPerIdle;
 }
 
 impl origin::Config for Test {}

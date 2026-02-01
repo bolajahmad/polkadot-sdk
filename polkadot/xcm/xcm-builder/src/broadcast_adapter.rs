@@ -16,12 +16,15 @@
 
 //! Adapters for broadcast/publish operations in XCM.
 
-use alloc::vec::Vec;
 use core::marker::PhantomData;
 use frame_support::traits::Contains;
 use polkadot_primitives::Id as ParaId;
 use polkadot_runtime_parachains::broadcaster::Publish;
-use xcm::latest::{prelude::XcmError, Junction, Location, PublishData, Result as XcmResult};
+use sp_runtime::BoundedVec;
+use xcm::latest::{
+	prelude::XcmError, Junction, Location, MaxPublishValueLength, PublishKey, PublishTtl,
+	Result as XcmResult,
+};
 use xcm_executor::traits::BroadcastHandler;
 
 /// Configurable broadcast adapter that validates parachain origins.
@@ -32,23 +35,24 @@ where
 	Filter: Contains<Location>,
 	Handler: Publish,
 {
-	fn handle_publish(origin: &Location, data: PublishData) -> XcmResult {
-		// Check if origin is authorized to publish
+	fn handle_publish(
+		origin: &Location,
+		key: PublishKey,
+		value: BoundedVec<u8, MaxPublishValueLength>,
+		ttl: PublishTtl,
+	) -> XcmResult {
 		if !Filter::contains(origin) {
 			return Err(XcmError::NoPermission);
 		}
 
-		// Extract parachain ID from authorized origin
 		let para_id = match origin.unpack() {
-			(0, [Junction::Parachain(id)]) => ParaId::from(*id), // Direct parachain
-			(1, [Junction::Parachain(id), ..]) => ParaId::from(*id), // Sibling parachain
-			_ => return Err(XcmError::BadOrigin),                // Should be caught by filter
+			(0, [Junction::Parachain(id)]) => ParaId::from(*id),
+			(1, [Junction::Parachain(id), ..]) => ParaId::from(*id),
+			_ => return Err(XcmError::BadOrigin),
 		};
 
-		// Call the actual handler
-		let data_vec: Vec<([u8; 32], Vec<u8>)> =
-			data.into_inner().into_iter().map(|(k, v)| (k, v.into_inner())).collect();
-		Handler::publish_data(para_id, data_vec).map_err(|_| XcmError::PublishFailed)
+		Handler::publish_data(para_id, key, value.into_inner(), ttl)
+			.map_err(|_| XcmError::PublishFailed)
 	}
 }
 
@@ -70,17 +74,15 @@ mod tests {
 		prelude::XcmError, Junction, Location, MaxPublishValueLength, PublishData, PublishKey,
 	};
 
-	// Mock handler that tracks calls
 	parameter_types! {
-		pub static PublishCalls: Vec<(ParaId, Vec<(PublishKey, Vec<u8>)>)> = vec![];
+		pub static PublishCalls: Vec<(ParaId, Vec<(PublishKey, Vec<u8>, u32)>)> = vec![];
 	}
 
-	// Helper to create test publish data
-	fn test_publish_data(items: Vec<([u8; 32], &[u8])>) -> PublishData {
+	fn test_publish_data(items: Vec<([u8; 32], &[u8], u32)>) -> PublishData {
 		items
 			.into_iter()
-			.map(|(k, v)| {
-				(k, BoundedVec::<u8, MaxPublishValueLength>::try_from(v.to_vec()).unwrap())
+			.map(|(k, v, ttl)| {
+				(k, BoundedVec::<u8, MaxPublishValueLength>::try_from(v.to_vec()).unwrap(), ttl)
 			})
 			.collect::<Vec<_>>()
 			.try_into()
@@ -91,7 +93,7 @@ mod tests {
 	impl Publish for MockPublishHandler {
 		fn publish_data(
 			publisher: ParaId,
-			data: Vec<([u8; 32], Vec<u8>)>,
+			data: Vec<([u8; 32], Vec<u8>, u32)>,
 		) -> Result<(), sp_runtime::DispatchError> {
 			let mut calls = PublishCalls::get();
 			calls.push((publisher, data));
@@ -105,7 +107,7 @@ mod tests {
 		PublishCalls::set(vec![]);
 		let origin = Location::new(0, [Junction::Parachain(1000)]);
 		let key1 = [1u8; 32];
-		let data = test_publish_data(vec![(key1, b"value1")]);
+		let data = test_publish_data(vec![(key1, b"value1", 0)]);
 
 		let result =
 			ParachainBroadcastAdapter::<OnlyParachains, MockPublishHandler>::handle_publish(
@@ -117,7 +119,7 @@ mod tests {
 		let calls = PublishCalls::get();
 		assert_eq!(calls.len(), 1);
 		assert_eq!(calls[0].0, ParaId::from(1000));
-		assert_eq!(calls[0].1, vec![(key1, b"value1".to_vec())]);
+		assert_eq!(calls[0].1, vec![(key1, b"value1".to_vec(), 0)]);
 	}
 
 	#[test]
@@ -128,7 +130,7 @@ mod tests {
 			[Junction::Parachain(2000), Junction::AccountId32 { network: None, id: [1; 32] }],
 		);
 		let key1 = [2u8; 32];
-		let data = test_publish_data(vec![(key1, b"value1")]);
+		let data = test_publish_data(vec![(key1, b"value1", 100)]);
 
 		let result =
 			ParachainBroadcastAdapter::<OnlyParachains, MockPublishHandler>::handle_publish(
@@ -145,7 +147,7 @@ mod tests {
 		PublishCalls::set(vec![]);
 		let origin = Location::here();
 		let key1 = [3u8; 32];
-		let data = test_publish_data(vec![(key1, b"value1")]);
+		let data = test_publish_data(vec![(key1, b"value1", 0)]);
 
 		let result =
 			ParachainBroadcastAdapter::<OnlyParachains, MockPublishHandler>::handle_publish(

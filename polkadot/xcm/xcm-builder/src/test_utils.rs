@@ -67,8 +67,12 @@ impl VersionChangeNotifier for TestSubscriptionService {
 pub struct TestBroadcastHandler;
 
 impl BroadcastHandler for TestBroadcastHandler {
-	fn handle_publish(origin: &Location, data: PublishData) -> XcmResult {
-		// Extract para_id from origin
+	fn handle_publish(
+		origin: &Location,
+		key: [u8; 32],
+		value: sp_runtime::BoundedVec<u8, MaxPublishValueLength>,
+		_ttl: u32,
+	) -> XcmResult {
 		let para_id = match origin.unpack() {
 			(0, [Parachain(id)]) => *id,
 			(1, [Parachain(id), ..]) => *id,
@@ -76,11 +80,10 @@ impl BroadcastHandler for TestBroadcastHandler {
 		};
 
 		let mut published = PublishedData::get();
-		let data_vec: Vec<([u8; 32], Vec<u8>)> =
-			data.into_inner().into_iter().map(|(k, v)| (k, v.into_inner())).collect();
-
-		// Merge with existing data for this parachain
-		published.entry(para_id).or_insert_with(Vec::new).extend(data_vec);
+		published
+			.entry(para_id)
+			.or_insert_with(Vec::new)
+			.push((key, value.into_inner()));
 		PublishedData::set(published);
 
 		Ok(())

@@ -111,6 +111,7 @@ members = [
 	"cumulus/parachains/integration-tests/emulated/tests/coretime/coretime-westend",
 	"cumulus/parachains/integration-tests/emulated/tests/governance/westend",
 	"cumulus/parachains/integration-tests/emulated/tests/people/people-westend",
+	"cumulus/parachains/integration-tests/emulated/tests/pubsub/penpal-westend",
 	"cumulus/parachains/pallets/collective-content",
 	"cumulus/parachains/pallets/parachain-info",
 	"cumulus/parachains/pallets/ping",

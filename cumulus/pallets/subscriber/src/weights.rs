@@ -50,14 +50,9 @@ pub trait WeightInfo {
 	fn collect_publisher_roots(n: u32) -> Weight;
 	fn process_published_data(n: u32, k: u32, s: u32) -> Weight;
 	fn clear_stored_roots() -> Weight;
+	fn enable_publisher() -> Weight;
+	fn clear_publisher_cache() -> Weight;
 
-	/// Weight for processing relay proof excluding handler execution.
-	/// Benchmarked with no-op handler. Handler weights are added at runtime.
-	///
-	/// Parameters:
-	/// - `num_publishers`: Number of publishers being processed
-	/// - `num_keys`: Total number of keys across all publishers
-	/// - `total_bytes`: Total bytes of data being decoded
 	fn process_proof_excluding_handler(num_publishers: u32, num_keys: u32, total_bytes: u32) -> Weight {
 		Self::collect_publisher_roots(num_publishers)
 			.saturating_add(Self::process_published_data(num_publishers, num_keys, total_bytes))
@@ -109,9 +104,22 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().reads(1))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
+
+	fn enable_publisher() -> Weight {
+		Weight::from_parts(9_000_000, 0)
+			.saturating_add(Weight::from_parts(0, 1500))
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(1))
+	}
+
+	fn clear_publisher_cache() -> Weight {
+		Weight::from_parts(15_000_000, 0)
+			.saturating_add(Weight::from_parts(0, 10000))
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(100))
+	}
 }
 
-// For backwards compatibility and tests.
 impl WeightInfo for () {
 	fn collect_publisher_roots(n: u32) -> Weight {
 		Weight::from_parts(1_000_000, 0)
@@ -133,5 +141,19 @@ impl WeightInfo for () {
 			.saturating_add(Weight::from_parts(0, 5187))
 			.saturating_add(RocksDbWeight::get().reads(1))
 			.saturating_add(RocksDbWeight::get().writes(1))
+	}
+
+	fn enable_publisher() -> Weight {
+		Weight::from_parts(9_000_000, 0)
+			.saturating_add(Weight::from_parts(0, 1500))
+			.saturating_add(RocksDbWeight::get().reads(1))
+			.saturating_add(RocksDbWeight::get().writes(1))
+	}
+
+	fn clear_publisher_cache() -> Weight {
+		Weight::from_parts(15_000_000, 0)
+			.saturating_add(Weight::from_parts(0, 10000))
+			.saturating_add(RocksDbWeight::get().reads(1))
+			.saturating_add(RocksDbWeight::get().writes(100))
 	}
 }

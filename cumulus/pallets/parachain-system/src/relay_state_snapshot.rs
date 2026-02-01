@@ -399,4 +399,65 @@ impl RelayChainStateProof {
 			.child_storage(child_info, key)
 			.map_err(|_| Error::ReadEntry(ReadEntryErr::Proof))
 	}
+
+	/// Consume self and return the underlying storage proof.
+	pub fn into_storage_proof(self) -> StorageProof {
+		let mut db = self.trie_backend.into_storage();
+		StorageProof::new(db.drain().into_iter().filter_map(|kv| {
+			if (kv.1).1 > 0 {
+				Some((kv.1).0)
+			} else {
+				None
+			}
+		}))
+	}
+
+	/// Get the relay state root.
+	pub fn state_root(&self) -> relay_chain::Hash {
+		*self.trie_backend.root()
+	}
+
+	/// Consume self and return both the storage proof and the state root.
+	pub fn into_parts(self) -> (StorageProof, relay_chain::Hash) {
+		let root = *self.trie_backend.root();
+		let mut db = self.trie_backend.into_storage();
+		let proof = StorageProof::new(db.drain().into_iter().filter_map(|kv| {
+			if (kv.1).1 > 0 {
+				Some((kv.1).0)
+			} else {
+				None
+			}
+		}));
+		(proof, root)
+	}
+
+	/// Get access to the underlying MemoryDB for proof processing.
+	pub fn as_memory_db(&self) -> MemoryDB<HashingFor<relay_chain::Block>> {
+		self.trie_backend.backend_storage().clone()
+	}
+
+	/// Rebuild the proof keeping only nodes whose hashes are in the given set.
+	pub fn keep_only_accessed_nodes(
+		&mut self,
+		accessed_hashes: &alloc::collections::BTreeSet<relay_chain::Hash>,
+	) {
+		let root = *self.trie_backend.root();
+		let mut old_db = self.trie_backend.backend_storage().clone();
+
+		let filtered_nodes: Vec<Vec<u8>> = old_db
+			.drain()
+			.into_iter()
+			.filter_map(|(hash, (data, ref_count))| {
+				if ref_count > 0 && accessed_hashes.contains(&hash) {
+					Some(data)
+				} else {
+					None
+				}
+			})
+			.collect();
+
+		let new_proof = StorageProof::new(filtered_nodes);
+		let new_db = new_proof.into_memory_db::<HashingFor<relay_chain::Block>>();
+		self.trie_backend = TrieBackendBuilder::new(new_db, root).build();
+	}
 }

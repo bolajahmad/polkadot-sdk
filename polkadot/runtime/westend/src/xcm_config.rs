@@ -17,9 +17,9 @@
 //! XCM configurations for Westend.
 
 use super::{
-	parachains_origin, AccountId, AllPalletsWithSystem, Balances, Dmp, FellowshipAdmin,
-	GeneralAdmin, ParaId, Runtime, RuntimeCall, RuntimeEvent, RuntimeOrigin, StakingAdmin,
-	TransactionByteFee, Treasury, WeightToFee, XcmPallet,
+	parachains_origin, AccountId, AllPalletsWithSystem, Balances, Broadcaster, Dmp,
+	FellowshipAdmin, GeneralAdmin, ParaId, Runtime, RuntimeCall, RuntimeEvent, RuntimeOrigin,
+	StakingAdmin, TransactionByteFee, Treasury, WeightToFee, XcmPallet,
 };
 use crate::governance::pallet_custom_origins::Treasurer;
 use frame_support::{
@@ -39,10 +39,11 @@ use westend_runtime_constants::{
 use xcm::latest::{prelude::*, WESTEND_GENESIS_HASH};
 use xcm_builder::{
 	AccountId32Aliases, AliasChildLocation, AllowExplicitUnpaidExecutionFrom,
-	AllowKnownQueryResponses, AllowSubscriptionsFrom, AllowTopLevelPaidExecutionFrom,
-	ChildParachainAsNative, ChildParachainConvertsVia, DescribeAllTerminal, DescribeFamily,
-	FrameTransactionalProcessor, FungibleAdapter, HashedDescription, IsChildSystemParachain,
-	IsConcrete, LocationAsSuperuser, MintLocation, OriginToPluralityVoice, SendXcmFeeToAccount,
+	AllowKnownQueryResponses, AllowPublishFrom, AllowSubscriptionsFrom,
+	AllowTopLevelPaidExecutionFrom, ChildParachainAsNative, ChildParachainConvertsVia,
+	DescribeAllTerminal, DescribeFamily, FrameTransactionalProcessor, FungibleAdapter,
+	HashedDescription, IsChildSystemParachain, IsConcrete, LocationAsSuperuser, MintLocation,
+	OriginToPluralityVoice, ParachainBroadcastAdapter, SendXcmFeeToAccount,
 	SignedAccountId32AsNative, SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit,
 	TrailingSetTopicAsId, UsingComponents, WeightInfoBounds, WithComputedOrigin, WithUniqueTopic,
 	XcmFeeManagerFromComponents,
@@ -131,6 +132,7 @@ parameter_types! {
 	pub WndForBroker: (AssetFilter, Location) = (Wnd::get(), Broker::get());
 	pub MaxInstructions: u32 = 100;
 	pub MaxAssetsIntoHolding: u32 = 64;
+	pub MaxPublishInstructions: u32 = 16;
 }
 
 pub type TrustedTeleporters = (
@@ -181,6 +183,8 @@ pub type Barrier = TrailingSetTopicAsId<(
 			AllowSubscriptionsFrom<OnlyParachains>,
 			// Messages from system parachains or the Fellows plurality need not pay for execution.
 			AllowExplicitUnpaidExecutionFrom<(IsChildSystemParachain<ParaId>, Fellows)>,
+			// Allow Publish instructions from parachains for the pub-sub system.
+			AllowPublishFrom<OnlyParachains, MaxPublishInstructions>,
 		),
 		UniversalLocation,
 		ConstU32<8>,
@@ -236,7 +240,7 @@ impl xcm_executor::Config for XcmConfig {
 	type HrmpChannelAcceptedHandler = ();
 	type HrmpChannelClosingHandler = ();
 	type XcmRecorder = XcmPallet;
-	type BroadcastHandler = ();
+	type BroadcastHandler = ParachainBroadcastAdapter<OnlyParachains, Broadcaster>;
 }
 
 parameter_types! {

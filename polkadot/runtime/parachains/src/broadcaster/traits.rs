@@ -21,12 +21,11 @@ use polkadot_primitives::Id as ParaId;
 use sp_runtime::DispatchResult;
 
 /// Trait for handling publish operations for parachains.
-///
-/// This trait provides the interface for parachains to publish key-value data.
-/// Keys must be 32-byte hashes.
 pub trait Publish {
-	/// Publish key-value data for a specific parachain.
+	/// Publish a single key-value pair with TTL for a specific parachain.
 	///
-	/// Keys must be 32-byte hashes.
-	fn publish_data(publisher: ParaId, data: Vec<([u8; 32], Vec<u8>)>) -> DispatchResult;
+	/// - key: 32-byte hash
+	/// - value: raw bytes
+	/// - ttl: blocks until expiration (0 = infinite/never expires)
+	fn publish_data(publisher: ParaId, key: [u8; 32], value: Vec<u8>, ttl: u32) -> DispatchResult;
 }

@@ -488,6 +488,46 @@ impl<T: Contains<Location>> ShouldExecute for AllowSubscriptionsFrom<T> {
 	}
 }
 
+/// Allows execution from `origin` if the message contains only `Publish` instructions,
+/// up to a configurable maximum count.
+///
+/// - `T`: Filter for allowed origins (typically parachain origins)
+/// - `MaxPublishInstructions`: Maximum number of `Publish` instructions allowed per message
+///
+/// This enables free execution for publish operations without opening up arbitrary XCM execution.
+/// Similar pattern to `AllowSubscriptionsFrom`.
+pub struct AllowPublishFrom<T, MaxPublishInstructions>(PhantomData<(T, MaxPublishInstructions)>);
+impl<T: Contains<Location>, MaxPublishInstructions: Get<u32>> ShouldExecute
+	for AllowPublishFrom<T, MaxPublishInstructions>
+{
+	fn should_execute<RuntimeCall>(
+		origin: &Location,
+		instructions: &mut [Instruction<RuntimeCall>],
+		max_weight: Weight,
+		properties: &mut Properties,
+	) -> Result<(), ProcessMessageError> {
+		tracing::trace!(
+			target: "xcm::barriers",
+			?origin, ?instructions, ?max_weight, ?properties,
+			"AllowPublishFrom",
+		);
+		ensure!(T::contains(origin), ProcessMessageError::Unsupported);
+		ensure!(!instructions.is_empty(), ProcessMessageError::BadFormat);
+		ensure!(
+			instructions.len() <= MaxPublishInstructions::get() as usize,
+			ProcessMessageError::StackLimitReached
+		);
+
+		for inst in instructions.iter() {
+			match inst {
+				Publish { .. } => {},
+				_ => return Err(ProcessMessageError::BadFormat),
+			}
+		}
+		Ok(())
+	}
+}
+
 /// Allows execution for the Relay Chain origin (represented as `Location::parent()`) if it is just
 /// a straight `HrmpNewChannelOpenRequest`, `HrmpChannelAccepted`, or `HrmpChannelClosing`
 /// instruction.

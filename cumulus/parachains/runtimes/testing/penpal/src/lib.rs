@@ -55,6 +55,7 @@ use assets_common::{
 	AssetIdForTrustBackedAssetsConvert,
 };
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
+use cumulus_pallet_subscriber::{SubscribedKey, SubscriptionHandler, TtlState};
 use cumulus_primitives_core::{AggregateMessageOrigin, ParaId};
 use frame_support::{
 	construct_runtime, derive_impl,
@@ -664,6 +665,7 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 	>;
 
 	type RelayParentOffset = ConstU32<0>;
+	type RelayProofExtender = Subscriber;
 }
 
 impl parachain_info::Config for Runtime {}
@@ -858,6 +860,59 @@ impl pallet_utility::Config for Runtime {
 	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
 }
 
+/// Example SubscriptionHandler implementation for Penpal.
+///
+/// This demonstrates how to subscribe to published data from other parachains.
+/// Users can customize this to subscribe to specific publishers and keys,
+/// and handle incoming data appropriately.
+pub struct PenpalSubscriptionHandler;
+
+impl SubscriptionHandler for PenpalSubscriptionHandler {
+	fn subscriptions() -> (Vec<(ParaId, Vec<SubscribedKey>)>, Weight) {
+		// Example: Subscribe to a hypothetical system parachain (ParaId 1000)
+		// with a sample key. In real usage, replace with actual subscriptions.
+		//
+		// let subscriptions = vec![
+		//     (ParaId::from(1000), vec![SubscribedKey::from_data(b"example_key")]),
+		// ];
+		//
+		// For testing, we return empty subscriptions.
+		// Enable subscriptions by uncommenting above and customizing.
+		(vec![], Weight::zero())
+	}
+
+	fn on_data_updated(
+		_publisher: ParaId,
+		_key: SubscribedKey,
+		_value: Vec<u8>,
+		_ttl_state: TtlState,
+	) -> Weight {
+		// Handle incoming published data here.
+		// Example: decode the value, update local storage, trigger events, etc.
+		//
+		// log::info!(
+		//     target: "penpal::subscriber",
+		//     "Received data from publisher {:?}, key {:?}, size {} bytes, ttl {:?}",
+		//     publisher, key, value.len(), ttl_state
+		// );
+		Weight::zero()
+	}
+}
+
+parameter_types! {
+	pub const MaxPublishers: u32 = 100;
+	pub const MaxTrieDepth: u32 = 32;
+	pub const MaxCachedNodeSize: u32 = 512;
+}
+
+impl cumulus_pallet_subscriber::Config for Runtime {
+	type SubscriptionHandler = PenpalSubscriptionHandler;
+	type WeightInfo = cumulus_pallet_subscriber::weights::SubstrateWeight<Runtime>;
+	type MaxPublishers = MaxPublishers;
+	type MaxTrieDepth = MaxTrieDepth;
+	type MaxCachedNodeSize = MaxCachedNodeSize;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -896,6 +951,9 @@ construct_runtime!(
 		AssetConversion: pallet_asset_conversion = 53,
 
 		Revive: pallet_revive = 60,
+
+		// Pub-sub subscriber pallet for receiving published data from relay chain.
+		Subscriber: cumulus_pallet_subscriber = 70,
 
 		Sudo: pallet_sudo = 255,
 	}
@@ -1230,6 +1288,12 @@ pallet_revive::impl_runtime_apis_plus_revive_traits!(
 			slot: cumulus_primitives_aura::Slot,
 		) -> bool {
 			ConsensusHook::can_build_upon(included_hash, slot)
+		}
+	}
+
+	impl cumulus_primitives_core::KeyToIncludeInRelayProof<Block> for Runtime {
+		fn keys_to_prove() -> cumulus_primitives_core::RelayProofRequest {
+			ParachainSystem::relay_keys_to_prove()
 		}
 	}
 );

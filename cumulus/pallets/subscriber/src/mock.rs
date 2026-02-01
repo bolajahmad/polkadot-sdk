@@ -24,30 +24,39 @@ impl frame_system::Config for Test {
 
 // Test handler that records calls
 parameter_types! {
-	pub static ReceivedData: Vec<(ParaId, Vec<u8>, Vec<u8>)> = vec![];
-	pub static TestSubscriptions: Vec<(ParaId, Vec<Vec<u8>>)> = vec![];
+	pub static ReceivedData: Vec<(ParaId, SubscribedKey, Vec<u8>, TtlState)> = vec![];
+	pub static TestSubscriptions: Vec<(ParaId, Vec<SubscribedKey>)> = vec![];
 }
 
 pub struct TestHandler;
 impl SubscriptionHandler for TestHandler {
-	fn subscriptions() -> (Vec<(ParaId, Vec<Vec<u8>>)>, Weight) {
+	fn subscriptions() -> (Vec<(ParaId, Vec<SubscribedKey>)>, Weight) {
 		(TestSubscriptions::get(), Weight::zero())
 	}
 
-	fn on_data_updated(publisher: ParaId, key: Vec<u8>, value: Vec<u8>) -> Weight {
-		ReceivedData::mutate(|d| d.push((publisher, key, value)));
+	fn on_data_updated(
+		publisher: ParaId,
+		key: SubscribedKey,
+		value: Vec<u8>,
+		ttl_state: TtlState,
+	) -> Weight {
+		ReceivedData::mutate(|d| d.push((publisher, key, value, ttl_state)));
 		Weight::zero()
 	}
 }
 
 parameter_types! {
 	pub const MaxPublishers: u32 = 100;
+	pub const MaxTrieDepth: u32 = 8;
+	pub const MaxCachedNodeSize: u32 = 512;
 }
 
 impl crate::Config for Test {
 	type SubscriptionHandler = TestHandler;
 	type WeightInfo = ();
 	type MaxPublishers = MaxPublishers;
+	type MaxTrieDepth = MaxTrieDepth;
+	type MaxCachedNodeSize = MaxCachedNodeSize;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

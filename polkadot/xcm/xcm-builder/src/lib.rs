@@ -43,10 +43,11 @@ pub use asset_exchange::SingleAssetExchangeAdapter;
 mod barriers;
 pub use barriers::{
 	AllowExplicitUnpaidExecutionFrom, AllowHrmpNotificationsFromRelayChain,
-	AllowKnownQueryResponses, AllowSubscriptionsFrom, AllowTopLevelPaidExecutionFrom,
-	AllowUnpaidExecutionFrom, DenyRecursively, DenyReserveTransferToRelayChain, DenyThenTry,
-	IsChildSystemParachain, IsParentsOnly, IsSiblingSystemParachain, RespectSuspension,
-	TakeWeightCredit, TrailingSetTopicAsId, WithComputedOrigin,
+	AllowKnownQueryResponses, AllowPublishFrom, AllowSubscriptionsFrom,
+	AllowTopLevelPaidExecutionFrom, AllowUnpaidExecutionFrom, DenyRecursively,
+	DenyReserveTransferToRelayChain, DenyThenTry, IsChildSystemParachain, IsParentsOnly,
+	IsSiblingSystemParachain, RespectSuspension, TakeWeightCredit, TrailingSetTopicAsId,
+	WithComputedOrigin,
 };
 
 mod broadcast_adapter;

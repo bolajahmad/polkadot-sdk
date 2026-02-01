@@ -76,7 +76,8 @@ use polkadot_runtime_common::{
 	BalanceToU256, BlockHashCount, BlockLength, SlowAdjustingFeeUpdate, U256ToBalance,
 };
 use polkadot_runtime_parachains::{
-	assigner_coretime as parachains_assigner_coretime, configuration as parachains_configuration,
+	assigner_coretime as parachains_assigner_coretime, broadcaster as parachains_broadcaster,
+	configuration as parachains_configuration,
 	configuration::ActiveConfigHrmpChannelSizeAndCapacityRatio,
 	coretime, disputes as parachains_disputes,
 	disputes::slashing as parachains_slashing,
@@ -1568,6 +1569,29 @@ impl parachains_on_demand::Config for Runtime {
 	type PalletId = OnDemandPalletId;
 }
 
+parameter_types! {
+	pub const BroadcasterMaxPublishItems: u32 = 16;
+	pub const BroadcasterMaxValueLength: u32 = 1024;
+	pub const BroadcasterMaxStoredKeys: u32 = 64;
+	pub const BroadcasterMaxTotalStorageSize: u32 = 2048;
+	pub const BroadcasterMaxPublishers: u32 = 1000;
+	pub const BroadcasterPublisherDeposit: Balance = 10 * UNITS;
+	pub const BroadcasterMaxTtlScansPerIdle: u32 = 500;
+}
+
+impl parachains_broadcaster::Config for Runtime {
+	type Currency = Balances;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type WeightInfo = ();
+	type MaxPublishItems = BroadcasterMaxPublishItems;
+	type MaxValueLength = BroadcasterMaxValueLength;
+	type MaxStoredKeys = BroadcasterMaxStoredKeys;
+	type MaxTotalStorageSize = BroadcasterMaxTotalStorageSize;
+	type MaxPublishers = BroadcasterMaxPublishers;
+	type PublisherDeposit = BroadcasterPublisherDeposit;
+	type MaxTtlScansPerIdle = BroadcasterMaxTtlScansPerIdle;
+}
+
 impl parachains_assigner_coretime::Config for Runtime {}
 
 impl parachains_initializer::Config for Runtime {
@@ -1975,6 +1999,8 @@ mod runtime {
 	pub type ParasDisputes = parachains_disputes;
 	#[runtime::pallet_index(54)]
 	pub type ParasSlashing = parachains_slashing;
+	#[runtime::pallet_index(55)]
+	pub type Broadcaster = parachains_broadcaster;
 	#[runtime::pallet_index(56)]
 	pub type OnDemandAssignmentProvider = parachains_on_demand;
 	#[runtime::pallet_index(57)]

@@ -186,10 +186,11 @@ pub mod prelude {
 			InstructionError, InstructionIndex, InteriorLocation,
 			Junction::{self, *},
 			Junctions::{self, Here},
-			Location, MaxAssetTransferFilters, MaxPublishItems, MaybeErrorCode,
+			Location, MaxAssetTransferFilters, MaxPublishInstructionsPerMessage,
+			MaxPublishValueLength, MaybeErrorCode,
 			NetworkId::{self, *},
-			OriginKind, Outcome, PalletInfo, Parent, ParentThen, PreparedMessage, PublishData,
-			PublishKey, QueryId, QueryResponseInfo, Reanchorable, Response, Result as XcmResult,
+			OriginKind, Outcome, PalletInfo, Parent, ParentThen, PreparedMessage, PublishKey,
+			PublishTtl, QueryId, QueryResponseInfo, Reanchorable, Response, Result as XcmResult,
 			SendError, SendResult, SendXcm, Weight,
 			WeightLimit::{self, *},
 			WildAsset::{self, *},
@@ -211,15 +212,18 @@ parameter_types! {
 	pub MaxPalletNameLen: u32 = 48;
 	pub MaxPalletsInfo: u32 = 64;
 	pub MaxAssetTransferFilters: u32 = 6;
-	pub MaxPublishItems: u32 = 10;
+	/// Maximum number of Publish instructions allowed per XCM message.
+	/// Used by AllowPublishFrom barrier to prevent message spam.
+	pub MaxPublishInstructionsPerMessage: u32 = 10;
 	pub MaxPublishValueLength: u32 = 1024;
 }
 
 /// Key type for published data - a 32-byte hash
 pub type PublishKey = [u8; 32];
 
-pub type PublishData =
-	BoundedVec<(PublishKey, BoundedVec<u8, MaxPublishValueLength>), MaxPublishItems>;
+/// TTL (Time-To-Live) for published data in blocks.
+/// A value of 0 means infinite (never expires).
+pub type PublishTtl = u32;
 
 #[derive(
 	Clone, Eq, PartialEq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
@@ -1150,12 +1154,12 @@ pub enum Instruction<Call> {
 
 	/// Publish data to the relay chain for other parachains to access.
 	///
-	/// This instruction allows parachains to publish key-value data pairs to the relay chain
-	/// which are stored in child tries on the relay chain indexed by the publisher's ParaId.
+	/// This instruction allows parachains to publish a single key-value data pair to the relay
+	/// chain which is stored in child tries on the relay chain indexed by the publisher's ParaId.
 	///
-	/// - `data`: The key-value pairs to be published, bounded by MaxPublishItems
-	///   - Keys: 32-byte hashes
-	///   - Values: Bounded by MaxPublishValueLength
+	/// - `key`: 32-byte hash identifying the data
+	/// - `value`: The data to publish, bounded by MaxPublishValueLength
+	/// - `ttl`: Time-To-Live in blocks (0 = infinite)
 	///
 	/// Safety: Origin must be a parachain (Sovereign Account). The relay chain will validate
 	/// the origin and store data in the appropriate child trie.
@@ -1166,7 +1170,7 @@ pub enum Instruction<Call> {
 	/// - NoPermission: If origin is not authorized by the configured filter
 	/// - BadOrigin: If origin is not a valid parachain
 	/// - PublishFailed: If the underlying handler fails
-	Publish { data: PublishData },
+	Publish { key: PublishKey, value: BoundedVec<u8, MaxPublishValueLength>, ttl: PublishTtl },
 }
 
 #[derive(
@@ -1269,7 +1273,7 @@ impl<Call> Instruction<Call> {
 				InitiateTransfer { destination, remote_fees, preserve_origin, assets, remote_xcm },
 			ExecuteWithOrigin { descendant_origin, xcm } =>
 				ExecuteWithOrigin { descendant_origin, xcm: xcm.into() },
-			Publish { data } => Publish { data },
+			Publish { key, value, ttl } => Publish { key, value, ttl },
 		}
 	}
 }
@@ -1345,7 +1349,7 @@ impl<Call, W: XcmWeightInfo<Call>> GetWeight<W> for Instruction<Call> {
 				W::initiate_transfer(destination, remote_fees, preserve_origin, assets, remote_xcm),
 			ExecuteWithOrigin { descendant_origin, xcm } =>
 				W::execute_with_origin(descendant_origin, xcm),
-			Publish { data } => W::publish(data),
+			Publish { key, value, ttl } => W::publish(&key, &value, ttl),
 		}
 	}
 }

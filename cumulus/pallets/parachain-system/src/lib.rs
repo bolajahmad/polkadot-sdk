@@ -265,10 +265,11 @@ pub mod pallet {
 		/// If set to 0, this config has no impact.
 		type RelayParentOffset: Get<u32>;
 
-		/// Optional prunes the relay chain state proof in [`Pallet::create_inherent`].
+		/// Optional extends the relay chain proof with additional keys.
 		///
+		/// Use this to request additional relay chain state to be included in the proof.
 		/// Set to `()` to disable.
-		type RelayChainProofPruner: RelayChainProofPruner;
+		type RelayProofExtender: RelayProofExtender;
 	}
 
 	#[pallet::hooks]
@@ -1155,7 +1156,6 @@ impl<T: Config> Pallet<T> {
 		size_limit = size_limit.saturating_add(messages_collection_size_limit);
 		let horizontal_messages = horizontal_messages.into_abridged(&mut size_limit);
 
-		// Prune relay chain state proof using remaining budget after messages.
 		let relay_chain_state =
 			core::mem::replace(&mut data.relay_chain_state, sp_trie::StorageProof::empty());
 		data.relay_chain_state = match RelayChainStateProof::new(
@@ -1163,10 +1163,7 @@ impl<T: Config> Pallet<T> {
 			data.validation_data.relay_parent_storage_root,
 			relay_chain_state,
 		) {
-			Ok(mut proof) => {
-				T::RelayChainProofPruner::prune_relay_proof(&mut proof, size_limit);
-				proof.into_storage_proof()
-			},
+			Ok(proof) => proof.into_storage_proof(),
 			Err(error) => panic!("Invalid relay chain state proof: {error:?}"),
 		};
 
@@ -1704,6 +1701,13 @@ impl<T: Config> Pallet<T> {
 	pub fn last_relay_block_number() -> RelayChainBlockNumber {
 		LastRelayChainBlockNumber::<T>::get()
 	}
+
+	/// Returns relay chain storage keys requested by configured proof extenders.
+	///
+	/// Call this from your runtime's `KeyToIncludeInRelayProof` implementation.
+	pub fn relay_keys_to_prove() -> cumulus_primitives_core::RelayProofRequest {
+		T::RelayProofExtender::relay_keys()
+	}
 }
 
 impl<T: Config> UpwardMessageSender for Pallet<T> {
@@ -1824,30 +1828,109 @@ impl OnSystemEvent for Tuple {
 
 /// Prunes unnecessary data from the relay chain state proof.
 ///
-/// Called inside `create_inherent` to reduce the proof size before block execution. This may be
-/// required because the proof will include everything requested by
-/// [`KeyToIncludeInRelayProof`](cumulus_primitives_core::KeyToIncludeInRelayProof) runtime api.
-/// Implementations can remove unneeded trie nodes, that are e.g. already cached on the parachain
-/// side or not required because the underlying data did not change.
+/// Processing mode for relay proof processing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessingMode {
+	/// Off-chain mode: determine what fits in budget, prune unneeded data from proof.
+	Prune,
+	/// On-chain mode: process proof and update state.
+	Verify,
+}
+
+/// Result of relay proof processing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProofProcessingResult {
+	/// All requested keys were processed successfully.
+	Complete,
+	/// Processing stopped before completion due to budget exhaustion.
+	///
+	/// Validation requirement: after returning `Incomplete`,
+	/// `!meter.can_consume(min_weight)` must hold, where min_weight covers
+	/// at least one additional operation. Otherwise the block fails validation
+	/// (collator omitted data that would have fit).
+	Incomplete,
+}
+
+/// Extends relay chain proof requests with additional keys.
 ///
-/// When `target_proof_size` is 0, the pruner should remove everything that isn't strictly
-/// required.
-pub trait RelayChainProofPruner {
-	/// Prune the relay chain state proof to fit within the target size.
+/// Implementations can request additional relay chain state data to be included in the
+/// proof provided to [`Pallet::set_validation_data`]. This is useful for pallets that
+/// need to read relay chain state beyond the standard validation data.
+///
+/// The requested keys are combined with any keys requested by other extenders and
+/// passed to the collator via the
+/// [`KeyToIncludeInRelayProof`](cumulus_primitives_core::KeyToIncludeInRelayProof) runtime API.
+///
+/// # Critical Invariant
+///
+/// Every key returned by [`relay_keys()`](Self::relay_keys) MUST be read from the proof
+/// during [`process_proof()`](Self::process_proof). After processing, the runtime validates
+/// that every node in the proof was accessed. Unread nodes cause block validation to fail.
+pub trait RelayProofExtender {
+	/// Returns relay storage keys to include in the proof.
+	///
+	/// Called by `ParachainSystem::relay_keys_to_prove()` which is used by
+	/// the runtime's `KeyToIncludeInRelayProof` implementation.
+	fn relay_keys() -> cumulus_primitives_core::RelayProofRequest;
+
+	/// Extends an existing key list with this extender's keys.
+	fn extend_keys(keys: &mut Vec<cumulus_primitives_core::RelayStorageKey>) {
+		keys.extend(Self::relay_keys().keys);
+	}
+
+	/// Processes the relay proof for keys returned by [`relay_keys()`](Self::relay_keys).
+	///
+	/// Must read all requested keys, or return [`ProofProcessingResult::Incomplete`] if weight
+	/// budget is exhausted. Unread proof nodes cause block validation failure.
 	///
 	/// # Arguments
-	/// * `relay_state_proof` - Mutable reference to the relay chain state proof to prune
-	/// * `target_proof_size` - Target size in bytes. When 0, remove all non-essential data. Even if
-	///   the proof doesn't fit into `target_proof_size`, it may still be small enough to fit into a
-	///   block. The given target size should not be the ultimate limit of the block for this
-	///   inherent.
-	fn prune_relay_proof(relay_state_proof: &mut RelayChainStateProof, target_proof_size: usize);
+	///
+	/// * `db` - Memory database containing the relay chain state proof
+	/// * `relay_root` - The relay chain state root to verify against
+	/// * `tracker` - Tracks which proof nodes have been accessed for validation
+	/// * `meter` - Tracks weight consumption (both ref_time and proof_size)
+	/// * `mode` - Processing mode (Prune for off-chain, Verify for on-chain)
+	///
+	/// # Weight Consumption
+	///
+	/// For each relay proof node read, consume:
+	/// `T::DbWeight::get().reads(1) + Weight::from_parts(0, node_size)`
+	///
+	/// Parachain storage reads (e.g., cached trie nodes) are tracked automatically
+	/// via the host function.
+	fn process_proof(
+		_db: &sp_trie::MemoryDB<sp_runtime::traits::BlakeTwo256>,
+		_relay_root: sp_core::H256,
+		_tracker: &mut sp_trie::accessed_nodes_tracker::AccessedNodesTracker<sp_core::H256>,
+		_meter: &mut sp_weights::WeightMeter,
+		_mode: ProcessingMode,
+	) -> ProofProcessingResult {
+		ProofProcessingResult::Complete
+	}
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(30)]
-impl RelayChainProofPruner for Tuple {
-	fn prune_relay_proof(relay_state_proof: &mut RelayChainStateProof, target_proof_size: usize) {
-		for_tuples!( #( Tuple::prune_relay_proof(relay_state_proof, target_proof_size); )* );
+impl RelayProofExtender for Tuple {
+	fn relay_keys() -> cumulus_primitives_core::RelayProofRequest {
+		let mut keys = vec![];
+		for_tuples!( #( Tuple::extend_keys(&mut keys); )* );
+		cumulus_primitives_core::RelayProofRequest { keys }
+	}
+
+	fn process_proof(
+		db: &sp_trie::MemoryDB<sp_runtime::traits::BlakeTwo256>,
+		relay_root: sp_core::H256,
+		tracker: &mut sp_trie::accessed_nodes_tracker::AccessedNodesTracker<sp_core::H256>,
+		meter: &mut sp_weights::WeightMeter,
+		mode: ProcessingMode,
+	) -> ProofProcessingResult {
+		for_tuples!( #(
+			match Tuple::process_proof(db, relay_root, tracker, meter, mode) {
+				ProofProcessingResult::Incomplete => return ProofProcessingResult::Incomplete,
+				ProofProcessingResult::Complete => {},
+			}
+		)* );
+		ProofProcessingResult::Complete
 	}
 }
 

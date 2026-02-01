@@ -32,7 +32,7 @@ use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
 use pallet_revive::{
 	create1,
 	evm::{
-		Account, Block, BlockNumberOrTag, BlockNumberOrTagOrHash, BlockTag,
+		Account, Block, BlockNumberOrTag, BlockNumberOrTagOrHash, BlockTag, GenericTransaction,
 		HashesOrTransactionInfos, TransactionInfo, TransactionUnsigned, H256, U256,
 	},
 };
@@ -315,6 +315,7 @@ async fn run_all_eth_rpc_tests_inner() -> anyhow::Result<()> {
 		test_multiple_transactions_in_block,
 		test_mixed_evm_substrate_transactions,
 		test_runtime_pallets_address_upload_code,
+		test_dry_run_of_contract_with_consume_all_gas,
 	);
 
 	log::debug!(target: LOG_TARGET, "All tests completed successfully!");
@@ -827,6 +828,47 @@ async fn test_runtime_pallets_address_upload_code() -> anyhow::Result<()> {
 	let stored_code = node_client.storage().at(block_hash).fetch(&query).await?;
 	assert!(stored_code.is_some(), "Code with hash {code_hash:?} should exist in storage");
 	assert_eq!(stored_code.unwrap(), bytecode, "Stored code should match the uploaded bytecode");
+
+	Ok(())
+}
+
+async fn test_dry_run_of_contract_with_consume_all_gas() -> anyhow::Result<()> {
+	// Arrange
+	let code = pallet_revive_fixtures::compile_module_with_type(
+		"ProblematicDryRun",
+		pallet_revive_fixtures::FixtureType::Resolc,
+	)?
+	.0;
+	let client = Arc::new(SharedResources::client().await);
+	let account = Account::default();
+
+	let receipt = TransactionBuilder::new(client.clone())
+		.input(code)
+		.send()
+		.await?
+		.wait_for_receipt()
+		.await?;
+	let contract_address = receipt
+		.contract_address
+		.expect("Expected the transaction to publish a contract");
+
+	// Act
+	let test_function_selector = [0xf8, 0xa8, 0xfd, 0x6d].to_vec();
+	let transaction = GenericTransaction {
+		from: Some(account.address()),
+		input: test_function_selector.into(),
+		to: Some(contract_address),
+		chain_id: Some(client.chain_id().await?),
+		nonce: Some(
+			client.get_transaction_count(account.address(), BlockTag::Latest.into()).await?,
+		),
+		r#type: Some(0u8.into()),
+		..Default::default()
+	};
+	let dry_run_result = client.estimate_gas(transaction, None).await;
+
+	// Assert
+	dry_run_result.expect("Dry run of this transaction must succeed");
 
 	Ok(())
 }

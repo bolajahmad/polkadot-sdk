@@ -143,6 +143,13 @@ impl RuntimeApi {
 		Ok(*gas_limit)
 	}
 
+	/// Calculates the block gas limit from the weights.
+	pub async fn block_gas_limit_from_weights(&self) -> Result<U256, ClientError> {
+		let payload = subxt_client::apis().revive_api().block_gas_limit_from_weights();
+		let gas_limit = self.0.call(payload).await?;
+		Ok(*gas_limit)
+	}
+
 	/// Get the miner address
 	pub async fn block_author(&self) -> Result<H160, ClientError> {
 		let payload = subxt_client::apis().revive_api().block_author();

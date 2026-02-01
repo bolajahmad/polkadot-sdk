@@ -814,13 +814,15 @@ pub mod pallet {
 					},
 					Some(genesis::ContractData { code, storage }) => {
 						let blob = if code.0.starts_with(&polkavm_common::program::BLOB_MAGIC) {
-							ContractBlob::<T>::from_pvm_code(   code.0.clone(), owner.clone()).inspect_err(|err| {
-								log::error!(target: LOG_TARGET, "Failed to create PVM ContractBlob for {address:?}: {err:?}");
-							})
+							ContractBlob::<T>::from_pvm_code(code.0.clone(), owner.clone())
+								.inspect_err(|err| {
+									log::error!(target: LOG_TARGET, "Failed to create PVM ContractBlob for {address:?}: {err:?}");
+								})
 						} else {
-							ContractBlob::<T>::from_evm_runtime_code(code.0.clone(), account_id).inspect_err(|err| {
-								log::error!(target: LOG_TARGET, "Failed to create EVM ContractBlob for {address:?}: {err:?}");
-							})
+							ContractBlob::<T>::from_evm_runtime_code(code.0.clone(), account_id)
+								.inspect_err(|err| {
+									log::error!(target: LOG_TARGET, "Failed to create EVM ContractBlob for {address:?}: {err:?}");
+								})
 						};
 
 						let Ok(blob) = blob else {
@@ -2105,6 +2107,14 @@ impl<T: Config> Pallet<T> {
 		u64::MAX.into()
 	}
 
+	/// Returns the block gas limit as calculated from the weights.
+	pub fn evm_block_gas_limit_from_weights() -> U256 {
+		let max_weight = Self::evm_max_extrinsic_weight();
+		let fee = T::FeeInfo::weight_to_fee(&max_weight);
+		let gas_scale: BalanceOf<T> = T::GasScale::get().into();
+		((fee.saturating_add(gas_scale.saturating_sub(1u32.into()))) / gas_scale).into()
+	}
+
 	/// The maximum weight an `eth_transact` is allowed to consume.
 	pub fn evm_max_extrinsic_weight() -> Weight {
 		let factor = <T as Config>::MaxEthExtrinsicWeight::get();
@@ -2567,6 +2577,9 @@ sp_api::decl_runtime_apis! {
 		/// Returns the block gas limit.
 		fn block_gas_limit() -> U256;
 
+		/// Returns the block gas limit as calculated from the weights.
+		fn block_gas_limit_from_weights() -> U256;
+
 		/// Returns the free balance of the given `[H160]` address, using EVM decimals.
 		fn balance(address: H160) -> U256;
 
@@ -2757,6 +2770,10 @@ macro_rules! impl_runtime_apis_plus_revive_traits {
 
 				fn block_gas_limit() -> $crate::U256 {
 					$crate::Pallet::<Self>::evm_block_gas_limit()
+				}
+
+				fn block_gas_limit_from_weights() -> $crate::U256 {
+					$crate::Pallet::<Self>::evm_block_gas_limit_from_weights()
 				}
 
 				fn gas_price() -> $crate::U256 {

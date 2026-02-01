@@ -17,12 +17,14 @@
 //! The [`EthRpcServer`] RPC server implementation
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+use std::{future::Future, pin::Pin};
+
 use client::ClientError;
 use jsonrpsee::{
 	core::{async_trait, RpcResult},
-	types::{ErrorCode, ErrorObjectOwned},
+	types::{ErrorCode, ErrorObject, ErrorObjectOwned},
 };
-use pallet_revive::evm::*;
+use pallet_revive::{evm::*, EthTransactInfo};
 use sp_core::{keccak_256, H160, H256, U256};
 use thiserror::Error;
 use tokio::time::Duration;
@@ -154,12 +156,26 @@ impl EthRpcServer for EthRpcServerImpl {
 		block: Option<BlockNumberOrTag>,
 	) -> RpcResult<U256> {
 		log::trace!(target: LOG_TARGET, "estimate_gas transaction={transaction:?} block={block:?}");
-		let block = block.unwrap_or_default();
-		let hash = self.client.block_hash_for_tag(block.clone().into()).await?;
-		let runtime_api = self.client.runtime_api(hash);
-		let dry_run = runtime_api.dry_run(transaction, block.into()).await?;
-		log::trace!(target: LOG_TARGET, "estimate_gas result={dry_run:?}");
-		Ok(dry_run.eth_gas)
+		// If the transaction's gas is specified then we don't need to perform binary search to find
+		// the lowest fee and just execute the dry run as is.
+		let estimation = if transaction.gas.is_some() {
+			self.dry_run(transaction, block).await?.eth_gas
+		} else {
+			let lowest_gas = U256::zero();
+			let highest_gas = {
+				let block = block.unwrap_or_default();
+				let hash = self.client.block_hash_for_tag(block.clone().into()).await?;
+				self.client.runtime_api(hash).block_gas_limit_from_weights().await? * U256::from(2)
+			};
+			let range = BinarySearchRange::new(
+				Inclusivity::Inclusive(lowest_gas),
+				Inclusivity::Inclusive(highest_gas),
+			);
+
+			self.estimate_gas_binary_search(None, range, transaction, block).await?
+		};
+		log::trace!(target: LOG_TARGET, "estimate_gas result={estimation:?}");
+		Ok(estimation)
 	}
 
 	async fn call(
@@ -484,4 +500,122 @@ impl EthRpcServerImpl {
 
 		Ok(Some(TransactionInfo::new(&receipt, signed_tx)))
 	}
+
+	async fn dry_run(
+		&self,
+		transaction: GenericTransaction,
+		block: Option<BlockNumberOrTag>,
+	) -> RpcResult<EthTransactInfo<u128>> {
+		let block = block.unwrap_or_default();
+		let hash = self.client.block_hash_for_tag(block.clone().into()).await?;
+		let runtime_api = self.client.runtime_api(hash);
+		runtime_api.dry_run(transaction, block.into()).await.map_err(Into::into)
+	}
+
+	fn estimate_gas_binary_search(
+		&self,
+		lowest_limit: Option<U256>,
+		range: BinarySearchRange<U256>,
+		transaction: GenericTransaction,
+		block: Option<BlockNumberOrTag>,
+	) -> Pin<Box<dyn Future<Output = RpcResult<U256>> + Send + '_>> {
+		Box::pin(async move {
+			let (left, mid, right) = match (range.left_mid_right(), lowest_limit) {
+				(Some(left_mid_right), _) => left_mid_right,
+				(None, Some(lowest_limit)) => return Ok(lowest_limit),
+				(None, None) =>
+					return Err(ErrorObject::owned(-32000, "Gas estimation failed", None::<()>)),
+			};
+
+			let mut mutated_transaction = transaction.clone();
+			mutated_transaction.gas = Some(mid);
+			let dry_run_result = self.dry_run(mutated_transaction.clone(), block).await;
+
+			match (dry_run_result, left, right) {
+				// Dry run succeeded and there's no left range. This is the lowest that the fee can
+				// get.
+				(Ok(dry_run_result), None, _) =>
+					Ok(lowest_limit.unwrap_or(dry_run_result.eth_gas).min(dry_run_result.eth_gas)),
+				// Dry run succeeded and there's a left range, try to reduce the fees even further.
+				(Ok(dry_run_result), Some(range), _) => {
+					let lowest_limit =
+						lowest_limit.unwrap_or(dry_run_result.eth_gas).min(dry_run_result.eth_gas);
+					self.estimate_gas_binary_search(Some(lowest_limit), range, transaction, block)
+						.await
+				},
+				// Dry run failed and there's no right range, this is potentially the lowest that
+				// the fees can get.
+				(Err(err), _, None) => lowest_limit.ok_or(err),
+				// Dry run failed, and there's a right range. If we've previously been able to find
+				// a lowest_limit then we continue and try to find a lower limit. If not, then we
+				// stop.
+				(Err(err), _, Some(range)) =>
+					if lowest_limit.is_some() ||
+						[
+							"OutOfGas",
+							"InvalidInstruction",
+							"InvalidGenericTransaction",
+							"StorageDepositNotEnoughFunds",
+						]
+						.iter()
+						.any(|str| err.message().contains(str))
+					{
+						self.estimate_gas_binary_search(lowest_limit, range, transaction, block)
+							.await
+					} else {
+						Err(err)
+					},
+			}
+		})
+	}
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct BinarySearchRange<T> {
+	start: Inclusivity<T>,
+	end: Inclusivity<T>,
+}
+
+impl BinarySearchRange<U256> {
+	pub fn new(start: Inclusivity<U256>, end: Inclusivity<U256>) -> Self {
+		Self { start, end }
+	}
+
+	pub fn left_mid_right(&self) -> Option<(Option<Self>, U256, Option<Self>)> {
+		match (self.start, self.end) {
+			(Inclusivity::Inclusive(start_inclusive), Inclusivity::Inclusive(end_inclusive)) => {
+				let mid_point =
+					start_inclusive.checked_add(end_inclusive)?.checked_div(U256::from(2))?;
+
+				let left = (mid_point != start_inclusive).then_some(Self {
+					start: Inclusivity::Inclusive(start_inclusive),
+					end: Inclusivity::Exclusive(mid_point),
+				});
+				let right = (mid_point != end_inclusive).then_some(Self {
+					start: Inclusivity::Exclusive(mid_point),
+					end: Inclusivity::Inclusive(end_inclusive),
+				});
+				Some((left, mid_point, right))
+			},
+			(start @ Inclusivity::Inclusive(..), Inclusivity::Exclusive(end_exclusive)) => {
+				let end = Inclusivity::Inclusive(end_exclusive.checked_sub(U256::one())?);
+				Self { start, end }.left_mid_right()
+			},
+			(Inclusivity::Exclusive(start_exclusive), end @ Inclusivity::Inclusive(_)) => {
+				let start = Inclusivity::Inclusive(start_exclusive.checked_add(U256::one())?);
+				Self { start, end }.left_mid_right()
+			},
+			(Inclusivity::Exclusive(start_exclusive), Inclusivity::Exclusive(end_exclusive)) => {
+				let start = Inclusivity::Inclusive(start_exclusive.checked_add(U256::one())?);
+				let end = Inclusivity::Inclusive(end_exclusive.checked_sub(U256::one())?);
+				Self { start, end }.left_mid_right()
+			},
+		}
+	}
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum Inclusivity<T> {
+	Inclusive(T),
+	Exclusive(T),
 }

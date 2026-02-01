@@ -135,7 +135,7 @@ async fn prepare_evm_transactions<Client: EthRpcClient + Sync + Send>(
 	let mut transactions = Vec::new();
 	for i in (0..count).rev() {
 		let nonce = start_nonce.saturating_add(U256::from(i as u64));
-		let tx_builder = TransactionBuilder::new(Arc::clone(client))
+		let tx_builder = TransactionBuilder::new(Arc::clone(&client))
 			.signer(signer.clone())
 			.nonce(nonce)
 			.value(amount)
@@ -832,10 +832,11 @@ async fn test_runtime_pallets_address_upload_code() -> anyhow::Result<()> {
 	Ok(())
 }
 
-async fn test_fibonacci_large_value_runs_out_of_gas(client: Arc<WsClient>) -> anyhow::Result<()> {
+async fn test_fibonacci_large_value_runs_out_of_gas() -> anyhow::Result<()> {
 	use pallet_revive::precompiles::alloy::sol_types::SolCall;
 	use pallet_revive_fixtures::Fibonacci;
 
+	let client = Arc::new(SharedResources::client().await);
 	let (bytes, _) = pallet_revive_fixtures::compile_module_with_type(
 		"Fibonacci",
 		pallet_revive_fixtures::FixtureType::Solc,

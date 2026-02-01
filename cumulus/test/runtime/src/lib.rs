@@ -376,7 +376,6 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnSystemEvent = TestPallet;
 	type OutboundXcmpMessageSource = ();
-	// Ignore all DMP messages by enqueueing them into `()`:
 	type DmpQueue = frame_support::traits::EnqueueWithOrigin<(), sp_core::ConstU8<0>>;
 	type ReservedDmpWeight = ();
 	type XcmpMessageHandler = ();
@@ -385,6 +384,7 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 		cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
 	type ConsensusHook = ConsensusHook;
 	type RelayParentOffset = ConstU32<RELAY_PARENT_OFFSET>;
+	type RelayProofExtender = ();
 }
 
 impl parachain_info::Config for Runtime {}
@@ -646,12 +646,9 @@ impl_runtime_apis! {
 		fn keys_to_prove() -> cumulus_primitives_core::RelayProofRequest {
 			use cumulus_primitives_core::RelayStorageKey;
 
-			RelayProofRequest {
-				keys: vec![
-					// Request a key to verify its inclusion in the proof.
-					RelayStorageKey::Top(test_pallet::relay_alice_account_key()),
-				],
-			}
+			let mut request = ParachainSystem::relay_keys_to_prove();
+			request.keys.push(RelayStorageKey::Top(test_pallet::relay_alice_account_key()));
+			request
 		}
 	}
 }

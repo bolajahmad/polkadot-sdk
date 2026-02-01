@@ -100,6 +100,7 @@ impl Config for Test {
 	type WeightInfo = ();
 	type RelayParentOffset = ConstU32<0>;
 	type RelayChainProofPruner = ();
+	type RelayProofExtender = ();
 }
 
 std::thread_local! {

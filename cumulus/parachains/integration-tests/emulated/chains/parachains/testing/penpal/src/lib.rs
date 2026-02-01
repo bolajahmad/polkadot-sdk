@@ -62,6 +62,7 @@ decl_test_parachains! {
 			ForeignAssets: penpal_runtime::ForeignAssets,
 			AssetConversion: penpal_runtime::AssetConversion,
 			Balances: penpal_runtime::Balances,
+			Subscriber: penpal_runtime::Subscriber,
 		}
 	},
 	pub struct PenpalB {
@@ -87,6 +88,7 @@ decl_test_parachains! {
 			ForeignAssets: penpal_runtime::ForeignAssets,
 			AssetConversion: penpal_runtime::AssetConversion,
 			Balances: penpal_runtime::Balances,
+			Subscriber: penpal_runtime::Subscriber,
 		}
 	},
 }

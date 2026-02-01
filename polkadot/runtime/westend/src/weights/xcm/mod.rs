@@ -307,9 +307,9 @@ impl<RuntimeCall> XcmWeightInfo<RuntimeCall> for WestendXcmWeight<RuntimeCall> {
 	fn execute_with_origin(_: &Option<InteriorLocation>, _: &Xcm<RuntimeCall>) -> Weight {
 		XcmGeneric::<Runtime>::execute_with_origin()
 	}
-	fn publish(_data: &PublishData) -> Weight {
-		// Westend does not currently support Publish operations
-		Weight::MAX
+	fn publish(data: &PublishData) -> Weight {
+		Weight::from_parts(10_000_000, 0)
+			.saturating_add(Weight::from_parts(5_000_000, 0).saturating_mul(data.len() as u64))
 	}
 }
 

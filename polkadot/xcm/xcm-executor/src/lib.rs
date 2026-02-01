@@ -1819,11 +1819,11 @@ impl<Config: config::Config> XcmExecutor<Config> {
 				Config::TransactionalProcessor::process(|| {
 					Config::HrmpChannelClosingHandler::handle(initiator, sender, recipient)
 				}),
-			Publish { data } => {
-				let origin = self.origin_ref().ok_or(XcmError::BadOrigin)?;
-				Config::BroadcastHandler::handle_publish(origin, data)?;
-				Ok(())
-			},
+		Publish { key, value, ttl } => {
+			let origin = self.origin_ref().ok_or(XcmError::BadOrigin)?;
+			Config::BroadcastHandler::handle_publish(origin, key, value, ttl)?;
+			Ok(())
+		},
 		}
 	}
 

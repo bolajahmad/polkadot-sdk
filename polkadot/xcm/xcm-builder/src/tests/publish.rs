@@ -21,11 +21,12 @@ use crate::test_utils::PublishedData;
 use sp_runtime::BoundedVec;
 use xcm::latest::{MaxPublishValueLength, PublishKey};
 
-// Helper to create test publish data
 fn test_publish_data(items: Vec<(PublishKey, &[u8])>) -> PublishData {
 	items
 		.into_iter()
-		.map(|(k, v)| (k, BoundedVec::<u8, MaxPublishValueLength>::try_from(v.to_vec()).unwrap()))
+		.map(|(k, v)| {
+			(k, BoundedVec::<u8, MaxPublishValueLength>::try_from(v.to_vec()).unwrap(), 0)
+		})
 		.collect::<Vec<_>>()
 		.try_into()
 		.unwrap()

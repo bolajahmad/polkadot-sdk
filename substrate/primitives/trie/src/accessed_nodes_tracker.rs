@@ -53,6 +53,11 @@ impl<H: Hash> AccessedNodesTracker<H> {
 
 		Ok(())
 	}
+
+	/// Get the set of accessed node hashes.
+	pub fn accessed_hashes(&self) -> &BTreeSet<H> {
+		&self.recorder
+	}
 }
 
 impl<H: Hash + Ord> TrieRecorder<H> for AccessedNodesTracker<H> {

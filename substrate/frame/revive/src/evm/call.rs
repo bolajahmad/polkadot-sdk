@@ -112,20 +112,6 @@ impl GenericTransaction {
 			}
 		}
 
-		// EIP-7702: Validate that type 0x04 transactions have a non-null destination
-		if let Some(super::Byte(TYPE_EIP7702)) = self.r#type.as_ref() {
-			if self.to.is_none() {
-				log::debug!(target: LOG_TARGET, "EIP-7702 transactions require non-null destination");
-				return Err(InvalidTransaction::Call);
-			}
-
-			// EIP-7702: Validate that type 0x04 transactions have non-empty authorization list
-			if self.authorization_list.is_empty() {
-				log::debug!(target: LOG_TARGET, "EIP-7702 transactions require non-empty authorization list");
-				return Err(InvalidTransaction::Call);
-			}
-		}
-
 		// Currently, effective_gas_price will always be the same as base_fee
 		// Because all callers of `into_call` will prepare `tx` that way. Some of the subsequent
 		// logic will not work correctly anymore if we change that assumption.

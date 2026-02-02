@@ -154,24 +154,33 @@ impl<T: Config> Pallet<T> {
 		Self::ensure_cores_for_sale(&status, &sale)?;
 
 		let now = RCBlockNumberProviderOf::<T::Coretime>::current_block_number();
+		// TODO: Check if it can be the case.
 		ensure!(now > sale.sale_start, Error::<T>::TooEarly);
-		let price = Self::sale_price(&sale, now);
-		ensure!(price_limit >= price, Error::<T>::Overpriced);
+		let blocks_since_sale_begin = now.saturating_sub(sale.sale_start);
+		let region_id = match Self::place_order(blocks_since_sale_begin, &who, Some(price_limit))? {
+			OrderResult::BidPlaced { id, bid_price } => {
+				// TODO: Emit event.
+				todo!() // TODO: Modify `do_purchase` signature to not return `RegionId`.
+			},
+			OrderResult::Sold { price } => {
+				let core = Self::purchase_core(&who, price, &mut sale)?;
+				SaleInfo::<T>::put(&sale);
+				let id = Self::issue(
+					core,
+					sale.region_begin,
+					CoreMask::complete(),
+					sale.region_end,
+					Some(who.clone()),
+					Some(price),
+				);
+				let duration = sale.region_end.saturating_sub(sale.region_begin);
+				Self::deposit_event(Event::Purchased { who, region_id: id, price, duration });
 
-		let core = Self::purchase_core(&who, price, &mut sale)?;
+				id
+			},
+		};
 
-		SaleInfo::<T>::put(&sale);
-		let id = Self::issue(
-			core,
-			sale.region_begin,
-			CoreMask::complete(),
-			sale.region_end,
-			Some(who.clone()),
-			Some(price),
-		);
-		let duration = sale.region_end.saturating_sub(sale.region_begin);
-		Self::deposit_event(Event::Purchased { who, region_id: id, price, duration });
-		Ok(id)
+		Ok(region_id)
 	}
 
 	/// Must be called on a core in `PotentialRenewals` whose value is a timeslice equal to the

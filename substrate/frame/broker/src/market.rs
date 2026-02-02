@@ -15,7 +15,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::PotentialRenewalId;
+use frame_system::pallet_prelude::AccountIdFor;
+use sp_runtime::DispatchError;
+
+use crate::{BalanceOf, Config, Pallet, PotentialRenewalId, RelayBlockNumberOf};
 
 // TODO: Extend the documentation.
 
@@ -26,7 +29,7 @@ use crate::PotentialRenewalId;
 /// - There're two types of orders: bulk coretime purchase and bulk coretime renewal.
 /// - Coretime regions are fungible.
 pub trait Market<Balance, RelayBlockNumber, AccountId> {
-	type Error;
+	type Error: Into<DispatchError>;
 	/// Unique ID assigned to every bid.
 	type BidId;
 
@@ -40,7 +43,8 @@ pub trait Market<Balance, RelayBlockNumber, AccountId> {
 	/// - `state` - market state, the caller is responsible for storing it
 	fn place_order(
 		since_timeslice_start: RelayBlockNumber,
-		who: AccountId,
+		who: &AccountId,
+		// TODO: Don't we want to specify the price every time?
 		price: Option<Balance>,
 	) -> Result<OrderResult<Balance, Self::BidId>, Self::Error>;
 
@@ -70,18 +74,53 @@ pub trait Market<Balance, RelayBlockNumber, AccountId> {
 	) -> Result<Vec<TickAction<AccountId, Balance, Self::BidId>>, Self::Error>;
 }
 
-enum OrderResult<Balance, BidId> {
+pub enum OrderResult<Balance, BidId> {
 	BidPlaced { id: BidId, bid_price: Balance },
 	Sold { price: Balance },
 }
 
-enum RenewalOrderResult<Balance, BidId> {
+pub enum RenewalOrderResult<Balance, BidId> {
 	BidPlaced { id: BidId, bid_price: Balance },
 	Sold { price: Balance },
 }
 
-enum TickAction<AccountId, Balance, BidId> {
+pub enum TickAction<AccountId, Balance, BidId> {
 	SellRegion { who: AccountId, refund: Balance },
 	RenewRegion { who: AccountId, renewal_id: PotentialRenewalId, refund: Balance },
 	CloseBid { id: BidId, amount: Balance },
+}
+
+impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for Pallet<T> {
+	type Error = DispatchError;
+	type BidId = ();
+
+	fn place_order(
+		since_timeslice_start: RelayBlockNumberOf<T>,
+		who: &AccountIdFor<T>,
+		price: Option<BalanceOf<T>>,
+	) -> Result<OrderResult<BalanceOf<T>, Self::BidId>, Self::Error> {
+		todo!()
+	}
+
+	fn place_renewal_order(
+		since_timeslice_start: RelayBlockNumberOf<T>,
+		who: AccountIdFor<T>,
+		renewal: PotentialRenewalId,
+		buying_price: BalanceOf<T>,
+	) -> Result<RenewalOrderResult<BalanceOf<T>, Self::BidId>, Self::Error> {
+		todo!()
+	}
+
+	fn close_bid(
+		id: Self::BidId,
+		maybe_check_owner: Option<AccountIdFor<T>>,
+	) -> Result<(), Self::Error> {
+		todo!()
+	}
+
+	fn tick(
+		since_timeslice_start: RelayBlockNumberOf<T>,
+	) -> Result<Vec<TickAction<AccountIdFor<T>, BalanceOf<T>, Self::BidId>>, Self::Error> {
+		todo!()
+	}
 }

@@ -184,30 +184,12 @@ impl<T: Config> AccountInfo<T> {
 		BalanceWithDust::new_unchecked::<T>(value, dust)
 	}
 
-	/// Loads the contract information for a given address, following EIP-7702 delegation.
+	/// Loads the ContractInfo for a given address.
 	///
-	/// - If the address is a contract, returns its ContractInfo
-	/// - If the address is delegated, returns the delegate target's ContractInfo
-	/// - Returns None for EOAs or if delegation target is not a contract
-	///
-	/// Per EIP-7702: only follows ONE level of delegation (no chaining).
-	/// If the target is also delegated, returns None.
+	/// Returns the account's own ContractInfo for both contracts and delegated accounts.
+	/// Returns None for EOAs.
 	pub fn load_contract(address: &H160) -> Option<ContractInfo<T>> {
-		let info = <AccountInfoOf<T>>::get(address)?;
-
-		match info.account_type {
-			AccountType::Contract(contract_info) => Some(contract_info),
-			AccountType::Delegated { target, .. } => {
-				// Follow delegation ONE level only - only return if target is a Contract
-				let target_info = <AccountInfoOf<T>>::get(&target)?;
-				match target_info.account_type {
-					AccountType::Contract(contract_info) => Some(contract_info),
-					// Target is EOA or also delegated - no executable code
-					_ => None,
-				}
-			},
-			AccountType::EOA => None,
-		}
+		<AccountInfoOf<T>>::get(address)?.account_type.contract_info()
 	}
 
 	/// Insert a contract, existing dust if any will be unchanged.

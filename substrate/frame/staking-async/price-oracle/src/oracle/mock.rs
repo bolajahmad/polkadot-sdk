@@ -33,11 +33,12 @@ use parking_lot::RwLock;
 use scale_info::TypeInfo;
 use sp_core::{
 	offchain::{
-		testing::{PoolState, TestOffchainExt, TestTransactionPoolExt},
+		testing::{OffchainState, PoolState, TestOffchainExt, TestTransactionPoolExt},
 		OffchainDbExt, OffchainWorkerExt, TransactionPoolExt,
 	},
 	ConstU32, ConstU64,
 };
+use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 use sp_runtime::{
 	impl_opaque_keys,
 	testing::{TestSignature, UintAuthorityId},
@@ -248,14 +249,38 @@ impl pallet_price_oracle::Config for Runtime {
 	type DefaultRequestDeadline = ConstU64<2000>;
 }
 
-#[derive(Default)]
 pub struct ExtBuilder {
-	extra_assets: Vec<(AssetId, Vec<Endpoint>)>,
+	assets: Vec<(AssetId, Vec<Endpoint>)>,
+}
+
+impl Default for ExtBuilder {
+	fn default() -> Self {
+		Self {
+			assets: vec![(
+				1,
+				vec![Endpoint {
+					body: Default::default(),
+					headers: Default::default(),
+					deadline: None,
+					confidence: Default::default(),
+					method: Method::Get,
+					parsing_method: ParsingMethod::CryptoCompareFree,
+					requires_api_key: false,
+					url: "ocw.local.io/price".to_string().into_bytes().try_into().unwrap(),
+				}],
+			)],
+		}
+	}
 }
 
 impl ExtBuilder {
 	pub fn extra_asset(mut self, id: AssetId, endpoints: Vec<Endpoint>) -> Self {
-		self.extra_assets.push((id, endpoints));
+		self.assets.push((id, endpoints));
+		self
+	}
+
+	pub fn only_asset(mut self, id: AssetId, endpoints: Vec<Endpoint>) -> Self {
+		self.assets = vec![(id, endpoints)];
 		self
 	}
 
@@ -272,20 +297,6 @@ impl ExtBuilder {
 
 impl ExtBuilder {
 	fn build(self) -> sp_io::TestExternalities {
-		let default_endpoint = Endpoint {
-			body: Default::default(),
-			headers: Default::default(),
-			deadline: None,
-			confidence: Default::default(),
-			method: Method::Get,
-			parsing_method: ParsingMethod::CryptoCompareFree,
-			requires_api_key: false,
-			url: "https://min-api.cryptocompare.com/data/price?fsym=DOT&tsyms=USD"
-				.to_string()
-				.into_bytes()
-				.try_into()
-				.unwrap(),
-		};
 		sp_tracing::try_init_simple();
 		let mut storage =
 			frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
@@ -297,10 +308,7 @@ impl ExtBuilder {
 				(3, Percent::from_percent(100)),
 				(4, Percent::from_percent(100)),
 			]),
-			tracked_assets: vec![(1, vec![default_endpoint])]
-				.into_iter()
-				.chain(self.extra_assets.into_iter())
-				.collect(),
+			tracked_assets: self.assets,
 		}
 		.assimilate_storage(&mut storage);
 
@@ -309,16 +317,19 @@ impl ExtBuilder {
 		ext
 	}
 
-	pub(crate) fn build_offchainify(self) -> (sp_io::TestExternalities, Arc<RwLock<PoolState>>) {
+	pub(crate) fn build_offchainify(
+		self,
+	) -> (sp_io::TestExternalities, Arc<RwLock<PoolState>>, Arc<RwLock<OffchainState>>) {
 		let mut ext = self.build();
-		let (offchain, _offchain_state) = TestOffchainExt::new();
+		let (offchain, offchain_state) = TestOffchainExt::new();
 		let (pool, pool_state) = TestTransactionPoolExt::new();
 
 		ext.register_extension(OffchainDbExt::new(offchain.clone()));
 		ext.register_extension(OffchainWorkerExt::new(offchain));
 		ext.register_extension(TransactionPoolExt::new(pool));
+		ext.register_extension(KeystoreExt::new(MemoryKeystore::new()));
 
-		(ext, pool_state)
+		(ext, pool_state, offchain_state)
 	}
 
 	pub fn build_and_execute(self, test: impl FnOnce() -> ()) {
@@ -327,9 +338,12 @@ impl ExtBuilder {
 		ext.execute_with(|| PriceOracle::do_try_state(System::block_number()).unwrap());
 	}
 
-	pub fn build_offchain_and_execute(self, test: impl FnOnce(Arc<RwLock<PoolState>>) -> ()) {
-		let (mut ext, pool_state) = self.build_offchainify();
-		ext.execute_with(|| test(pool_state));
+	pub fn build_offchain_and_execute(
+		self,
+		test: impl FnOnce(Arc<RwLock<PoolState>>, Arc<RwLock<OffchainState>>) -> (),
+	) {
+		let (mut ext, pool_state, offchain_state) = self.build_offchainify();
+		ext.execute_with(|| test(pool_state, offchain_state));
 		ext.execute_with(|| PriceOracle::do_try_state(System::block_number()).unwrap());
 	}
 }

@@ -719,8 +719,6 @@ mod tally_on_finalize {
 }
 
 mod on_session_change {
-	use super::*;
-
 	#[test]
 	fn respects_max_authorities() {
 		todo!()

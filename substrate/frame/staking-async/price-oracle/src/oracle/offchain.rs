@@ -598,13 +598,10 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 }
 
 #[cfg(test)]
-mod unit_tests {
+mod parsing_methods {
 	use super::*;
 	use crate::oracle::mock::Runtime;
-
 	type Worker = OracleOffchainWorker<Runtime>;
-
-	// -- Parsing tests --
 
 	#[test]
 	fn crypto_compare_free_parsing() {
@@ -650,8 +647,13 @@ mod unit_tests {
 		let body = br#"[{"id":"45219","price_usd":"invalid"}]"#.to_vec();
 		assert!(Worker::parse_response(&ParsingMethod::CoinLoreFree, body).is_err());
 	}
+}
 
-	// -- Endpoint validation tests --
+#[cfg(test)]
+mod unit_tests {
+	use super::*;
+	use crate::oracle::mock::*;
+	type Worker = OracleOffchainWorker<Runtime>;
 
 	#[test]
 	fn validate_endpoint_accepts_valid_endpoint() {
@@ -705,4 +707,218 @@ mod unit_tests {
 }
 
 #[cfg(test)]
-mod ocw_with_localhost_tests {}
+mod ocw_tests {
+	use super::*;
+	use crate::oracle::{
+		mock::*,
+		offchain::{Endpoint, Method, ParsingMethod, RequestData},
+	};
+	use sp_core::offchain::testing::PendingRequest;
+	use sp_runtime::testing::UintAuthorityId;
+
+	#[test]
+	fn ocw_makes_http_get_request() {
+		ExtBuilder::default().build_offchain_and_execute(|pool_state, offchain_state| {
+			// given: keys are available, mock HTTP response is registered
+			UintAuthorityId::set_all_keys(vec![0]);
+			offchain_state.write().expect_request(PendingRequest {
+				method: "GET".into(),
+				uri: "ocw.local.io/price".into(),
+				response: Some(br#"{"USD": 4.2}"#.to_vec()),
+				sent: true,
+				..Default::default()
+			});
+
+			// when: OCW worker runs
+			let block_number = PriceUpdateInterval::get();
+			let _result = OracleOffchainWorker::<Runtime>::offchain_worker(block_number);
+
+			// then: request was fulfilled (no panic from missing response)
+			// then: there is one transaction in the pool
+			assert_eq!(pool_state.read().transactions.len(), 1);
+			// then the transaction can be decoded
+			let tx = pool_state.write().transactions.pop().unwrap();
+			let tx = Extrinsic::decode(&mut &*tx).unwrap();
+			assert_eq!(
+				tx.function,
+				RuntimeCall::PriceOracle(crate::oracle::Call::vote {
+					asset_id: 1,
+					price: FixedU128::from_rational(42, 10),
+					produced_in: block_number
+				})
+			);
+		});
+	}
+
+	#[test]
+	fn ocw_makes_http_post_request_with_body_and_headers() {
+		ExtBuilder::default()
+			.only_asset(
+				1,
+				vec![Endpoint {
+					url: b"ocw.local.io/api/price".to_vec().try_into().unwrap(),
+					method: Method::Post,
+					headers: vec![crate::oracle::offchain::Header {
+						name: b"Content-Type".to_vec().try_into().unwrap(),
+						value: RequestData::Raw(b"application/json".to_vec().try_into().unwrap()),
+					}]
+					.try_into()
+					.unwrap(),
+					body: RequestData::Raw(br#"{"symbol": "DOT"}"#.to_vec().try_into().unwrap()),
+					parsing_method: ParsingMethod::CryptoCompareFree,
+					..Default::default()
+				}],
+			)
+			.build_offchain_and_execute(|pool_state, offchain_state| {
+				// given: keys are available, mock HTTP response is registered
+				UintAuthorityId::set_all_keys(vec![0]);
+				offchain_state.write().expect_request(PendingRequest {
+					method: "POST".into(),
+					uri: "ocw.local.io/api/price".into(),
+					headers: vec![("Content-Type".into(), "application/json".into())],
+					body: br#"{"symbol": "DOT"}"#.to_vec(),
+					response: Some(br#"{"USD": 4.2}"#.to_vec()),
+					sent: true,
+					..Default::default()
+				});
+
+				// when: OCW worker runs
+				let block_number = PriceUpdateInterval::get();
+				let _result = OracleOffchainWorker::<Runtime>::offchain_worker(block_number);
+
+				// then: request was fulfilled (no panic from missing response)
+				// then: there is one transaction in the pool
+				assert_eq!(pool_state.read().transactions.len(), 1);
+				// then the transaction can be decoded
+				let tx = pool_state.write().transactions.pop().unwrap();
+				let tx = Extrinsic::decode(&mut &*tx).unwrap();
+				assert_eq!(
+					tx.function,
+					RuntimeCall::PriceOracle(crate::oracle::Call::vote {
+						asset_id: 1,
+						price: FixedU128::from_rational(42, 10),
+						produced_in: block_number
+					})
+				);
+			});
+	}
+
+	#[test]
+	fn ocw_uses_api_key_from_offchain_database() {
+		let (mut ext, pool_state, offchain_state) = ExtBuilder::default()
+			.only_asset(
+				1,
+				vec![Endpoint {
+					url: b"ocw.local.io/premium".to_vec().try_into().unwrap(),
+					method: Method::Get,
+					headers: vec![crate::oracle::offchain::Header {
+						name: b"X-API-Key".to_vec().try_into().unwrap(),
+						value: RequestData::OffchainDatabase(
+							b"api_key".to_vec().try_into().unwrap(),
+						),
+					}]
+					.try_into()
+					.unwrap(),
+					requires_api_key: true,
+					parsing_method: ParsingMethod::CryptoCompareFree,
+					..Default::default()
+				}],
+			)
+			.build_offchainify();
+
+		ext.execute_with(|| {
+			// given: keys are available, API key in offchain db, mock response registered
+			UintAuthorityId::set_all_keys(vec![0]);
+			use sp_runtime::offchain::storage::StorageValueRef;
+			StorageValueRef::persistent(b"api_key").set(&b"secret-key-12345".to_vec());
+
+			offchain_state.write().expect_request(PendingRequest {
+				method: "GET".into(),
+				uri: "ocw.local.io/premium".into(),
+				headers: vec![("X-API-Key".into(), "secret-key-12345".into())],
+				response: Some(br#"{"USD": 4.2}"#.to_vec()),
+				sent: true,
+				..Default::default()
+			});
+
+			// when: OCW worker runs
+			let block_number = PriceUpdateInterval::get();
+			let _result = OracleOffchainWorker::<Runtime>::offchain_worker(block_number);
+
+			// then: request was fulfilled with API key header (no panic)
+			// then: there is one transaction in the pool
+			assert_eq!(pool_state.read().transactions.len(), 1);
+			// then the transaction can be decoded
+			let tx = pool_state.write().transactions.pop().unwrap();
+			let tx = Extrinsic::decode(&mut &*tx).unwrap();
+			assert_eq!(
+				tx.function,
+				RuntimeCall::PriceOracle(crate::oracle::Call::vote {
+					asset_id: 1,
+					price: FixedU128::from_rational(42, 10),
+					produced_in: block_number
+				})
+			);
+		});
+	}
+
+	#[test]
+	fn ocw_skips_endpoints_missing_api_keys() {
+		let (mut ext, pool_state, offchain_state) = ExtBuilder::default()
+			.only_asset(
+				1,
+				vec![
+					// Endpoint requiring API key (will be skipped - no key in db)
+					Endpoint {
+						url: b"ocw.local.io/premium".to_vec().try_into().unwrap(),
+						method: Method::Get,
+						headers: vec![crate::oracle::offchain::Header {
+							name: b"X-API-Key".to_vec().try_into().unwrap(),
+							value: RequestData::OffchainDatabase(
+								b"no_key".to_vec().try_into().unwrap(),
+							),
+						}]
+						.try_into()
+						.unwrap(),
+						requires_api_key: true,
+						parsing_method: ParsingMethod::CryptoCompareFree,
+						..Default::default()
+					},
+					// Endpoint not requiring API key (will be used)
+					Endpoint {
+						url: b"ocw.local.io/free".to_vec().try_into().unwrap(),
+						method: Method::Get,
+						requires_api_key: false,
+						parsing_method: ParsingMethod::CryptoCompareFree,
+						..Default::default()
+					},
+				],
+			)
+			.build_offchainify();
+
+		ext.execute_with(|| {
+			// given: one signing key is available, but API key is NOT in offchain database
+			UintAuthorityId::set_all_keys(vec![0]);
+
+			// when: run 10 rounds of OCW
+			for round in 0u64..10 {
+				let block_number = PriceUpdateInterval::get() * (round + 1);
+				frame_system::Pallet::<Runtime>::set_block_number(block_number);
+
+				// Register mock response for the free endpoint only
+				offchain_state.write().expect_request(PendingRequest {
+					method: "GET".into(),
+					uri: "ocw.local.io/free".into(),
+					response: Some(br#"{"USD": 4.2}"#.to_vec()),
+					sent: true,
+					..Default::default()
+				});
+
+				let _result = OracleOffchainWorker::<Runtime>::offchain_worker(block_number);
+			}
+
+			// then: 10 transactions submitted (one per round, using only the free endpoint)
+			assert_eq!(pool_state.read().transactions.len(), 10);
+		});
+	}
+}

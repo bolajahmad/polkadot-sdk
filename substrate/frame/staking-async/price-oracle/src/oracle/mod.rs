@@ -24,12 +24,12 @@ V0: next week
 - [x] Add confidence to the endpoint, last over-engineering!
 - [x] Authorities should be stored in BTree for easy retreival
 - Tests for OCW struct actually running:
-	- [ ] local http server running, recoding incoming requests.
-	- [ ] test all sorts of endpoint params: body, header, method,
-	- [ ] test offchain data-base key being fetched if needed.
-	- [ ] Test that apis that require ocw key, but is is not present are skipped.
+	- [x] local http server running, recoding incoming requests.
+	- [x] test all sorts of endpoint params: body, header, method,
+	- [x] test offchain data-base key being fetched if needed.
+	- [x] Test that apis that require ocw key, but is is not present are skipped.
 	- [ ] OCW lock to prevent overlaps
-	- e2e tests where pallet moves forward, and 1 OCW is submitting stuff (stretch)
+	- [ ] e2e tests where pallet moves forward, and 1 OCW is submitting stuff (stretch)
 - [ ] Benchmarking for on_init
 - New tx extension to:
 	- [ ] Should also read the authorities, and block any tx from other than these folks, if signed origin

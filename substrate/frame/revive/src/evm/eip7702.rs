@@ -97,6 +97,18 @@ pub(crate) fn validate_authorization<T: Config>(
 		return None;
 	}
 
+	let authority = match recover_authority(auth) {
+		Ok(addr) => addr,
+		Err(_) => {
+			log::debug!(target: LOG_TARGET, "Failed to recover authority from signature");
+			return None;
+		},
+	};
+
+	let account_id = T::AddressMapper::to_account_id(&authority);
+	let is_new_account = !frame_system::Account::<T>::contains_key(&account_id);
+
+	let current_nonce: u64 = frame_system::Pallet::<T>::account_nonce(&account_id).saturated_into();
 	let expected_nonce: u64 = match auth.nonce.try_into() {
 		Ok(nonce) => nonce,
 		Err(_) => {
@@ -108,19 +120,6 @@ pub(crate) fn validate_authorization<T: Config>(
 			return None;
 		},
 	};
-
-	let authority = match recover_authority(auth) {
-		Ok(addr) => addr,
-		Err(_) => {
-			log::debug!(target: LOG_TARGET, "Failed to recover authority from signature");
-			return None;
-		},
-	};
-
-	let account_id = T::AddressMapper::to_account_id(&authority);
-	let is_new_account = !frame_system::Account::<T>::contains_key(&account_id);
-	let current_nonce: u64 = frame_system::Pallet::<T>::account_nonce(&account_id).saturated_into();
-
 	if current_nonce != expected_nonce {
 		log::debug!(
 			target: LOG_TARGET,

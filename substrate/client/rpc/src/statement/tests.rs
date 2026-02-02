@@ -90,7 +90,7 @@ async fn subscribe_works() {
 	let first_topic = submitted[0].topic(0).expect("Should have topic");
 
 	let match_all_filter =
-		TopicFilter::MatchAll(vec![first_topic.clone()].try_into().expect("Single topic"));
+		TopicFilter::MatchAll(vec![first_topic].try_into().expect("Single topic"));
 	let submitted_clone = submitted.clone();
 	let match_any_filter = TopicFilter::MatchAny(
 		vec![

@@ -1600,7 +1600,7 @@ impl<T: Config> Pallet<T> {
 
 		Self::ensure_non_contract_if_signed(&origin)?;
 
-		let mut call = Call::<T>::eth_call_with_authorization_list {
+		let mut call = Call::<T>::eth_call {
 			dest,
 			value,
 			weight_limit,
@@ -1609,32 +1609,66 @@ impl<T: Config> Pallet<T> {
 			transaction_encoded: transaction_encoded.clone(),
 			effective_gas_price,
 			encoded_len,
-			authorization_list: authorization_list.clone(),
 		}
 		.into();
 		let info = T::FeeInfo::dispatch_info(&call);
 		let base_info = T::FeeInfo::base_dispatch_info(&mut call);
 		drop(call);
 
-		let extra_weight = base_info.total_weight();
-
-		let limits = TransactionLimits::EthereumGas {
-			eth_gas_limit: eth_gas_limit.saturated_into(),
-			maybe_weight_limit: Some(weight_limit),
-			eth_tx_info: EthTxInfo::new(encoded_len, extra_weight),
-		};
-
-		let mut meter = TransactionMeter::new(limits)?;
-
-		if !authorization_list.is_empty() {
-			evm::eip7702::process_authorizations::<T>(
-				&authorization_list,
-				U256::from(T::ChainId::get()),
-				&mut meter,
-			)?;
-		}
-
 		block_storage::with_ethereum_context::<T>(transaction_encoded, || {
+			let extra_weight = base_info.total_weight();
+
+			let limits = TransactionLimits::EthereumGas {
+				eth_gas_limit: eth_gas_limit.saturated_into(),
+				maybe_weight_limit: Some(weight_limit),
+				eth_tx_info: EthTxInfo::new(encoded_len, extra_weight),
+			};
+
+			let mut meter = match TransactionMeter::new(limits) {
+				Ok(meter) => meter,
+				Err(error) => {
+					return block_storage::EthereumCallResult {
+						receipt_gas_info: ReceiptGasInfo {
+							gas_used: U256::zero(),
+							effective_gas_price,
+						},
+						result: Err(DispatchErrorWithPostInfo {
+							post_info: PostDispatchInfo {
+								actual_weight: Some(base_info.call_weight),
+								pays_fee: Pays::Yes,
+							},
+							error,
+						}),
+					}
+				},
+			};
+
+			if !authorization_list.is_empty() {
+				if let Err(error) = evm::eip7702::process_authorizations::<T>(
+					&authorization_list,
+					U256::from(T::ChainId::get()),
+					&mut meter,
+				) {
+					return block_storage::EthereumCallResult {
+						receipt_gas_info: ReceiptGasInfo {
+							gas_used: Pallet::<T>::convert_native_to_evm(
+								meter.total_consumed_gas(),
+							),
+							effective_gas_price,
+						},
+						result: Err(DispatchErrorWithPostInfo {
+							post_info: PostDispatchInfo {
+								actual_weight: Some(
+									meter.weight_consumed().saturating_add(base_info.call_weight),
+								),
+								pays_fee: Pays::Yes,
+							},
+							error,
+						}),
+					};
+				}
+			}
+
 			let output = Self::bare_call_internal(
 				origin,
 				dest,

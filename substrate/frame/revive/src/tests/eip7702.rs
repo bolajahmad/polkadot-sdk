@@ -38,9 +38,7 @@ fn set_delegation_creates_indicator() {
 		let target = H160::from([0x22; 20]);
 
 		assert_ok!(AccountInfo::<Test>::set_delegation(&eoa, target));
-
 		assert!(AccountInfo::<Test>::is_delegated(&eoa));
-
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&eoa), Some(target));
 	});
 }
@@ -55,7 +53,6 @@ fn clear_delegation_restores_eoa() {
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 
 		assert_ok!(AccountInfo::<Test>::clear_delegation(&authority));
-
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
 	});
 }

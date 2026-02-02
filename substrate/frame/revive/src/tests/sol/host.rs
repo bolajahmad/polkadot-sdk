@@ -21,7 +21,7 @@ use crate::{
 	exec::EMPTY_CODE_HASH,
 	metering::TransactionLimits,
 	storage::AccountInfo,
-	test_utils::{builder::Contract, ALICE, BOB, BOB_ADDR},
+	test_utils::{builder::Contract, ALICE, BOB, BOB_ADDR, CHARLIE, CHARLIE_ADDR},
 	tests::{
 		builder, dummy_evm_contract, test_utils, test_utils::get_contract, Contracts, ExtBuilder,
 		RuntimeEvent, Test, TestSigner,
@@ -66,15 +66,6 @@ fn create_delegated_eoa(target: &H160) -> H160 {
 
 	assert!(AccountInfo::<Test>::is_delegated(&authority));
 	authority
-}
-
-/// Create a funded EOA (not delegated, not a contract)
-fn create_funded_eoa() -> H160 {
-	let seed = H256::random();
-	let address = H160::from_slice(&sp_io::hashing::keccak_256(&seed.0)[12..]);
-	let account_id = <Test as Config>::AddressMapper::to_account_id(&address);
-	let _ = <Test as Config>::Currency::set_balance(&account_id, 100_000_000);
-	address
 }
 
 /// Call EXTCODEHASH opcode via the Host contract
@@ -216,8 +207,8 @@ fn extcodesize_works(fixture_type: FixtureType) {
 
 		// Test case 3: Regular EOA - returns 0
 		{
-			let eoa = create_funded_eoa();
-			let result = call_extcodesize(&host_addr, &eoa);
+			<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
+			let result = call_extcodesize(&host_addr, &CHARLIE_ADDR);
 			assert_eq!(result, 0, "EXTCODESIZE for regular EOA should return 0");
 		}
 
@@ -270,8 +261,8 @@ fn extcodehash_works(fixture_type: FixtureType) {
 
 		// Test case 3: Regular EOA - returns EMPTY_CODE_HASH
 		{
-			let eoa = create_funded_eoa();
-			let result = call_extcodehash(&host_addr, &eoa);
+			<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
+			let result = call_extcodehash(&host_addr, &CHARLIE_ADDR);
 			assert_eq!(
 				result, EMPTY_CODE_HASH,
 				"EXTCODEHASH for regular EOA should return EMPTY_CODE_HASH"
@@ -333,8 +324,8 @@ fn pallet_code_works() {
 
 		// Test case 3: Regular EOA - returns empty
 		{
-			let eoa = create_funded_eoa();
-			let code = Contracts::code(&eoa);
+			<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
+			let code = Contracts::code(&CHARLIE_ADDR);
 			assert!(code.is_empty(), "Pallet::code for regular EOA should return empty");
 		}
 

@@ -237,19 +237,7 @@ impl<T: Config> AccountInfo<T> {
 
 	/// EIP-7702: Set a delegation indicator for an EOA
 	/// Marks the account as delegated to the target address.
-	///
-	/// Creates a `ContractInfo` for the delegated account with its own storage trie.
-	/// The code hash is copied from the target contract (or zero if target is not a contract).
-	/// Per EIP-7702, if the target has no code, the delegation still succeeds but
-	/// executes empty code.
-	///
-	/// If the account is already delegated, the existing storage trie is preserved but
-	/// the code hash is updated to the new target's code hash.
 	pub fn set_delegation(address: &H160, target: H160) -> Result<(), DispatchError> {
-		// Get the target's code hash directly from storage.
-		// If the target is a Contract, use its code_hash.
-		// If the target is Delegated, use its code_hash (which points to the target it delegates
-		// to). If the target is EOA or doesn't exist, use zero hash (empty code per EIP-7702).
 		let target_code_hash = <AccountInfoOf<T>>::get(&target)
 			.and_then(|info| match info.account_type {
 				AccountType::Contract(c) => Some(c.code_hash),
@@ -260,7 +248,6 @@ impl<T: Config> AccountInfo<T> {
 
 		AccountInfoOf::<T>::mutate(address, |account| -> Result<(), DispatchError> {
 			let contract_info = if let Some(account) = account.as_ref() {
-				// If already delegated, preserve the existing trie but update code hash
 				if let AccountType::Delegated { contract_info: existing, .. } =
 					&account.account_type
 				{

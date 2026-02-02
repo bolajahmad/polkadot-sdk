@@ -38,25 +38,10 @@ pub const EIP7702_MAGIC: u8 = 0x05;
 
 /// Process a list of EIP-7702 authorization tuples
 ///
-/// This function processes authorization tuples according to the EIP-7702 specification:
-/// 1. Verifies the chain ID (must be 0 or current chain)
-/// 2. Recovers the authority address from the signature
-/// 3. Verifies the account nonce matches
-/// 4. Verifies the account code is empty or already delegated
-/// 5. Sets the delegation indicator (0xef0100 || address) or clears if address is 0x0
-/// 6. Increments the authority's nonce
-///
-/// Weight is charged progressively:
-/// - First charges for checking if account exists
-/// - Then charges for processing the authorization (existing or new account)
-///
 /// # Parameters
 /// - `authorization_list`: List of authorization tuples to process
 /// - `chain_id`: Current chain ID
 /// - `meter`: Weight meter to charge weight from
-///
-/// # Returns
-/// `Ok(())` on success, or `Err` if out of weight
 pub fn process_authorizations<T: Config>(
 	authorization_list: &[AuthorizationListEntry],
 	chain_id: U256,
@@ -106,8 +91,6 @@ pub(crate) fn validate_authorization<T: Config>(
 	};
 
 	let account_id = T::AddressMapper::to_account_id(&authority);
-	let is_new_account = !frame_system::Account::<T>::contains_key(&account_id);
-
 	let current_nonce: u64 = frame_system::Pallet::<T>::account_nonce(&account_id).saturated_into();
 	let expected_nonce: u64 = match auth.nonce.try_into() {
 		Ok(nonce) => nonce,
@@ -137,6 +120,7 @@ pub(crate) fn validate_authorization<T: Config>(
 		return None;
 	}
 
+	let is_new_account = !frame_system::Account::<T>::contains_key(&account_id);
 	Some((authority, is_new_account))
 }
 
@@ -144,21 +128,16 @@ pub(crate) fn validate_authorization<T: Config>(
 ///
 /// This is exposed for benchmarking purposes.
 pub(crate) fn apply_delegation<T: Config>(authority: &H160, target_address: H160) {
-	let account_id = T::AddressMapper::to_account_id(authority);
-
 	if target_address.is_zero() {
 		let _ = AccountInfo::<T>::clear_delegation(authority);
 	} else {
 		if let Err(e) = AccountInfo::<T>::set_delegation(authority, target_address) {
-			log::debug!(
-				target: LOG_TARGET,
-				"Failed to set delegation for {authority:?}: {e:?}",
-			);
+			log::debug!(target: LOG_TARGET, "Failed to set delegation for {authority:?}: {e:?}");
 			return;
 		}
 	}
 
-	frame_system::Pallet::<T>::inc_account_nonce(&account_id);
+	frame_system::Pallet::<T>::inc_account_nonce(&T::AddressMapper::to_account_id(authority));
 }
 
 /// Recover the authority address from an authorization signature
@@ -169,9 +148,7 @@ fn recover_authority(auth: &AuthorizationListEntry) -> Result<H160, ()> {
 	let mut message = Vec::new();
 	message.push(EIP7702_MAGIC);
 	message.extend_from_slice(&auth.rlp_encode_unsigned());
-
-	let signature = auth.signature();
-	recover_eth_address_from_message(&message, &signature)
+	recover_eth_address_from_message(&message, &auth.signature())
 }
 
 /// Sign an authorization entry
@@ -184,30 +161,18 @@ fn recover_authority(auth: &AuthorizationListEntry) -> Result<H160, ()> {
 /// - `address`: Target address to delegate to
 /// - `nonce`: Nonce for the authorization
 #[cfg(any(test, feature = "runtime-benchmarks"))]
-#[allow(dead_code)] // Used by benchmarks; tests use Signer::sign_authorization wrapper
 pub fn sign_authorization(
 	signing_key: &k256::ecdsa::SigningKey,
 	chain_id: U256,
 	address: H160,
 	nonce: U256,
 ) -> AuthorizationListEntry {
-	use sp_core::keccak_256;
-
-	// Create unsigned entry for RLP encoding
-	let unsigned = AuthorizationListEntry {
-		chain_id,
-		address,
-		nonce,
-		y_parity: U256::zero(),
-		r: U256::zero(),
-		s: U256::zero(),
-	};
-
+	let unsigned = AuthorizationListEntry { chain_id, address, nonce, ..Default::default() };
 	let mut message = Vec::new();
 	message.push(EIP7702_MAGIC);
 	message.extend_from_slice(&unsigned.rlp_encode_unsigned());
 
-	let hash = keccak_256(&message);
+	let hash = sp_core::keccak_256(&message);
 	let (signature, recovery_id) =
 		signing_key.sign_prehash_recoverable(&hash).expect("signing succeeds");
 

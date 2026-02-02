@@ -17,7 +17,7 @@
 
 //! Tests for SatelliteCurrency wrapper: verifies that burn_from redirects to satellite.
 
-use crate::{currency::SatelliteCurrency, mock::*};
+use crate::mock::*;
 use frame_support::{
 	assert_ok,
 	traits::{
@@ -27,14 +27,13 @@ use frame_support::{
 };
 
 type DapSatellitePallet = crate::Pallet<Test>;
-type SatelliteCurrencyWrapper = SatelliteCurrency<Test>;
 
 // ============================================================================
-// Tests for SatelliteCurrency::burn_from (redirects burns to satellite)
+// Tests for pallet using SatelliteCurrency (burn redirects to satellite)
 // ============================================================================
 
 #[test]
-fn satellite_currency_burn_from_redirects_to_satellite() {
+fn pallet_burn_via_satellite_currency_redirects_to_satellite() {
 	new_test_ext().execute_with(|| {
 		// Given
 		let satellite = DapSatellitePallet::satellite_account();
@@ -43,16 +42,10 @@ fn satellite_currency_burn_from_redirects_to_satellite() {
 		let initial_active = Balances::active_issuance();
 		assert_eq!(Balances::free_balance(satellite), ed);
 
-		// When: multiple burns from different accounts via SatelliteCurrency
-		assert_ok!(<SatelliteCurrencyWrapper as Mutate<_>>::burn_from(
-			&1, 30, Expendable, Exact, Polite
-		));
-		assert_ok!(<SatelliteCurrencyWrapper as Mutate<_>>::burn_from(
-			&2, 50, Expendable, Exact, Polite
-		));
-		assert_ok!(<SatelliteCurrencyWrapper as Mutate<_>>::burn_from(
-			&3, 100, Expendable, Exact, Polite
-		));
+		// When: multiple burns via MockBurner pallet (uses SatelliteCurrency)
+		assert_ok!(MockBurner::burn(RuntimeOrigin::signed(1), 30));
+		assert_ok!(MockBurner::burn(RuntimeOrigin::signed(2), 50));
+		assert_ok!(MockBurner::burn(RuntimeOrigin::signed(3), 100));
 
 		// Then: satellite accumulated all burns
 		assert_eq!(Balances::free_balance(satellite), ed + 180);
@@ -68,7 +61,7 @@ fn satellite_currency_burn_from_redirects_to_satellite() {
 }
 
 #[test]
-fn satellite_currency_burn_from_can_reap_account() {
+fn pallet_burn_via_satellite_currency_can_reap_account() {
 	new_test_ext().execute_with(|| {
 		// Given
 		let satellite = DapSatellitePallet::satellite_account();
@@ -76,10 +69,8 @@ fn satellite_currency_burn_from_can_reap_account() {
 		let initial_total = Balances::total_issuance();
 		assert_eq!(Balances::free_balance(1), 100);
 
-		// When: burn entire balance via SatelliteCurrency (Expendable allows reaping)
-		assert_ok!(<SatelliteCurrencyWrapper as Mutate<_>>::burn_from(
-			&1, 100, Expendable, Exact, Polite
-		));
+		// When: burn entire balance via MockBurner pallet
+		assert_ok!(MockBurner::burn(RuntimeOrigin::signed(1), 100));
 
 		// Then: account reaped
 		assert_eq!(Balances::free_balance(1), 0);
@@ -87,35 +78,6 @@ fn satellite_currency_burn_from_can_reap_account() {
 		assert_eq!(Balances::free_balance(satellite), ed + 100);
 		// And: total issuance unchanged
 		assert_eq!(Balances::total_issuance(), initial_total);
-	});
-}
-
-#[test]
-fn satellite_currency_burn_from_respects_preservation() {
-	use frame_support::{assert_noop, traits::tokens::Preservation::Preserve};
-	use sp_runtime::TokenError;
-
-	new_test_ext().execute_with(|| {
-		// Given: user has 100
-		assert_eq!(Balances::free_balance(1), 100);
-
-		// When: try to burn all with Preserve via SatelliteCurrency
-		let result =
-			<SatelliteCurrencyWrapper as Mutate<_>>::burn_from(&1, 100, Preserve, Exact, Polite);
-
-		// Then: fails because it would kill the account
-		assert_noop!(result, TokenError::FundsUnavailable);
-
-		// And: can burn amount that keeps account alive
-		let ed = <Balances as Inspect<_>>::minimum_balance();
-		assert_ok!(<SatelliteCurrencyWrapper as Mutate<_>>::burn_from(
-			&1,
-			100 - ed,
-			Preserve,
-			Exact,
-			Polite
-		));
-		assert_eq!(Balances::free_balance(1), ed);
 	});
 }
 

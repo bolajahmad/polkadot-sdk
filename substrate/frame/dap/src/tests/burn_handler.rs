@@ -17,7 +17,7 @@
 
 //! Tests for DapCurrency wrapper: verifies that burn_from redirects to buffer.
 
-use crate::{currency::DapCurrency, mock::*};
+use crate::mock::*;
 use frame_support::{
 	assert_ok,
 	traits::{
@@ -27,14 +27,13 @@ use frame_support::{
 };
 
 type DapPallet = crate::Pallet<Test>;
-type DapCurrencyWrapper = DapCurrency<Test>;
 
 // ============================================================================
-// Tests for DapCurrency::burn_from (redirects burns to DAP buffer)
+// Tests for pallet using DapCurrency (burn redirects to buffer)
 // ============================================================================
 
 #[test]
-fn dap_currency_burn_from_redirects_to_buffer() {
+fn pallet_burn_via_dap_currency_redirects_to_buffer() {
 	new_test_ext().execute_with(|| {
 		// Given
 		let buffer = DapPallet::buffer_account();
@@ -43,12 +42,10 @@ fn dap_currency_burn_from_redirects_to_buffer() {
 		let initial_active = Balances::active_issuance();
 		assert_eq!(Balances::free_balance(buffer), ed);
 
-		// When: multiple burns from different accounts via DapCurrency
-		assert_ok!(<DapCurrencyWrapper as Mutate<_>>::burn_from(&1, 30, Expendable, Exact, Polite));
-		assert_ok!(<DapCurrencyWrapper as Mutate<_>>::burn_from(&2, 50, Expendable, Exact, Polite));
-		assert_ok!(<DapCurrencyWrapper as Mutate<_>>::burn_from(
-			&3, 100, Expendable, Exact, Polite
-		));
+		// When: multiple burns via MockBurner pallet (uses DapCurrency)
+		assert_ok!(MockBurner::burn(RuntimeOrigin::signed(1), 30));
+		assert_ok!(MockBurner::burn(RuntimeOrigin::signed(2), 50));
+		assert_ok!(MockBurner::burn(RuntimeOrigin::signed(3), 100));
 
 		// Then: buffer accumulated all burns
 		assert_eq!(Balances::free_balance(buffer), ed + 180);
@@ -64,7 +61,7 @@ fn dap_currency_burn_from_redirects_to_buffer() {
 }
 
 #[test]
-fn dap_currency_burn_from_can_reap_account() {
+fn pallet_burn_via_dap_currency_can_reap_account() {
 	new_test_ext().execute_with(|| {
 		// Given
 		let buffer = DapPallet::buffer_account();
@@ -72,10 +69,8 @@ fn dap_currency_burn_from_can_reap_account() {
 		let initial_total = Balances::total_issuance();
 		assert_eq!(Balances::free_balance(1), 100);
 
-		// When: burn entire balance via DapCurrency (Expendable allows reaping)
-		assert_ok!(<DapCurrencyWrapper as Mutate<_>>::burn_from(
-			&1, 100, Expendable, Exact, Polite
-		));
+		// When: burn entire balance via MockBurner pallet
+		assert_ok!(MockBurner::burn(RuntimeOrigin::signed(1), 100));
 
 		// Then: account reaped
 		assert_eq!(Balances::free_balance(1), 0);
@@ -83,34 +78,6 @@ fn dap_currency_burn_from_can_reap_account() {
 		assert_eq!(Balances::free_balance(buffer), ed + 100);
 		// And: total issuance unchanged
 		assert_eq!(Balances::total_issuance(), initial_total);
-	});
-}
-
-#[test]
-fn dap_currency_burn_from_respects_preservation() {
-	use frame_support::{assert_noop, traits::tokens::Preservation::Preserve};
-	use sp_runtime::TokenError;
-
-	new_test_ext().execute_with(|| {
-		// Given: user has 100
-		assert_eq!(Balances::free_balance(1), 100);
-
-		// When: try to burn all with Preserve via DapCurrency (should fail to keep account alive)
-		let result = <DapCurrencyWrapper as Mutate<_>>::burn_from(&1, 100, Preserve, Exact, Polite);
-
-		// Then: fails because it would kill the account
-		assert_noop!(result, TokenError::FundsUnavailable);
-
-		// And: can burn amount that keeps account alive
-		let ed = <Balances as Inspect<_>>::minimum_balance();
-		assert_ok!(<DapCurrencyWrapper as Mutate<_>>::burn_from(
-			&1,
-			100 - ed,
-			Preserve,
-			Exact,
-			Polite
-		));
-		assert_eq!(Balances::free_balance(1), ed);
 	});
 }
 

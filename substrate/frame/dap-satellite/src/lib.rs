@@ -144,10 +144,7 @@ pub mod pallet {
 					);
 				},
 				Err(e) => {
-					frame_support::defensive!(
-						"Failed to mint ED into DAP satellite: {:?}",
-						e
-					);
+					frame_support::defensive!("Failed to mint ED into DAP satellite: {:?}", e);
 				},
 			}
 		}
@@ -415,10 +412,7 @@ pub mod currency {
 				T::Currency::increase_balance(&satellite, actual, BestEffort).inspect_err(|e| {
 					// Try to restore balance to source account.
 					let _ = T::Currency::increase_balance(who, actual, BestEffort);
-					frame_support::defensive!(
-						"Failed to credit DAP satellite: {:?}",
-						e
-					);
+					frame_support::defensive!("Failed to credit DAP satellite: {:?}", e);
 				});
 
 			Ok(actual)

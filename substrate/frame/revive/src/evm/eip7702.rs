@@ -24,12 +24,12 @@
 use crate::{
 	address::AddressMapper,
 	evm::api::{recover_eth_address_from_message, AuthorizationListEntry},
+	metering::TransactionMeter,
 	storage::AccountInfo,
-	weights::WeightInfo,
-	Config, LOG_TARGET,
+	Config, RuntimeCosts, LOG_TARGET,
 };
 use alloc::vec::Vec;
-use frame_support::{dispatch::DispatchResult, weights::WeightMeter};
+use frame_support::dispatch::DispatchResult;
 use sp_core::{H160, U256};
 use sp_runtime::SaturatedConversion;
 
@@ -41,24 +41,20 @@ pub const EIP7702_MAGIC: u8 = 0x05;
 /// # Parameters
 /// - `authorization_list`: List of authorization tuples to process
 /// - `chain_id`: Current chain ID
-/// - `meter`: Weight meter to charge weight from
+/// - `meter`: Transaction meter to charge weight from
 pub fn process_authorizations<T: Config>(
 	authorization_list: &[AuthorizationListEntry],
 	chain_id: U256,
-	meter: &mut WeightMeter,
+	meter: &mut TransactionMeter<T>,
 ) -> DispatchResult {
 	for auth in authorization_list.iter() {
-		meter
-			.try_consume(T::WeightInfo::validate_authorization())
-			.map_err(|_| crate::Error::<T>::OutOfGas)?;
+		meter.charge_weight_token(RuntimeCosts::ValidateAuthorization)?;
 
 		let Some((authority, is_new_account)) = validate_authorization::<T>(auth, chain_id) else {
 			continue;
 		};
 
-		meter
-			.try_consume(T::WeightInfo::apply_delegation(is_new_account as u32))
-			.map_err(|_| crate::Error::<T>::OutOfGas)?;
+		meter.charge_weight_token(RuntimeCosts::ApplyDelegation { is_new_account })?;
 		apply_delegation::<T>(&authority, auth.address);
 	}
 

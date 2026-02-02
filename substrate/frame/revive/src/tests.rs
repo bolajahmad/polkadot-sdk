@@ -322,6 +322,15 @@ pub(crate) mod builder {
 		EthCallBuilder::<Test>::eth_call(crate::Origin::<Test>::EthTransaction(ALICE).into(), dest)
 	}
 
+	pub fn eth_call_with_authorization_list(
+		dest: H160,
+	) -> EthCallWithAuthorizationListBuilder<Test> {
+		EthCallWithAuthorizationListBuilder::<Test>::eth_call_with_authorization_list(
+			crate::Origin::<Test>::EthTransaction(ALICE).into(),
+			dest,
+		)
+	}
+
 	pub fn eth_instantiate_with_code(code: Vec<u8>) -> EthInstantiateWithCodeBuilder<Test> {
 		EthInstantiateWithCodeBuilder::<Test>::eth_instantiate_with_code(
 			crate::Origin::<Test>::EthTransaction(ALICE).into(),

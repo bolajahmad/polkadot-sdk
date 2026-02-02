@@ -60,7 +60,7 @@ fn create_delegated_eoa(target: &H160) -> H160 {
 	let auth = signer.sign_authorization(chain_id, *target, nonce);
 
 	// Process the authorization to set up delegation
-	let result = builder::eth_call(*target)
+	let result = builder::eth_call_with_authorization_list(*target)
 		.authorization_list(vec![auth])
 		.eth_gas_limit(1_000_000u64.into())
 		.build();

@@ -1345,72 +1345,52 @@ pub mod pallet {
 			transaction_encoded: Vec<u8>,
 			effective_gas_price: U256,
 			encoded_len: u32,
-			authorization_list: Vec<evm::AuthorizationListEntry>,
 		) -> DispatchResultWithPostInfo {
-			let signer = Self::ensure_eth_signed(origin)?;
-			let origin = OriginFor::<T>::signed(signer.clone());
-
-			Self::ensure_non_contract_if_signed(&origin)?;
-
-			let (eth_gas_limit, weight_limit) = if !authorization_list.is_empty() {
-				let mut meter = frame_support::weights::WeightMeter::with_limit(weight_limit);
-				evm::eip7702::process_authorizations::<T>(
-					&authorization_list,
-					U256::from(T::ChainId::get()),
-					&mut meter,
-				)?;
-
-				let auth_gas = metering::SignedGas::<T>::from_weight_fee(
-					T::FeeInfo::weight_to_fee(&meter.consumed()),
-				)
-				.to_ethereum_gas()
-				.unwrap_or_default();
-
-				(eth_gas_limit.saturating_sub(auth_gas.into()), meter.remaining())
-			} else {
-				(eth_gas_limit, weight_limit)
-			};
-
-			let mut call = Call::<T>::eth_call {
+			Self::eth_call_impl(
+				origin,
 				dest,
 				value,
 				weight_limit,
 				eth_gas_limit,
-				data: data.clone(),
-				transaction_encoded: transaction_encoded.clone(),
+				data,
+				transaction_encoded,
 				effective_gas_price,
 				encoded_len,
-				authorization_list: authorization_list.clone(),
-			}
-			.into();
-			let info = T::FeeInfo::dispatch_info(&call);
-			let base_info = T::FeeInfo::base_dispatch_info(&mut call);
-			drop(call);
+				vec![],
+			)
+		}
 
-			block_storage::with_ethereum_context::<T>(transaction_encoded, || {
-				let extra_weight = base_info.total_weight();
-				let output = Self::bare_call(
-					origin,
-					dest,
-					value,
-					TransactionLimits::EthereumGas {
-						eth_gas_limit: adjusted_eth_gas_limit.saturated_into(),
-						weight_limit,
-						eth_tx_info: EthTxInfo::new(encoded_len, extra_weight),
-					},
-					data,
-					ExecConfig::new_eth_tx(effective_gas_price, encoded_len, extra_weight),
-				);
-
-				block_storage::EthereumCallResult::new::<T>(
-					signer,
-					output,
-					base_info.call_weight,
-					encoded_len,
-					&info,
-					effective_gas_price,
-				)
-			})
+		/// Same as [`Self::eth_call`] but with EIP-7702 authorization list support.
+		#[pallet::call_index(13)]
+		#[pallet::weight(
+			T::WeightInfo::eth_call(Pallet::<T>::has_dust(*value).into())
+			.saturating_add(*weight_limit)
+			.saturating_add(T::WeightInfo::on_finalize_block_per_tx(transaction_encoded.len() as u32))
+		)]
+		pub fn eth_call_with_authorization_list(
+			origin: OriginFor<T>,
+			dest: H160,
+			value: U256,
+			weight_limit: Weight,
+			eth_gas_limit: U256,
+			data: Vec<u8>,
+			transaction_encoded: Vec<u8>,
+			effective_gas_price: U256,
+			encoded_len: u32,
+			authorization_list: Vec<evm::AuthorizationListEntry>,
+		) -> DispatchResultWithPostInfo {
+			Self::eth_call_impl(
+				origin,
+				dest,
+				value,
+				weight_limit,
+				eth_gas_limit,
+				data,
+				transaction_encoded,
+				effective_gas_price,
+				encoded_len,
+				authorization_list,
+			)
 		}
 
 		/// Executes a Substrate runtime call from an Ethereum transaction.
@@ -1603,6 +1583,83 @@ fn dispatch_result<R>(
 }
 
 impl<T: Config> Pallet<T> {
+	fn eth_call_impl(
+		origin: OriginFor<T>,
+		dest: H160,
+		value: U256,
+		weight_limit: Weight,
+		eth_gas_limit: U256,
+		data: Vec<u8>,
+		transaction_encoded: Vec<u8>,
+		effective_gas_price: U256,
+		encoded_len: u32,
+		authorization_list: Vec<evm::AuthorizationListEntry>,
+	) -> DispatchResultWithPostInfo {
+		let signer = Self::ensure_eth_signed(origin)?;
+		let origin = OriginFor::<T>::signed(signer.clone());
+
+		Self::ensure_non_contract_if_signed(&origin)?;
+
+		let (eth_gas_limit, weight_limit) = if !authorization_list.is_empty() {
+			let mut meter = frame_support::weights::WeightMeter::with_limit(weight_limit);
+			evm::eip7702::process_authorizations::<T>(
+				&authorization_list,
+				U256::from(T::ChainId::get()),
+				&mut meter,
+			)?;
+
+			let auth_gas = metering::SignedGas::<T>::from_weight_fee(T::FeeInfo::weight_to_fee(
+				&meter.consumed(),
+			))
+			.to_ethereum_gas()
+			.unwrap_or_default();
+
+			(eth_gas_limit.saturating_sub(auth_gas.into()), meter.remaining())
+		} else {
+			(eth_gas_limit, weight_limit)
+		};
+
+		let mut call = Call::<T>::eth_call {
+			dest,
+			value,
+			weight_limit,
+			eth_gas_limit,
+			data: data.clone(),
+			transaction_encoded: transaction_encoded.clone(),
+			effective_gas_price,
+			encoded_len,
+		}
+		.into();
+		let info = T::FeeInfo::dispatch_info(&call);
+		let base_info = T::FeeInfo::base_dispatch_info(&mut call);
+		drop(call);
+
+		block_storage::with_ethereum_context::<T>(transaction_encoded, || {
+			let extra_weight = base_info.total_weight();
+			let output = Self::bare_call(
+				origin,
+				dest,
+				value,
+				TransactionLimits::EthereumGas {
+					eth_gas_limit: eth_gas_limit.saturated_into(),
+					maybe_weight_limit: Some(weight_limit),
+					eth_tx_info: EthTxInfo::new(encoded_len, extra_weight),
+				},
+				data,
+				ExecConfig::new_eth_tx(effective_gas_price, encoded_len, extra_weight),
+			);
+
+			block_storage::EthereumCallResult::new::<T>(
+				signer,
+				output,
+				base_info.call_weight,
+				encoded_len,
+				&info,
+				effective_gas_price,
+			)
+		})
+	}
+
 	/// A generalized version of [`Self::call`].
 	///
 	/// Identical to [`Self::call`] but tailored towards being called by other code within the
@@ -1872,8 +1929,32 @@ impl<T: Config> Pallet<T> {
 			}
 		};
 
+		// EIP-7702: Process authorizations and adjust gas limit
+		let eth_gas_limit = if !call_info.authorization_list.is_empty() {
+			let mut meter = frame_support::weights::WeightMeter::new();
+			if let Err(e) = evm::eip7702::process_authorizations::<T>(
+				&call_info.authorization_list,
+				U256::from(T::ChainId::get()),
+				&mut meter,
+			) {
+				return Err(EthTransactError::Message(format!(
+					"Authorization processing failed: {e:?}"
+				)));
+			}
+
+			let auth_gas = metering::SignedGas::<T>::from_weight_fee(T::FeeInfo::weight_to_fee(
+				&meter.consumed(),
+			))
+			.to_ethereum_gas()
+			.unwrap_or_default();
+
+			call_info.eth_gas_limit.saturating_sub(auth_gas.into())
+		} else {
+			call_info.eth_gas_limit
+		};
+
 		let transaction_limits = TransactionLimits::EthereumGas {
-			eth_gas_limit: call_info.eth_gas_limit.saturated_into(),
+			eth_gas_limit: eth_gas_limit.saturated_into(),
 			weight_limit: Self::evm_max_extrinsic_weight(),
 			eth_tx_info: EthTxInfo::new(call_info.encoded_len, base_weight),
 		};

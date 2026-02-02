@@ -171,7 +171,7 @@ impl GenericTransaction {
 				crate::Call::eth_substrate_call::<T> { call: Box::new(call), transaction_encoded }
 					.into()
 			} else {
-				crate::Call::eth_call::<T> {
+				crate::Call::eth_call_with_authorization_list::<T> {
 					dest,
 					value,
 					weight_limit: Zero::zero(),

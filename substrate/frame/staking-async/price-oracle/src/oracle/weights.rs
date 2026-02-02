@@ -35,6 +35,7 @@ use core::marker::PhantomData;
 /// Weight functions needed for `pallet_price_oracle`.
 pub trait WeightInfo {
 	fn vote() -> Weight;
+	fn on_finalize_per_asset() -> Weight;
 }
 
 /// Weights for `pallet_price_oracle` using the Substrate node and recommended hardware.
@@ -43,11 +44,17 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	fn vote() -> Weight {
 		Weight::default() // CI-FAIL
 	}
+	fn on_finalize_per_asset() -> Weight {
+		Weight::default() // CI-FAIL
+	}
 }
 
 // For testing
 impl WeightInfo for () {
 	fn vote() -> Weight {
+		Weight::default()
+	}
+	fn on_finalize_per_asset() -> Weight {
 		Weight::default()
 	}
 }

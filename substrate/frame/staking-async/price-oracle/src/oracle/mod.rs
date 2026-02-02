@@ -34,9 +34,11 @@ V0: next week
 	- [ ] Should also read the authorities, and block any tx from other than these folks, if signed origin
 	- [ ] tests
 - [ ] Tests for existing tx-extension (minimal)
-- [ ] vote should be operational
+- [x] vote should be operational
 - [ ] Cleanup test runtime (remove tx-extension, make it more realistic)
+- [ ] One papi test for quick-ish sanity test
 - [ ] Westend integration
+- [ ] doc cleanup
 - [ ] Cleanup and have a minimal simulation crate.
 - [ ] vibe code a simple UI in PJS
 
@@ -706,7 +708,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// A new opinion from `origin` about the `price` of `asset_id`.
 		#[pallet::call_index(0)]
-		#[pallet::weight(T::WeightInfo::vote())]
+		#[pallet::weight((T::WeightInfo::vote(), DispatchClass::Operational))]
 		pub fn vote(
 			origin: OriginFor<T>,
 			asset_id: T::AssetId,
@@ -740,7 +742,7 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(1)]
-		#[pallet::weight({1000})]
+		#[pallet::weight({(1000, DispatchClass::Operational)})]
 		pub fn register_asset(
 			_origin: OriginFor<T>,
 			_asset_id: T::AssetId,
@@ -750,13 +752,13 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(2)]
-		#[pallet::weight({1000})]
+		#[pallet::weight({(1000, DispatchClass::Operational)})]
 		pub fn deregister_asset(_origin: OriginFor<T>, _asset_id: T::AssetId) -> DispatchResult {
 			Ok(())
 		}
 
 		#[pallet::call_index(3)]
-		#[pallet::weight({1000})]
+		#[pallet::weight({(1000, DispatchClass::Operational)})]
 		pub fn add_endpoint(
 			_origin: OriginFor<T>,
 			_asset_id: T::AssetId,
@@ -766,7 +768,7 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(4)]
-		#[pallet::weight({1000})]
+		#[pallet::weight({(1000, DispatchClass::Operational)})]
 		pub fn remove_endpoint(
 			_origin: OriginFor<T>,
 			_asset_id: T::AssetId,
@@ -776,25 +778,25 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(5)]
-		#[pallet::weight({1000})]
+		#[pallet::weight({(1000, DispatchClass::Operational)})]
 		pub fn force_set_authorities(_origin: OriginFor<T>) -> DispatchResult {
 			Ok(())
 		}
 
 		#[pallet::call_index(6)]
-		#[pallet::weight({1000})]
+		#[pallet::weight({(1000, DispatchClass::Operational)})]
 		pub fn set_invulnerables(_origin: OriginFor<T>) -> DispatchResult {
 			Ok(())
 		}
 
 		#[pallet::call_index(7)]
-		#[pallet::weight({1000})]
+		#[pallet::weight({(1000, DispatchClass::Operational)})]
 		pub fn ban_authority(_origin: OriginFor<T>) -> DispatchResult {
 			Ok(())
 		}
 
 		#[pallet::call_index(8)]
-		#[pallet::weight({1000})]
+		#[pallet::weight({(1000, DispatchClass::Operational)})]
 		pub fn unban_authority(_origin: OriginFor<T>) -> DispatchResult {
 			Ok(())
 		}

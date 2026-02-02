@@ -74,11 +74,7 @@ pub(crate) fn validate_authorization<T: Config>(
 	chain_id: U256,
 ) -> Option<(H160, bool)> {
 	if !auth.chain_id.is_zero() && auth.chain_id != chain_id {
-		log::debug!(
-			target: LOG_TARGET,
-			"Invalid chain_id in authorization: expected {chain_id:?} or 0, got {:?}",
-			auth.chain_id
-		);
+		log::debug!(target: LOG_TARGET, "Invalid chain_id in authorization: expected {chain_id:?} or 0, got {:?}", auth.chain_id);
 		return None;
 	}
 
@@ -95,28 +91,18 @@ pub(crate) fn validate_authorization<T: Config>(
 	let expected_nonce: u64 = match auth.nonce.try_into() {
 		Ok(nonce) => nonce,
 		Err(_) => {
-			log::debug!(
-				target: LOG_TARGET,
-				"Authorization nonce too large: {:?}",
-				auth.nonce
-			);
+			log::debug!(target: LOG_TARGET, "Authorization nonce too large: {:?}", auth.nonce);
 			return None;
 		},
 	};
 	if current_nonce != expected_nonce {
-		log::debug!(
-			target: LOG_TARGET,
-			"Nonce mismatch for {authority:?}: expected {expected_nonce:?}, got {current_nonce:?}",
-		);
+		log::debug!(target: LOG_TARGET, "Nonce mismatch for {authority:?}: expected {expected_nonce:?}, got {current_nonce:?}");
 		return None;
 	}
 
 	// Verify account is not a contract (but delegated accounts are allowed)
 	if AccountInfo::<T>::is_contract(&authority) {
-		log::debug!(
-			target: LOG_TARGET,
-			"Account {authority:?} has non-delegation code",
-		);
+		log::debug!(target: LOG_TARGET, "Account {authority:?} has non-delegation code");
 		return None;
 	}
 

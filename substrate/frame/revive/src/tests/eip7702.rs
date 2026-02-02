@@ -21,7 +21,7 @@ use crate::{
 	evm::fees::InfoT,
 	storage::AccountInfo,
 	test_utils::builder::Contract,
-	tests::{builder, dummy_evm_contract, TestSigner, *},
+	tests::{builder, TestSigner, *},
 	Code, Config,
 };
 use frame_support::{
@@ -147,12 +147,11 @@ fn valid_signature_is_verified_correctly() {
 		let seed = H256::random();
 		let signer = TestSigner::new(&seed.0);
 		let authority = signer.address;
-
 		let authority_id = <Test as Config>::AddressMapper::to_account_id(&authority);
+
 		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 1_000_000);
 
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-
 		let auth = signer.sign_authorization(chain_id, target, nonce);
 
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
@@ -181,7 +180,6 @@ fn invalid_chain_id_rejects_authorization() {
 		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 1_000_000);
 
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-
 		let auth = signer.sign_authorization(wrong_chain_id, target, nonce);
 
 		// Authorization with wrong chain_id should be skipped (not error)
@@ -273,7 +271,6 @@ fn authorization_increments_nonce() {
 		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 1_000_000);
 
 		let nonce_before = frame_system::Pallet::<Test>::account_nonce(&authority_id);
-
 		let auth = signer.sign_authorization(chain_id, target, U256::from(nonce_before));
 
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
@@ -301,7 +298,6 @@ fn chain_id_zero_accepts_any_chain() {
 		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 1_000_000);
 
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-
 		let auth = signer.sign_authorization(U256::zero(), target, nonce);
 
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
@@ -327,7 +323,6 @@ fn new_account_sets_delegation() {
 
 		let authority_id = <Test as Config>::AddressMapper::to_account_id(&authority);
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-
 		let auth = signer.sign_authorization(chain_id, target, nonce);
 
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
@@ -355,8 +350,8 @@ fn clearing_delegation_with_zero_address() {
 		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 1_000_000);
 
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-
 		let auth1 = signer.sign_authorization(chain_id, target, nonce);
+
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth1],
 			chain_id,
@@ -366,7 +361,6 @@ fn clearing_delegation_with_zero_address() {
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 
 		let new_nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-
 		let auth2 = signer.sign_authorization(chain_id, H160::zero(), new_nonce);
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth2],
@@ -452,7 +446,6 @@ fn test_runtime_set_authorization() {
 		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 100_000_000);
 
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-
 		let auth = signer.sign_authorization(chain_id, target_contract.addr, nonce);
 
 		let result = builder::eth_call(target_contract.addr)
@@ -461,7 +454,6 @@ fn test_runtime_set_authorization() {
 			.build();
 
 		assert_ok!(result);
-
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(
 			AccountInfo::<Test>::get_delegation_target(&authority),
@@ -509,7 +501,6 @@ fn test_runtime_clear_authorization() {
 			.eth_gas_limit(1_000_000u64.into())
 			.build();
 		assert_ok!(result1);
-
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 
 		let new_nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
@@ -580,5 +571,78 @@ fn test_runtime_delegation_resolution() {
 		let call_result = builder::eth_call(authority).eth_gas_limit(1_000_000u64.into()).build();
 
 		assert_ok!(&call_result);
+	});
+}
+
+/// Test that delegation chains are not followed during execution (EIP-7702 spec)
+///
+/// Per EIP-7702: "In case a delegation indicator points to another delegation,
+/// creating a potential chain or loop of delegations, clients must retrieve
+/// only the first code and then stop following the delegation chain."
+///
+/// This test verifies:
+/// 1. Calling Alice (who delegates to Counter) executes the contract code
+/// 2. A contract can delegatecall to Alice and execute the contract code
+/// 3. Calling Bob (who delegates to Alice) does NOT execute code (chain not followed)
+#[test]
+fn delegation_chain_does_not_execute() {
+	use alloy_core::sol_types::SolCall;
+	use pallet_revive_fixtures::{compile_module_with_type, Caller, Counter, FixtureType};
+
+	let (counter_code, _) = compile_module_with_type("Counter", FixtureType::Solc).unwrap();
+	let (caller_code, _) = compile_module_with_type("Caller", FixtureType::Solc).unwrap();
+
+	ExtBuilder::default().build().execute_with(|| {
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&ALICE, 100_000_000);
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&BOB, 100_000_000);
+
+		// Deploy Counter contract
+		let counter =
+			builder::bare_instantiate(Code::Upload(counter_code)).build_and_unwrap_contract();
+
+		// Alice delegates to the Counter contract
+		assert_ok!(AccountInfo::<Test>::set_delegation(&ALICE_ADDR, counter.addr));
+
+		// Case 1: Calling Alice executes the contract - setNumber(42) should work
+		let result = builder::bare_call(ALICE_ADDR)
+			.data(
+				Counter::setNumberCall { newNumber: alloy_core::primitives::U256::from(42) }
+					.abi_encode(),
+			)
+			.build_and_unwrap_result();
+		assert!(!result.did_revert(), "calling Alice should execute Counter code");
+
+		// Case 2: A contract can delegatecall to Alice and execute the code
+		let caller_contract =
+			builder::bare_instantiate(Code::Upload(caller_code)).build_and_unwrap_contract();
+
+		let result = builder::bare_call(caller_contract.addr)
+			.data(
+				Caller::delegateCall {
+					_callee: ALICE_ADDR.0.into(),
+					_data: Counter::incrementCall {}.abi_encode().into(),
+					_gas: u64::MAX,
+				}
+				.abi_encode(),
+			)
+			.build_and_unwrap_result();
+		assert!(!result.did_revert(), "delegatecall to Alice should work");
+		let decoded = Caller::delegateCall::abi_decode_returns(&result.data).unwrap();
+		assert!(decoded.success, "delegatecall to Alice should succeed");
+
+		// Case 3: Bob delegates to Alice (chain: Bob -> Alice -> Counter)
+		// Calling Bob should NOT execute code because chains are not followed
+		assert_ok!(AccountInfo::<Test>::set_delegation(&BOB_ADDR, ALICE_ADDR));
+
+		let result = builder::bare_call(BOB_ADDR)
+			.data(
+				Counter::setNumberCall { newNumber: alloy_core::primitives::U256::from(99) }
+					.abi_encode(),
+			)
+			.build_and_unwrap_result();
+		// Bob is treated as an EOA (no code), so the call succeeds but does nothing
+		assert!(!result.did_revert(), "call to Bob should not revert (treated as EOA transfer)");
+		// The call returns empty data because Bob has no code to execute
+		assert!(result.data.is_empty(), "call to Bob should return empty (no code executed)");
 	});
 }

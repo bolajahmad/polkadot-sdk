@@ -194,10 +194,19 @@ impl<T: Config> AccountInfo<T> {
 	}
 
 	/// Insert a contract, existing dust if any will be unchanged.
+	/// Preserves Delegated status if the account is already delegated.
 	pub fn insert_contract(address: &H160, contract: ContractInfo<T>) {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {
-				account.account_type = contract.clone().into();
+				match &account.account_type {
+					AccountType::Delegated { target, .. } => {
+						account.account_type = AccountType::Delegated {
+							target: *target,
+							contract_info: Some(contract.clone()),
+						};
+					},
+					_ => account.account_type = contract.clone().into(),
+				}
 			} else {
 				*account = Some(AccountInfo { account_type: contract.clone().into(), dust: 0 });
 			}

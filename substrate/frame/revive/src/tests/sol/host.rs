@@ -21,7 +21,9 @@ use crate::{
 	exec::EMPTY_CODE_HASH,
 	metering::TransactionLimits,
 	storage::AccountInfo,
-	test_utils::{builder::Contract, ALICE, BOB, BOB_ADDR, CHARLIE, CHARLIE_ADDR},
+	test_utils::{
+		builder::Contract, ALICE, BOB, BOB_ADDR, CHARLIE, CHARLIE_ADDR, DJANGO, DJANGO_ADDR,
+	},
 	tests::{
 		builder, dummy_evm_contract, test_utils, test_utils::get_contract, Contracts, ExtBuilder,
 		RuntimeEvent, Test, TestSigner,
@@ -256,6 +258,21 @@ fn extcodehash_works(fixture_type: FixtureType) {
 			assert_eq!(
 				result, target_code_hash,
 				"EXTCODEHASH for delegated EOA should return target's code hash"
+			);
+		}
+
+		// Test case 2b: Delegation chain - returns EMPTY_CODE_HASH (chains not followed per
+		// EIP-7702)
+		{
+			// delegated_eoa -> target_addr (contract)
+			// DJANGO -> delegated_eoa (another delegated account)
+			<Test as Config>::Currency::set_balance(&DJANGO, 100_000_000);
+			let delegated_eoa = create_delegated_eoa(&target_addr);
+			assert_ok!(AccountInfo::<Test>::set_delegation(&DJANGO_ADDR, delegated_eoa));
+			let result = call_extcodehash(&host_addr, &DJANGO_ADDR);
+			assert_eq!(
+				result, EMPTY_CODE_HASH,
+				"EXTCODEHASH for delegation chain should return EMPTY_CODE_HASH (no chain following)"
 			);
 		}
 

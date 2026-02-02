@@ -931,7 +931,7 @@ mod tests {
 
 		// Statement with completely different topics.
 		let mut statement = signed_statement(1);
-		statement.set_topic(0, topic3.clone());
+		statement.set_topic(0, topic3);
 
 		subscriptions.notify_matching_filters(&statement);
 

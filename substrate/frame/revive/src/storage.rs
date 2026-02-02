@@ -143,6 +143,17 @@ impl<T: Config> From<ContractInfo<T>> for AccountType<T> {
 	}
 }
 
+impl<T: Config> AccountType<T> {
+	/// Returns the ContractInfo if this account type has one.
+	pub fn contract_info(self) -> Option<ContractInfo<T>> {
+		match self {
+			AccountType::Contract(info) => Some(info),
+			AccountType::Delegated { contract_info, .. } => Some(contract_info),
+			AccountType::EOA => None,
+		}
+	}
+}
+
 impl<T: Config> AccountInfo<T> {
 	/// Returns true if the account is a contract.
 	pub fn is_contract(address: &H160) -> bool {
@@ -195,24 +206,6 @@ impl<T: Config> AccountInfo<T> {
 					_ => None,
 				}
 			},
-			AccountType::EOA => None,
-		}
-	}
-
-	/// Loads the ContractInfo for storage operations at a given address.
-	///
-	/// Unlike `load_contract`, this returns the account's own ContractInfo
-	/// for storage access, not the delegation target's ContractInfo.
-	///
-	/// - If the address is a contract, returns its ContractInfo
-	/// - If the address is delegated, returns the delegated account's own ContractInfo
-	/// - Returns None for EOAs
-	pub fn load_contract_info_for_storage(address: &H160) -> Option<ContractInfo<T>> {
-		let info = <AccountInfoOf<T>>::get(address)?;
-
-		match info.account_type {
-			AccountType::Contract(contract_info) => Some(contract_info),
-			AccountType::Delegated { contract_info, .. } => Some(contract_info),
 			AccountType::EOA => None,
 		}
 	}

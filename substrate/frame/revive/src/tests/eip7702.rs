@@ -19,6 +19,7 @@
 
 use crate::{
 	evm::fees::InfoT,
+	metering::TransactionMeter,
 	storage::AccountInfo,
 	test_utils::builder::Contract,
 	tests::{builder, TestSigner, *},
@@ -27,7 +28,7 @@ use crate::{
 use frame_support::{
 	assert_ok,
 	traits::fungible::{Balanced, Mutate},
-	weights::WeightMeter,
+	weights::Weight,
 };
 use sp_core::{H160, H256, U256};
 
@@ -157,7 +158,7 @@ fn valid_signature_is_verified_correctly() {
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth],
 			chain_id,
-			&mut WeightMeter::new(),
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 		));
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
@@ -186,7 +187,7 @@ fn invalid_chain_id_rejects_authorization() {
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth],
 			correct_chain_id,
-			&mut WeightMeter::new(),
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 		));
 
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
@@ -215,7 +216,7 @@ fn nonce_mismatch_rejects_authorization() {
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth],
 			chain_id,
-			&mut WeightMeter::new(),
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 		));
 
 		assert!(!AccountInfo::<Test>::is_delegated(&signer.address));
@@ -248,7 +249,7 @@ fn multiple_authorizations_from_same_authority_first_wins() {
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth1, auth2, auth3],
 			chain_id,
-			&mut WeightMeter::new(),
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 		));
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
@@ -276,7 +277,7 @@ fn authorization_increments_nonce() {
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth],
 			chain_id,
-			&mut WeightMeter::new(),
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 		));
 
 		let nonce_after = frame_system::Pallet::<Test>::account_nonce(&authority_id);
@@ -303,7 +304,7 @@ fn chain_id_zero_accepts_any_chain() {
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth],
 			current_chain_id,
-			&mut WeightMeter::new(),
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 		));
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
@@ -328,7 +329,7 @@ fn new_account_sets_delegation() {
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth],
 			chain_id,
-			&mut WeightMeter::new(),
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 		));
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
@@ -355,7 +356,7 @@ fn clearing_delegation_with_zero_address() {
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth1],
 			chain_id,
-			&mut WeightMeter::new(),
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 		));
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
@@ -365,7 +366,7 @@ fn clearing_delegation_with_zero_address() {
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth2],
 			chain_id,
-			&mut WeightMeter::new(),
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 		));
 
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
@@ -407,7 +408,7 @@ fn process_multiple_authorizations_from_different_signers() {
 		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth1, auth2, auth3],
 			chain_id,
-			&mut WeightMeter::new(),
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 		));
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority1));

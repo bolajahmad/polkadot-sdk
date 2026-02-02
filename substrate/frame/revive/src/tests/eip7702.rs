@@ -52,7 +52,7 @@ fn clear_delegation_restores_eoa() {
 		assert_ok!(AccountInfo::<Test>::set_delegation(&authority, target));
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 
-		assert_ok!(AccountInfo::<Test>::clear_delegation(&authority));
+		AccountInfo::<Test>::clear_delegation(&authority);
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
 	});
 }
@@ -141,7 +141,7 @@ fn multiple_delegations_last_one_wins() {
 #[test]
 fn valid_signature_is_verified_correctly() {
 	ExtBuilder::default().build().execute_with(|| {
-		let chain_id = U256::from(1);
+		let chain_id = U256::from(<Test as Config>::ChainId::get());
 		let target = H160::from([0x42; 20]);
 
 		let seed = H256::random();
@@ -168,7 +168,7 @@ fn valid_signature_is_verified_correctly() {
 #[test]
 fn invalid_chain_id_rejects_authorization() {
 	ExtBuilder::default().build().execute_with(|| {
-		let correct_chain_id = U256::from(1);
+		let correct_chain_id = U256::from(<Test as Config>::ChainId::get());
 		let wrong_chain_id = U256::from(999);
 		let target = H160::from([0x42; 20]);
 
@@ -196,7 +196,7 @@ fn invalid_chain_id_rejects_authorization() {
 #[test]
 fn nonce_mismatch_rejects_authorization() {
 	ExtBuilder::default().build().execute_with(|| {
-		let chain_id = U256::from(1);
+		let chain_id = U256::from(<Test as Config>::ChainId::get());
 		let target = H160::from([0x42; 20]);
 
 		let seed = H256::random();
@@ -225,7 +225,7 @@ fn nonce_mismatch_rejects_authorization() {
 #[test]
 fn multiple_authorizations_from_same_authority_first_wins() {
 	ExtBuilder::default().build().execute_with(|| {
-		let chain_id = U256::from(1);
+		let chain_id = U256::from(<Test as Config>::ChainId::get());
 		let target1 = H160::from([0x11; 20]);
 		let target2 = H160::from([0x22; 20]);
 		let target3 = H160::from([0x33; 20]);
@@ -260,7 +260,7 @@ fn multiple_authorizations_from_same_authority_first_wins() {
 #[test]
 fn authorization_increments_nonce() {
 	ExtBuilder::default().build().execute_with(|| {
-		let chain_id = U256::from(1);
+		let chain_id = U256::from(<Test as Config>::ChainId::get());
 		let target = H160::from([0x42; 20]);
 
 		let seed = H256::random();
@@ -287,7 +287,7 @@ fn authorization_increments_nonce() {
 #[test]
 fn chain_id_zero_accepts_any_chain() {
 	ExtBuilder::default().build().execute_with(|| {
-		let current_chain_id = U256::from(1);
+		let current_chain_id = U256::from(<Test as Config>::ChainId::get());
 		let target = H160::from([0x42; 20]);
 
 		let seed = H256::random();
@@ -314,7 +314,7 @@ fn chain_id_zero_accepts_any_chain() {
 #[test]
 fn new_account_sets_delegation() {
 	ExtBuilder::default().build().execute_with(|| {
-		let chain_id = U256::from(1);
+		let chain_id = U256::from(<Test as Config>::ChainId::get());
 		let target = H160::from([0x42; 20]);
 
 		let seed = H256::random();
@@ -339,7 +339,7 @@ fn new_account_sets_delegation() {
 #[test]
 fn clearing_delegation_with_zero_address() {
 	ExtBuilder::default().build().execute_with(|| {
-		let chain_id = U256::from(1);
+		let chain_id = U256::from(<Test as Config>::ChainId::get());
 		let target = H160::from([0x42; 20]);
 
 		let seed = H256::random();
@@ -376,7 +376,7 @@ fn clearing_delegation_with_zero_address() {
 #[test]
 fn process_multiple_authorizations_from_different_signers() {
 	ExtBuilder::default().build().execute_with(|| {
-		let chain_id = U256::from(1);
+		let chain_id = U256::from(<Test as Config>::ChainId::get());
 		let target = H160::from([0x42; 20]);
 
 		let seed1 = H256::from([1u8; 32]);

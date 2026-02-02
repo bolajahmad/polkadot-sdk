@@ -78,23 +78,18 @@ pub(crate) fn validate_authorization<T: Config>(
 		return None;
 	}
 
-	let authority = match recover_authority(auth) {
-		Ok(addr) => addr,
-		Err(_) => {
-			log::debug!(target: LOG_TARGET, "Failed to recover authority from signature");
-			return None;
-		},
+	let Ok(authority) = recover_authority(auth) else {
+		log::debug!(target: LOG_TARGET, "Failed to recover authority from signature");
+		return None;
+	};
+	let account_id = T::AddressMapper::to_account_id(&authority);
+
+	let current_nonce: u64 = frame_system::Pallet::<T>::account_nonce(&account_id).saturated_into();
+	let Ok::<u64, _>(expected_nonce) = auth.nonce.try_into() else {
+		log::debug!(target: LOG_TARGET, "Authorization nonce too large: {:?}", auth.nonce);
+		return None;
 	};
 
-	let account_id = T::AddressMapper::to_account_id(&authority);
-	let current_nonce: u64 = frame_system::Pallet::<T>::account_nonce(&account_id).saturated_into();
-	let expected_nonce: u64 = match auth.nonce.try_into() {
-		Ok(nonce) => nonce,
-		Err(_) => {
-			log::debug!(target: LOG_TARGET, "Authorization nonce too large: {:?}", auth.nonce);
-			return None;
-		},
-	};
 	if current_nonce != expected_nonce {
 		log::debug!(target: LOG_TARGET, "Nonce mismatch for {authority:?}: expected {expected_nonce:?}, got {current_nonce:?}");
 		return None;
@@ -146,7 +141,7 @@ fn recover_authority(auth: &AuthorizationListEntry) -> Result<H160, ()> {
 /// - `chain_id`: Chain ID for the authorization
 /// - `address`: Target address to delegate to
 /// - `nonce`: Nonce for the authorization
-#[cfg(any(test, feature = "runtime-benchmarks"))]
+#[cfg(feature = "runtime-benchmarks")]
 pub fn sign_authorization(
 	signing_key: &k256::ecdsa::SigningKey,
 	chain_id: U256,

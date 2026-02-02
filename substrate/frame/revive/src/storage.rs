@@ -275,7 +275,7 @@ impl<T: Config> AccountInfo<T> {
 	///
 	/// If the delegated account has accumulated storage, its child trie is queued
 	/// for deletion.
-	pub fn clear_delegation(address: &H160) -> Result<(), DispatchError> {
+	pub fn clear_delegation(address: &H160) {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {
 				if let AccountType::Delegated { contract_info, .. } = &account.account_type {
@@ -288,7 +288,6 @@ impl<T: Config> AccountInfo<T> {
 				}
 			}
 		});
-		Ok(())
 	}
 }
 

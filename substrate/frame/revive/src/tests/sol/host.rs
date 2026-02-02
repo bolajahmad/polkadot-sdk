@@ -169,11 +169,9 @@ fn extcodesize_works(fixture_type: FixtureType) {
 	ExtBuilder::default().build().execute_with(|| {
 		<Test as Config>::Currency::set_balance(&ALICE, 100_000_000_000);
 
-		// Deploy the Host contract (used to call EXTCODESIZE)
 		let Contract { addr: host_addr, .. } =
 			builder::bare_instantiate(Code::Upload(code)).build_and_unwrap_contract();
 
-		// Deploy a target contract for delegation tests
 		let Contract { addr: target_addr, .. } =
 			builder::bare_instantiate(Code::Upload(dummy_evm_contract()))
 				.build_and_unwrap_contract();
@@ -188,36 +186,25 @@ fn extcodesize_works(fixture_type: FixtureType) {
 			test_utils::ensure_stored(info.code_hash) as u64
 		};
 
-		// Test case 1: Regular contract - returns its own code size
-		{
-			let result = call_extcodesize(&host_addr, &host_addr);
-			assert_eq!(
-				result, host_code_size,
-				"EXTCODESIZE for regular contract should return its code size"
-			);
+		<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
+		let delegated_eoa = create_delegated_eoa(&target_addr);
+
+		struct TestCase<'a> {
+			name: &'a str,
+			addr: H160,
+			expected: u64,
 		}
 
-		// Test case 2: Delegated EOA - returns target's code size (EIP-7702)
-		{
-			let delegated_eoa = create_delegated_eoa(&target_addr);
-			let result = call_extcodesize(&host_addr, &delegated_eoa);
-			assert_eq!(
-				result, target_code_size,
-				"EXTCODESIZE for delegated EOA should return target's code size"
-			);
-		}
+		let cases = vec![
+			TestCase { name: "regular contract", addr: host_addr, expected: host_code_size },
+			TestCase { name: "delegated EOA", addr: delegated_eoa, expected: target_code_size },
+			TestCase { name: "regular EOA", addr: CHARLIE_ADDR, expected: 0 },
+			TestCase { name: "non-existent", addr: H160::from_low_u64_be(0xdead), expected: 0 },
+		];
 
-		// Test case 3: Regular EOA - returns 0
-		{
-			<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
-			let result = call_extcodesize(&host_addr, &CHARLIE_ADDR);
-			assert_eq!(result, 0, "EXTCODESIZE for regular EOA should return 0");
-		}
-
-		// Test case 4: Non-existent address - returns 0
-		{
-			let result = call_extcodesize(&host_addr, &H160::from_low_u64_be(0xdead));
-			assert_eq!(result, 0, "EXTCODESIZE for non-existent address should return 0");
+		for tc in cases {
+			let result = call_extcodesize(&host_addr, &tc.addr);
+			assert_eq!(result, tc.expected, "EXTCODESIZE for {} failed", tc.name);
 		}
 	});
 }
@@ -304,52 +291,79 @@ fn pallet_code_works() {
 	ExtBuilder::default().build().execute_with(|| {
 		<Test as Config>::Currency::set_balance(&ALICE, 100_000_000_000);
 
-		// Deploy a target contract
 		let Contract { addr: contract_addr, .. } =
 			builder::bare_instantiate(Code::Upload(dummy_evm_contract()))
 				.build_and_unwrap_contract();
 
-		// Test case 1: Regular contract - returns actual code
-		{
-			let code = Contracts::code(&contract_addr);
-			assert!(!code.is_empty(), "Pallet::code for contract should return code");
-			// The code should be the pristine code stored
-			let expected =
-				PristineCode::<Test>::get(test_utils::get_contract(&contract_addr).code_hash)
-					.unwrap();
-			assert_eq!(code, expected, "Pallet::code for contract should return pristine code");
+		let pristine_code =
+			PristineCode::<Test>::get(test_utils::get_contract(&contract_addr).code_hash)
+				.unwrap()
+				.to_vec();
+
+		<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
+		let delegated_eoa = create_delegated_eoa(&contract_addr);
+
+		enum Expected {
+			Code(Vec<u8>),
+			Delegated(H160),
+			Empty,
 		}
 
-		// Test case 2: Delegated EOA - returns delegation indicator (0xef0100 || target)
-		{
-			let delegated_eoa = create_delegated_eoa(&contract_addr);
-			let code = Contracts::code(&delegated_eoa);
-
-			// EIP-7702: delegation indicator is 0xef0100 followed by the target address
-			assert_eq!(code.len(), 23, "Delegation indicator should be 23 bytes (3 + 20)");
-			assert_eq!(
-				&code[0..3],
-				&[0xef, 0x01, 0x00],
-				"Delegation indicator should start with 0xef0100"
-			);
-			assert_eq!(
-				&code[3..23],
-				contract_addr.as_bytes(),
-				"Delegation indicator should contain target address"
-			);
+		struct TestCase<'a> {
+			name: &'a str,
+			addr: H160,
+			expected: Expected,
 		}
 
-		// Test case 3: Regular EOA - returns empty
-		{
-			<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
-			let code = Contracts::code(&CHARLIE_ADDR);
-			assert!(code.is_empty(), "Pallet::code for regular EOA should return empty");
-		}
+		let cases = vec![
+			TestCase {
+				name: "contract",
+				addr: contract_addr,
+				expected: Expected::Code(pristine_code),
+			},
+			TestCase {
+				name: "delegated EOA",
+				addr: delegated_eoa,
+				expected: Expected::Delegated(contract_addr),
+			},
+			TestCase { name: "regular EOA", addr: CHARLIE_ADDR, expected: Expected::Empty },
+			TestCase {
+				name: "non-existent",
+				addr: H160::from_low_u64_be(0xdead),
+				expected: Expected::Empty,
+			},
+		];
 
-		// Test case 4: Non-existent address - returns empty
-		{
-			let code = Contracts::code(&H160::from_low_u64_be(0xdead));
-			assert!(code.is_empty(), "Pallet::code for non-existent address should return empty");
+		for tc in cases {
+			let code = Contracts::code(&tc.addr);
+			match tc.expected {
+				Expected::Code(expected) => {
+					assert_eq!(code, expected, "Pallet::code for {} failed", tc.name);
+				},
+				Expected::Delegated(target) => {
+					assert_eq!(
+						code.len(),
+						23,
+						"Delegation indicator for {} should be 23 bytes",
+						tc.name
+					);
+					assert_eq!(
+						&code[0..3],
+						&[0xef, 0x01, 0x00],
+						"Delegation prefix for {} wrong",
+						tc.name
+					);
+					assert_eq!(
+						&code[3..23],
+						target.as_bytes(),
+						"Delegation target for {} wrong",
+						tc.name
+					);
+				},
+				Expected::Empty => {
+					assert!(code.is_empty(), "Pallet::code for {} should be empty", tc.name);
+				},
+			}
 		}
 	});
 }

@@ -1352,33 +1352,21 @@ pub mod pallet {
 
 			Self::ensure_non_contract_if_signed(&origin)?;
 
-			// Process EIP-7702 authorizations with weight metering
 			let (eth_gas_limit, weight_limit) = if !authorization_list.is_empty() {
-				let chain_id = U256::from(T::ChainId::get());
-
-				// Calculate worst-case weight for authorization processing
-				let auth_count = authorization_list.len() as u64;
-				let auth_weight = T::WeightInfo::validate_authorization()
-					.saturating_mul(auth_count)
-					.saturating_add(T::WeightInfo::apply_delegation(1).saturating_mul(auth_count));
-
-				// Create a weight meter and process authorizations
-				let mut meter = frame_support::weights::WeightMeter::with_limit(auth_weight);
+				let mut meter = frame_support::weights::WeightMeter::with_limit(weight_limit);
 				evm::eip7702::process_authorizations::<T>(
 					&authorization_list,
-					chain_id,
+					U256::from(T::ChainId::get()),
 					&mut meter,
 				)?;
 
-				// Adjust gas/weight limits by consumed weight
-				let consumed = meter.consumed();
-				let gas_scale: u64 = T::GasScale::get().into();
-				let auth_gas = consumed.ref_time().saturating_div(gas_scale);
+				let auth_gas = metering::SignedGas::<T>::from_weight_fee(
+					T::FeeInfo::weight_to_fee(&meter.consumed()),
+				)
+				.to_ethereum_gas()
+				.unwrap_or_default();
 
-				let adjusted_gas_limit = eth_gas_limit.saturating_sub(U256::from(auth_gas));
-				let adjusted_weight_limit = weight_limit.saturating_sub(consumed);
-
-				(adjusted_gas_limit, adjusted_weight_limit)
+				(eth_gas_limit.saturating_sub(auth_gas.into()), meter.remaining())
 			} else {
 				(eth_gas_limit, weight_limit)
 			};

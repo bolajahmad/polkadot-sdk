@@ -1600,7 +1600,7 @@ impl<T: Config> Pallet<T> {
 
 		Self::ensure_non_contract_if_signed(&origin)?;
 
-		let mut call = Call::<T>::eth_call {
+		let mut call = Call::<T>::eth_call_with_authorization_list {
 			dest,
 			value,
 			weight_limit,
@@ -1609,15 +1609,45 @@ impl<T: Config> Pallet<T> {
 			transaction_encoded: transaction_encoded.clone(),
 			effective_gas_price,
 			encoded_len,
+			authorization_list: authorization_list.clone(),
 		}
 		.into();
 		let info = T::FeeInfo::dispatch_info(&call);
 		let base_info = T::FeeInfo::base_dispatch_info(&mut call);
 		drop(call);
 
-		block_storage::with_ethereum_context::<T>(transaction_encoded, || {
-			let extra_weight = base_info.total_weight();
+		let extra_weight = base_info.total_weight();
 
+		// Process authorizations OUTSIDE the transaction context
+		// so delegation changes persist even if the call fails
+		let (eth_gas_limit, weight_limit) = if !authorization_list.is_empty() {
+			let auth_limits = TransactionLimits::WeightAndDeposit {
+				weight_limit,
+				deposit_limit: BalanceOf::<T>::max_value(),
+			};
+			let mut auth_meter = TransactionMeter::new(auth_limits)?;
+
+			evm::eip7702::process_authorizations::<T>(
+				&authorization_list,
+				U256::from(T::ChainId::get()),
+				&mut auth_meter,
+			)?;
+
+			let auth_gas = metering::SignedGas::<T>::from_weight_fee(T::FeeInfo::weight_to_fee(
+				&auth_meter.weight_consumed(),
+			))
+			.to_ethereum_gas()
+			.unwrap_or_default();
+
+			(
+				eth_gas_limit.saturating_sub(auth_gas.into()),
+				auth_meter.weight_left().unwrap_or(Weight::zero()),
+			)
+		} else {
+			(eth_gas_limit, weight_limit)
+		};
+
+		block_storage::with_ethereum_context::<T>(transaction_encoded, || {
 			let limits = TransactionLimits::EthereumGas {
 				eth_gas_limit: eth_gas_limit.saturated_into(),
 				maybe_weight_limit: Some(weight_limit),
@@ -1642,32 +1672,6 @@ impl<T: Config> Pallet<T> {
 					}
 				},
 			};
-
-			if !authorization_list.is_empty() {
-				if let Err(error) = evm::eip7702::process_authorizations::<T>(
-					&authorization_list,
-					U256::from(T::ChainId::get()),
-					&mut meter,
-				) {
-					return block_storage::EthereumCallResult {
-						receipt_gas_info: ReceiptGasInfo {
-							gas_used: Pallet::<T>::convert_native_to_evm(
-								meter.total_consumed_gas(),
-							),
-							effective_gas_price,
-						},
-						result: Err(DispatchErrorWithPostInfo {
-							post_info: PostDispatchInfo {
-								actual_weight: Some(
-									meter.weight_consumed().saturating_add(base_info.call_weight),
-								),
-								pays_fee: Pays::Yes,
-							},
-							error,
-						}),
-					};
-				}
-			}
 
 			let output = Self::bare_call_internal(
 				origin,

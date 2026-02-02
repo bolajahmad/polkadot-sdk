@@ -17,35 +17,32 @@
 
 use crate::PotentialRenewalId;
 
+// TODO: Extend the documentation.
+
 /// Trait representig generic market logic.
 ///
 /// The assumptions for this generic market are:
 /// - Every order will either create a bid or will be resolved immediately.
 /// - There're two types of orders: bulk coretime purchase and bulk coretime renewal.
 /// - Coretime regions are fungible.
-pub trait Market<Balance, BlockNumber, AccountId> {
+pub trait Market<Balance, RelayBlockNumber, AccountId> {
 	type Error;
-	/// Internal market state that must be preserved between the method calls. If the market logic
-	/// allows creating bids they should be stored there as well as the bid structure depends on the
-	/// market implementation.
-	type State;
 	/// Unique ID assigned to every bid.
 	type BidId;
 
-	/// Place an order for bulk coretime purchase.
+	/// Place an order for one bulk coretime region purchase.
 	///
 	/// This method may or may not create a bid, according to the market rules.
 	///
 	/// - `since_timeslice_start` - amount of blocks passed since the current timeslice start
-	/// - `amount` - maximum price which the buyer is willing to pay (or None if it's defined by the
+	/// - `price` - maximum price which the buyer is willing to pay (or None if it's defined by the
 	///   market itself)
 	/// - `state` - market state, the caller is responsible for storing it
 	fn place_order(
-		since_timeslice_start: BlockNumber,
+		since_timeslice_start: RelayBlockNumber,
 		who: AccountId,
-		amount: Option<Balance>,
-		state: &mut Self::State,
-	) -> Result<PlaceOrderOutcome<Balance, Self::BidId>, Self::Error>;
+		price: Option<Balance>,
+	) -> Result<OrderResult<Balance, Self::BidId>, Self::Error>;
 
 	/// Place an order for bulk coretime renewal.
 	///
@@ -55,37 +52,31 @@ pub trait Market<Balance, BlockNumber, AccountId> {
 	/// - `buying_price` - price which was paid for this region the last time it was sold
 	/// - `state` - market state, the caller is responsible for storing it
 	fn place_renewal_order(
-		since_timeslice_start: BlockNumber,
+		since_timeslice_start: RelayBlockNumber,
 		who: AccountId,
 		renewal: PotentialRenewalId,
 		buying_price: Balance,
-		state: &mut Self::State,
-	) -> Result<PlaceRenewalOrderOutcome<Balance, Self::BidId>, Self::Error>;
+	) -> Result<RenewalOrderResult<Balance, Self::BidId>, Self::Error>;
 
 	/// Close the bid given its `BidId`.
 	///
 	/// If the market logic allows creating the bids this method allows to close any bids (either
 	/// forcefully if `maybe_check_owner` is `None` or checking the bid owner if it's `Some`).
-	fn close_bid(
-		id: Self::BidId,
-		maybe_check_owner: Option<AccountId>,
-		state: &mut Self::State,
-	) -> Result<(), Self::Error>;
+	fn close_bid(id: Self::BidId, maybe_check_owner: Option<AccountId>) -> Result<(), Self::Error>;
 
 	/// Logic that gets called in `on_initialize` hook.
 	fn tick(
-		since_timeslice_start: BlockNumber,
-		state: &mut Self::State,
+		since_timeslice_start: RelayBlockNumber,
 	) -> Result<Vec<TickAction<AccountId, Balance, Self::BidId>>, Self::Error>;
 }
 
-enum PlaceOrderOutcome<Balance, BidId> {
-	BidPlaced { id: BidId, bid_amount: Balance },
+enum OrderResult<Balance, BidId> {
+	BidPlaced { id: BidId, bid_price: Balance },
 	Sold { price: Balance },
 }
 
-enum PlaceRenewalOrderOutcome<Balance, BidId> {
-	BidPlaced { id: BidId, bid_amount: Balance },
+enum RenewalOrderResult<Balance, BidId> {
+	BidPlaced { id: BidId, bid_price: Balance },
 	Sold { price: Balance },
 }
 

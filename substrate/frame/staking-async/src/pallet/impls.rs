@@ -212,7 +212,8 @@ impl<T: Config> Pallet<T> {
 		// update this staker in the sorted list, if they exist in it.
 		if T::VoterList::contains(stash) {
 			// This might fail if the voter list is locked.
-			let _ = T::VoterList::on_update(&stash, Self::weight_of(stash));
+			let _ = T::VoterList::on_update(&stash, Self::weight_of(stash))
+				.inspect_err(|err| crate::log!(warn, "error updating voter list: {:?}", err));
 		}
 
 		Self::deposit_event(Event::<T>::Bonded { stash: stash.clone(), amount: extra });
@@ -752,8 +753,9 @@ impl<T: Config> Pallet<T> {
 	pub fn do_add_nominator(who: &T::AccountId, nominations: Nominations<T>) {
 		if !Nominators::<T>::contains_key(who) {
 			// maybe update sorted list.
-			let _ = T::VoterList::on_insert(who.clone(), Self::weight_of(who))
-				.defensive_unwrap_or_default();
+			let _ = T::VoterList::on_insert(who.clone(), Self::weight_of(who)).inspect_err(|err| {
+				crate::log!(warn, "error adding nominator to voter list: {:?}", err)
+			});
 		}
 		Nominators::<T>::insert(who, nominations);
 	}
@@ -769,7 +771,9 @@ impl<T: Config> Pallet<T> {
 	pub fn do_remove_nominator(who: &T::AccountId) -> bool {
 		let outcome = if Nominators::<T>::contains_key(who) {
 			Nominators::<T>::remove(who);
-			let _ = T::VoterList::on_remove(who);
+			let _ = T::VoterList::on_remove(who).inspect_err(|err| {
+				crate::log!(warn, "error removing nominator from voter list: {:?}", err)
+			});
 			true
 		} else {
 			false
@@ -788,7 +792,9 @@ impl<T: Config> Pallet<T> {
 	pub fn do_add_validator(who: &T::AccountId, prefs: ValidatorPrefs) {
 		if !Validators::<T>::contains_key(who) {
 			// maybe update sorted list.
-			let _ = T::VoterList::on_insert(who.clone(), Self::weight_of(who));
+			let _ = T::VoterList::on_insert(who.clone(), Self::weight_of(who)).inspect_err(|err| {
+				crate::log!(warn, "error adding validator to voter list: {:?}", err)
+			});
 		}
 		Validators::<T>::insert(who, prefs);
 	}
@@ -803,7 +809,9 @@ impl<T: Config> Pallet<T> {
 	pub fn do_remove_validator(who: &T::AccountId) -> bool {
 		let outcome = if Validators::<T>::contains_key(who) {
 			Validators::<T>::remove(who);
-			let _ = T::VoterList::on_remove(who);
+			let _ = T::VoterList::on_remove(who).inspect_err(|err| {
+				crate::log!(warn, "error removing validator from voter list: {:?}", err)
+			});
 			true
 		} else {
 			false

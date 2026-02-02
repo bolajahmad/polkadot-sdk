@@ -34,8 +34,8 @@ fn on_unbalanced_deposits_to_satellite() {
 
 		// Given: satellite has ED, users have balances (1: 100, 2: 200, 3: 300)
 		assert_eq!(Balances::free_balance(satellite), ed);
-		let initial_active = <Balances as Inspect<_>>::active_issuance();
 		let initial_total = <Balances as Inspect<_>>::total_issuance();
+		let initial_active = <Balances as Inspect<_>>::active_issuance();
 
 		// When: multiple imbalances are deposited (e.g., coretime revenue from user payments)
 		// withdraw() takes funds from an account and returns a Credit
@@ -80,8 +80,8 @@ fn on_unbalanced_deposits_to_satellite() {
 		// And: total issuance unchanged (funds moved, not created/destroyed)
 		assert_eq!(<Balances as Inspect<_>>::total_issuance(), initial_total);
 
-		// And: active issuance decreased by 100 (funds deactivated in satellite)
-		assert_eq!(<Balances as Inspect<_>>::active_issuance(), initial_active - 100);
+		// And: active issuance unchanged (satellite chains don't deactivate)
+		assert_eq!(<Balances as Inspect<_>>::active_issuance(), initial_active);
 	});
 }
 
@@ -89,10 +89,10 @@ fn on_unbalanced_deposits_to_satellite() {
 fn on_unbalanced_handles_zero_amount() {
 	new_test_ext().execute_with(|| {
 		let satellite = DapSatellitePallet::satellite_account();
+		let initial_active = <Balances as Inspect<_>>::active_issuance();
 
 		// Given: satellite has ED (=1)
 		assert_eq!(Balances::free_balance(satellite), 1);
-		let initial_active = <Balances as Inspect<_>>::active_issuance();
 
 		// When: imbalance with zero amount
 		let credit = <Balances as Balanced<u64>>::issue(0);
@@ -100,6 +100,7 @@ fn on_unbalanced_handles_zero_amount() {
 
 		// Then: satellite still has just ED (no-op)
 		assert_eq!(Balances::free_balance(satellite), 1);
+		// And: active issuance unchanged
 		assert_eq!(<Balances as Inspect<_>>::active_issuance(), initial_active);
 	});
 }

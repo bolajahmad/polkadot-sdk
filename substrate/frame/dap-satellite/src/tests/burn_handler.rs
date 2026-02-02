@@ -58,8 +58,8 @@ fn satellite_currency_burn_from_redirects_to_satellite() {
 		assert_eq!(Balances::free_balance(satellite), ed + 180);
 		// And: total issuance unchanged (funds transferred, not destroyed)
 		assert_eq!(Balances::total_issuance(), initial_total);
-		// And: active issuance decreased (funds deactivated)
-		assert_eq!(Balances::active_issuance(), initial_active - 180);
+		// And: active issuance unchanged (satellite chains don't deactivate)
+		assert_eq!(Balances::active_issuance(), initial_active);
 		// And: user balances updated
 		assert_eq!(Balances::free_balance(1), 70);
 		assert_eq!(Balances::free_balance(2), 150);

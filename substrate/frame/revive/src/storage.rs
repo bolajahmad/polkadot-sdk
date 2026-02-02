@@ -83,9 +83,10 @@ pub enum AccountType<T: Config> {
 	EOA,
 
 	/// An account that has delegated its code execution to another address (EIP-7702).
-	/// Contains the target address to which execution is delegated and its own ContractInfo
-	/// for storage deposits.
-	Delegated { target: H160, contract_info: ContractInfo<T> },
+	/// Contains the target address and optionally ContractInfo if the target is a contract.
+	/// Per EIP-7702, delegation chains are not followed - if target is itself delegated,
+	/// contract_info is None and no code can be executed.
+	Delegated { target: H160, contract_info: Option<ContractInfo<T>> },
 }
 
 /// Information for managing an account and its sub trie abstraction.
@@ -148,7 +149,7 @@ impl<T: Config> AccountType<T> {
 	pub fn contract_info(self) -> Option<ContractInfo<T>> {
 		match self {
 			AccountType::Contract(info) => Some(info),
-			AccountType::Delegated { contract_info, .. } => Some(contract_info),
+			AccountType::Delegated { contract_info, .. } => contract_info,
 			AccountType::EOA => None,
 		}
 	}
@@ -204,16 +205,13 @@ impl<T: Config> AccountInfo<T> {
 	}
 
 	/// Updates the ContractInfo for storage operations at a given address.
-	///
-	/// This handles both contracts and delegated accounts, updating their
-	/// ContractInfo with the modified storage deposit information.
 	pub fn update_contract_info(address: &H160, contract_info: ContractInfo<T>) {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {
 				match &mut account.account_type {
 					AccountType::Contract(ref mut info) => *info = contract_info,
 					AccountType::Delegated { contract_info: ref mut info, .. } =>
-						*info = contract_info,
+						*info = Some(contract_info),
 					AccountType::EOA => {},
 				}
 			}
@@ -236,36 +234,22 @@ impl<T: Config> AccountInfo<T> {
 	}
 
 	/// EIP-7702: Set a delegation indicator for an EOA
+	///
 	/// Marks the account as delegated to the target address.
+	/// Per EIP-7702, only creates ContractInfo if target is a Contract.
+	/// If target is delegated or EOA, contract_info is None (no chain following).
 	pub fn set_delegation(address: &H160, target: H160) -> Result<(), DispatchError> {
-		let target_code_hash = <AccountInfoOf<T>>::get(&target)
-			.and_then(|info| match info.account_type {
-				AccountType::Contract(c) => Some(c.code_hash),
-				AccountType::Delegated { contract_info, .. } => Some(contract_info.code_hash),
-				AccountType::EOA => None,
-			})
-			.unwrap_or_default();
-
-		AccountInfoOf::<T>::mutate(address, |account| -> Result<(), DispatchError> {
-			let contract_info = if let Some(account) = account.as_ref() {
-				if let AccountType::Delegated { contract_info: existing, .. } =
-					&account.account_type
-				{
-					let mut updated = existing.clone();
-					updated.code_hash = target_code_hash;
-					updated
-				} else {
+		let contract_info =
+			<AccountInfoOf<T>>::get(&target).and_then(|info| match info.account_type {
+				AccountType::Contract(c) => {
 					let account_id = T::AddressMapper::to_account_id(address);
 					let nonce = frame_system::Pallet::<T>::account_nonce(&account_id);
-					ContractInfo::<T>::new_for_delegation(address, nonce, target_code_hash)?
-				}
-			} else {
-				// No account exists, create new ContractInfo
-				let account_id = T::AddressMapper::to_account_id(address);
-				let nonce = frame_system::Pallet::<T>::account_nonce(&account_id);
-				ContractInfo::<T>::new_for_delegation(address, nonce, target_code_hash)?
-			};
+					ContractInfo::<T>::new_for_delegation(address, nonce, c.code_hash).ok()
+				},
+				_ => None,
+			});
 
+		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {
 				account.account_type = AccountType::Delegated { target, contract_info };
 			} else {
@@ -286,9 +270,10 @@ impl<T: Config> AccountInfo<T> {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {
 				if let AccountType::Delegated { contract_info, .. } = &account.account_type {
-					// Queue the child trie for deletion if storage was used
-					if contract_info.storage_items > 0 {
-						ContractInfo::<T>::queue_trie_for_deletion(contract_info.trie_id.clone());
+					if let Some(info) = contract_info {
+						if info.storage_items > 0 {
+							ContractInfo::<T>::queue_trie_for_deletion(info.trie_id.clone());
+						}
 					}
 					account.account_type = AccountType::EOA;
 				}

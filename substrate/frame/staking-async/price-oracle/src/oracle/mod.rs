@@ -28,9 +28,8 @@ V0: next week
 	- [x] test all sorts of endpoint params: body, header, method,
 	- [x] test offchain data-base key being fetched if needed.
 	- [x] Test that apis that require ocw key, but is is not present are skipped.
-	- [ ] OCW lock to prevent overlaps
-	- [ ] e2e tests where pallet moves forward, and 1 OCW is submitting stuff (stretch)
-- [ ] Benchmarking for on_init
+	- [x] e2e tests where pallet moves forward, and 1 OCW is submitting stuff (stretch)
+- [x] Benchmarking for on_init
 - New tx extension to:
 	- [ ] Should also read the authorities, and block any tx from other than these folks, if signed origin
 	- [ ] tests
@@ -64,9 +63,8 @@ pub use weights::WeightInfo;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use crate::oracle::offchain::Endpoint;
-
 	use super::{offchain, WeightInfo};
+	use crate::oracle::offchain::Endpoint;
 	use alloc::vec::Vec;
 	use frame_support::{
 		dispatch::DispatchResult,
@@ -199,6 +197,9 @@ pub mod pallet {
 		/// In milliseconds.
 		type DefaultRequestDeadline: Get<u64>;
 
+		#[cfg(feature = "runtime-benchmarks")]
+		type BenchmarkHelper: crate::oracle::benchmarking::BenchmarkHelper<Self>;
+
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: super::WeightInfo;
 	}
@@ -267,7 +268,7 @@ pub mod pallet {
 		}
 
 		/// Register a new asset to be tracked.
-		fn register_asset(
+		pub(crate) fn register_asset(
 			asset_id: T::AssetId,
 			endpoints: BoundedVec<Endpoint, T::MaxEndpointsPerAsset>,
 		) -> DispatchResult {
@@ -320,7 +321,7 @@ pub mod pallet {
 		}
 
 		/// Add a new `vote` or `asset_id` from `who`
-		fn add_vote(
+		pub(crate) fn add_vote(
 			asset_id: T::AssetId,
 			who: T::AccountId,
 			vote: Vote<BlockNumberFor<T>>,
@@ -806,6 +807,7 @@ pub mod pallet {
 				.into_iter()
 				.map(|(who, vote)| (who, vote.price, vote.produced_in))
 				.collect::<Vec<_>>();
+			log!(debug, "tallying asset {:?} with {} votes", asset_id, votes.len());
 			match T::TallyManager::tally(asset_id, votes) {
 				Ok((price, confidence)) => {
 					// will store the new price, and prune old voting data as per `HistoryDepth`.

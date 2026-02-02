@@ -247,6 +247,8 @@ impl pallet_price_oracle::Config for Runtime {
 	type OnPriceUpdate = OnPriceUpdate;
 	type WeightInfo = ();
 	type DefaultRequestDeadline = ConstU64<2000>;
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = ();
 }
 
 pub struct ExtBuilder {
@@ -293,10 +295,15 @@ impl ExtBuilder {
 		HistoryDepth::set(depth);
 		self
 	}
+
+	pub fn empty(mut self) -> Self {
+		self.assets = vec![];
+		self
+	}
 }
 
 impl ExtBuilder {
-	fn build(self) -> sp_io::TestExternalities {
+	pub(crate) fn build(self) -> sp_io::TestExternalities {
 		sp_tracing::try_init_simple();
 		let mut storage =
 			frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();

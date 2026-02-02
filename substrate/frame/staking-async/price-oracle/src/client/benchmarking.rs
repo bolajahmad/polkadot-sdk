@@ -20,7 +20,6 @@
 use super::*;
 use crate::client::{pallet::Config, Pallet};
 use frame_benchmarking::v2::*;
-use frame_system::RawOrigin;
 
 #[benchmarks]
 mod benchmarks {

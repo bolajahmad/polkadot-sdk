@@ -2685,3 +2685,43 @@ fn fatp_tx_is_revalidated_by_mempool_revalidation() {
 	let xt0_events = block_on(xt0_watcher.collect::<Vec<_>>());
 	assert_eq!(xt0_events, vec![TransactionStatus::Ready, TransactionStatus::Invalid,]);
 }
+
+/// Ready event lost in manual-seal mode.
+///
+/// This test simulates the scenario:
+/// 1. A block is created and immediately finalized
+/// 2. A transaction is submitted AFTER finalization (to the finalized view)
+/// 3. The Ready event should be delivered immediately (before any new block)
+#[test]
+fn fatp_watcher_ready_event_after_instant_finalization() {
+	sp_tracing::try_init_simple();
+
+	let (pool, api, _) = pool();
+
+	// Create block 1 (empty)
+	let header01 = api.push_block(1, vec![], true);
+
+	// Notify new best and immediately finalize
+	block_on(pool.maintain(new_best_block_event(&pool, None, header01.hash())));
+	block_on(pool.maintain(finalized_block_event(&pool, api.genesis_hash(), header01.hash())));
+
+	let xt0 = uxt(Alice, 200);
+	let xt0_watcher = block_on(pool.submit_and_watch(invalid_hash(), SOURCE, xt0.clone())).unwrap();
+
+	std::thread::sleep(Duration::from_millis(100));
+
+	// Now check if the Ready event is available.
+	let ready_event = xt0_watcher.take(1).collect::<Vec<_>>().now_or_never();
+
+	assert!(
+		ready_event.is_some(),
+		"Ready event should be available after submission on active finalized view."
+	);
+
+	let events = ready_event.unwrap();
+	assert_eq!(
+		events,
+		vec![TransactionStatus::Ready],
+		"First event should be Ready, delivered from the finalized view"
+	);
+}

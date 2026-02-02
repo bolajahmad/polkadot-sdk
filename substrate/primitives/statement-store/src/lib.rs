@@ -24,13 +24,90 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use codec::{Compact, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
+use core::ops::Deref;
 use scale_info::{build::Fields, Path, Type, TypeInfo};
 use sp_application_crypto::RuntimeAppPublic;
 #[cfg(feature = "std")]
 use sp_core::Pair;
 
 /// Statement topic.
-pub type Topic = [u8; 32];
+///
+/// A 32-byte topic identifier that serializes as a hex string (like `sp_core::Bytes`).
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	MaxEncodedLen,
+	TypeInfo,
+)]
+pub struct Topic(pub [u8; 32]);
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Topic {
+	fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		sp_core::bytes::serialize(&self.0, serializer)
+	}
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Topic {
+	fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		let mut arr = [0u8; 32];
+		sp_core::bytes::deserialize_check_len(
+			deserializer,
+			sp_core::bytes::ExpectedLen::Exact(&mut arr[..]),
+		)?;
+		Ok(Topic(arr))
+	}
+}
+
+impl From<[u8; 32]> for Topic {
+	fn from(inner: [u8; 32]) -> Self {
+		Topic(inner)
+	}
+}
+
+impl From<Topic> for [u8; 32] {
+	fn from(topic: Topic) -> Self {
+		topic.0
+	}
+}
+
+impl AsRef<[u8; 32]> for Topic {
+	fn as_ref(&self) -> &[u8; 32] {
+		&self.0
+	}
+}
+
+impl AsRef<[u8]> for Topic {
+	fn as_ref(&self) -> &[u8] {
+		&self.0
+	}
+}
+
+impl Deref for Topic {
+	type Target = [u8; 32];
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
 /// Decryption key identifier.
 pub type DecryptionKey = [u8; 32];
 /// Statement hash.
@@ -50,7 +127,7 @@ pub const MAX_ANY_TOPICS: usize = 128;
 
 #[cfg(feature = "std")]
 pub use store_api::{
-	CheckedTopicFilter, Error, FilterDecision, InvalidReason, RejectionReason, Result,
+	Error, FilterDecision, InvalidReason, OptimizedTopicFilter, RejectionReason, Result,
 	StatementSource, StatementStore, SubmitResult, TopicFilter,
 };
 
@@ -648,7 +725,9 @@ impl Statement {
 
 #[cfg(test)]
 mod test {
-	use crate::{hash_encoded, Field, Proof, SignatureVerificationResult, Statement, MAX_TOPICS};
+	use crate::{
+		hash_encoded, Field, Proof, SignatureVerificationResult, Statement, Topic, MAX_TOPICS,
+	};
 	use codec::{Decode, Encode};
 	use scale_info::{MetaType, TypeInfo};
 	use sp_application_crypto::Pair;
@@ -661,8 +740,8 @@ mod test {
 		let proof = Proof::OnChain { who: [42u8; 32], block_hash: [24u8; 32], event_index: 66 };
 
 		let decryption_key = [0xde; 32];
-		let topic1 = [0x01; 32];
-		let topic2 = [0x02; 32];
+		let topic1: Topic = [0x01; 32].into();
+		let topic2: Topic = [0x02; 32].into();
 		let data = vec![55, 99];
 		let expiry = 999;
 		let channel = [0xcc; 32];
@@ -675,7 +754,7 @@ mod test {
 		statement.set_topic(1, topic2);
 		statement.set_plain_data(data.clone());
 
-		statement.set_topic(5, [0x55; 32]);
+		statement.set_topic(5, [0x55; 32].into());
 		assert_eq!(statement.topic(5), None);
 
 		let fields = vec![
@@ -698,8 +777,8 @@ mod test {
 
 	#[test]
 	fn decode_checks_fields() {
-		let topic1 = [0x01; 32];
-		let topic2 = [0x02; 32];
+		let topic1: Topic = [0x01; 32].into();
+		let topic2: Topic = [0x02; 32].into();
 		let priority = 999;
 
 		let fields = vec![
@@ -772,30 +851,30 @@ mod test {
 	#[test]
 	fn check_matches() {
 		let mut statement = Statement::new();
-		let topic1 = [0x01; 32];
-		let topic2 = [0x02; 32];
-		let topic3 = [0x03; 32];
+		let topic1: Topic = [0x01; 32].into();
+		let topic2: Topic = [0x02; 32].into();
+		let topic3: Topic = [0x03; 32].into();
 
 		statement.set_topic(0, topic1);
 		statement.set_topic(1, topic2);
 
-		let filter_any = crate::CheckedTopicFilter::Any;
+		let filter_any = crate::OptimizedTopicFilter::Any;
 		assert!(filter_any.matches(&statement));
 
 		let filter_all =
-			crate::CheckedTopicFilter::MatchAll([topic1, topic2].iter().cloned().collect());
+			crate::OptimizedTopicFilter::MatchAll([topic1, topic2].iter().cloned().collect());
 		assert!(filter_all.matches(&statement));
 
 		let filter_all_fail =
-			crate::CheckedTopicFilter::MatchAll([topic1, topic3].iter().cloned().collect());
+			crate::OptimizedTopicFilter::MatchAll([topic1, topic3].iter().cloned().collect());
 		assert!(!filter_all_fail.matches(&statement));
 
 		let filter_any_match =
-			crate::CheckedTopicFilter::MatchAny([topic2, topic3].iter().cloned().collect());
+			crate::OptimizedTopicFilter::MatchAny([topic2, topic3].iter().cloned().collect());
 		assert!(filter_any_match.matches(&statement));
 
 		let filter_any_fail =
-			crate::CheckedTopicFilter::MatchAny([topic3].iter().cloned().collect());
+			crate::OptimizedTopicFilter::MatchAny([topic3].iter().cloned().collect());
 		assert!(!filter_any_fail.matches(&statement));
 	}
 
@@ -830,7 +909,7 @@ mod test {
 				let mut statement = Statement::new();
 
 				statement.set_expiry(i as u64);
-				statement.set_topic(0, [(i % 256) as u8; 32]);
+				statement.set_topic(0, [(i % 256) as u8; 32].into());
 				statement.set_plain_data(vec![i as u8; 512]);
 				statement.sign_sr25519_private(&keyring);
 
@@ -867,7 +946,7 @@ mod test {
 		statement.set_expiry(expiry);
 		statement.set_channel(channel);
 		for i in 0..MAX_TOPICS {
-			statement.set_topic(i, [i as u8; 32]);
+			statement.set_topic(i, [i as u8; 32].into());
 		}
 		statement.set_plain_data(data);
 

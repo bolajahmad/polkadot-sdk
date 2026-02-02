@@ -66,8 +66,8 @@ use sp_statement_store::{
 	runtime_api::{
 		InvalidStatement, StatementSource, StatementStoreExt, ValidStatement, ValidateStatement,
 	},
-	AccountId, BlockHash, Channel, CheckedTopicFilter, DecryptionKey, FilterDecision, Hash,
-	InvalidReason, Proof, RejectionReason, Result, Statement, SubmitResult, Topic,
+	AccountId, BlockHash, Channel, DecryptionKey, FilterDecision, Hash, InvalidReason,
+	OptimizedTopicFilter, Proof, RejectionReason, Result, Statement, SubmitResult, Topic,
 };
 pub use sp_statement_store::{Error, StatementStore, MAX_TOPICS};
 use std::{
@@ -294,14 +294,14 @@ impl Index {
 	fn iterate_with(
 		&self,
 		key: Option<DecryptionKey>,
-		topic: &CheckedTopicFilter,
+		topic: &OptimizedTopicFilter,
 		f: impl FnMut(&Hash) -> Result<()>,
 	) -> Result<()> {
 		match topic {
-			CheckedTopicFilter::Any => self.iterate_with_any(key, f),
-			CheckedTopicFilter::MatchAll(topics) =>
+			OptimizedTopicFilter::Any => self.iterate_with_any(key, f),
+			OptimizedTopicFilter::MatchAll(topics) =>
 				self.iterate_with_match_all(key, topics.iter(), f),
-			CheckedTopicFilter::MatchAny(topics) =>
+			OptimizedTopicFilter::MatchAny(topics) =>
 				self.iterate_with_match_any(key, topics.iter(), f),
 		}
 	}
@@ -739,7 +739,7 @@ impl Store {
 	fn collect_statements_locked<R>(
 		&self,
 		key: Option<DecryptionKey>,
-		topic_filter: &CheckedTopicFilter,
+		topic_filter: &OptimizedTopicFilter,
 		index: &Index,
 		result: &mut Vec<R>,
 		mut f: impl FnMut(Statement) -> Option<R>,
@@ -777,7 +777,7 @@ impl Store {
 	fn collect_statements<R>(
 		&self,
 		key: Option<DecryptionKey>,
-		topic_filter: &CheckedTopicFilter,
+		topic_filter: &OptimizedTopicFilter,
 		f: impl FnMut(Statement) -> Option<R>,
 	) -> Result<Vec<R>> {
 		let mut result = Vec::new();
@@ -925,7 +925,7 @@ impl Store {
 	) -> Result<Vec<R>> {
 		self.collect_statements(
 			Some(dest),
-			&CheckedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
+			&OptimizedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
 			|statement| {
 				if let (Some(key), Some(_)) = (statement.decryption_key(), statement.data()) {
 					let public: sp_core::ed25519::Public = UncheckedFrom::unchecked_from(key);
@@ -1079,7 +1079,7 @@ impl StatementStore for Store {
 	fn broadcasts(&self, match_all_topics: &[Topic]) -> Result<Vec<Vec<u8>>> {
 		self.collect_statements(
 			None,
-			&CheckedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
+			&OptimizedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
 			|statement| statement.into_data(),
 		)
 	}
@@ -1090,7 +1090,7 @@ impl StatementStore for Store {
 	fn posted(&self, match_all_topics: &[Topic], dest: [u8; 32]) -> Result<Vec<Vec<u8>>> {
 		self.collect_statements(
 			Some(dest),
-			&CheckedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
+			&OptimizedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
 			|statement| statement.into_data(),
 		)
 	}
@@ -1106,7 +1106,7 @@ impl StatementStore for Store {
 	fn broadcasts_stmt(&self, match_all_topics: &[Topic]) -> Result<Vec<Vec<u8>>> {
 		self.collect_statements(
 			None,
-			&CheckedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
+			&OptimizedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
 			|statement| Some(statement.encode()),
 		)
 	}
@@ -1117,7 +1117,7 @@ impl StatementStore for Store {
 	fn posted_stmt(&self, match_all_topics: &[Topic], dest: [u8; 32]) -> Result<Vec<Vec<u8>>> {
 		self.collect_statements(
 			Some(dest),
-			&CheckedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
+			&OptimizedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
 			|statement| Some(statement.encode()),
 		)
 	}
@@ -1304,7 +1304,7 @@ impl StatementStore for Store {
 impl StatementStoreSubscriptionApi for Store {
 	fn subscribe_statement(
 		&self,
-		topic_filter: CheckedTopicFilter,
+		topic_filter: OptimizedTopicFilter,
 	) -> Result<(Vec<Vec<u8>>, async_channel::Sender<Bytes>, SubscriptionStatementsStream)> {
 		// Keep the index read lock until after we have subscribed to avoid missing statements.
 		let mut existing_statements = Vec::new();
@@ -1463,9 +1463,9 @@ mod tests {
 	}
 
 	fn topic(data: u64) -> Topic {
-		let mut topic: Topic = Default::default();
-		topic[0..8].copy_from_slice(&data.to_le_bytes());
-		topic
+		let mut bytes = [0u8; 32];
+		bytes[0..8].copy_from_slice(&data.to_le_bytes());
+		Topic::from(bytes)
 	}
 
 	fn dec_key(data: u64) -> DecryptionKey {

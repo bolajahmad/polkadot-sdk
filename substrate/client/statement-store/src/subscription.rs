@@ -43,7 +43,7 @@ use crate::LOG_TARGET;
 use sc_utils::id_sequence::SeqID;
 use sp_core::{traits::SpawnNamed, Bytes, Encode};
 pub use sp_statement_store::StatementStore;
-use sp_statement_store::{CheckedTopicFilter, Result, Statement, Topic, MAX_TOPICS};
+use sp_statement_store::{OptimizedTopicFilter, Result, Statement, Topic, MAX_TOPICS};
 use std::{
 	collections::{hash_map::Entry, HashMap, HashSet},
 	sync::atomic::AtomicU64,
@@ -57,7 +57,7 @@ pub trait StatementStoreSubscriptionApi: Send + Sync {
 	/// stream for receiving matched statements when they arrive.
 	fn subscribe_statement(
 		&self,
-		topic_filter: CheckedTopicFilter,
+		topic_filter: OptimizedTopicFilter,
 	) -> Result<(Vec<Vec<u8>>, async_channel::Sender<Bytes>, SubscriptionStatementsStream)>;
 }
 
@@ -142,7 +142,7 @@ impl SubscriptionsHandle {
 	/// Subscribe to statements matching the topic filter.
 	pub(crate) fn subscribe(
 		&self,
-		topic_filter: CheckedTopicFilter,
+		topic_filter: OptimizedTopicFilter,
 	) -> (async_channel::Sender<Bytes>, SubscriptionStatementsStream) {
 		let next_id = self.next_id();
 		let (tx, rx) = async_channel::bounded(SUBSCRIPTION_BUFFER_SIZE);
@@ -186,14 +186,14 @@ struct SubscriptionsInfo {
 	// Subscriptions that listen with Any filter (i.e., no topic filtering).
 	subscriptions_any: HashMap<SeqID, SubscriptionInfo>,
 	// Mapping from subscription ID to topic filter.
-	by_sub_id: HashMap<SeqID, CheckedTopicFilter>,
+	by_sub_id: HashMap<SeqID, OptimizedTopicFilter>,
 }
 
 // Information about a single subscription.
 #[derive(Clone, Debug)]
 pub(crate) struct SubscriptionInfo {
 	// The filter used for this subscription.
-	topic_filter: CheckedTopicFilter,
+	topic_filter: OptimizedTopicFilter,
 	// The unique ID of this subscription.
 	seq_id: SeqID,
 	// Channel to send matched statements to the subscriber.
@@ -215,16 +215,16 @@ impl SubscriptionsInfo {
 		self.by_sub_id
 			.insert(subscription_info.seq_id, subscription_info.topic_filter.clone());
 		match &subscription_info.topic_filter {
-			CheckedTopicFilter::Any => {
+			OptimizedTopicFilter::Any => {
 				self.subscriptions_any.insert(subscription_info.seq_id, subscription_info);
 			},
-			CheckedTopicFilter::MatchAll(topics) =>
+			OptimizedTopicFilter::MatchAll(topics) =>
 				for topic in topics {
 					self.subscriptions_match_all_by_topic.entry(*topic).or_default()
 						[topics.len() - 1]
 						.insert(subscription_info.seq_id, subscription_info.clone());
 				},
-			CheckedTopicFilter::MatchAny(topics) =>
+			OptimizedTopicFilter::MatchAny(topics) =>
 				for topic in topics {
 					self.subscriptions_match_any_by_topic
 						.entry(*topic)
@@ -352,12 +352,12 @@ impl SubscriptionsInfo {
 		};
 
 		let topics = match &entry {
-			CheckedTopicFilter::Any => {
+			OptimizedTopicFilter::Any => {
 				self.subscriptions_any.remove(&id);
 				return;
 			},
-			CheckedTopicFilter::MatchAll(topics) => topics,
-			CheckedTopicFilter::MatchAny(topics) => topics,
+			OptimizedTopicFilter::MatchAll(topics) => topics,
+			OptimizedTopicFilter::MatchAny(topics) => topics,
 		};
 
 		// Remove subscription from relevant maps.
@@ -468,11 +468,11 @@ mod tests {
 		let mut subscriptions = SubscriptionsInfo::new();
 
 		let (tx1, _rx1) = async_channel::bounded::<Bytes>(10);
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAll(
-				vec![topic1, topic2].iter().cloned().collect(),
+			topic_filter: OptimizedTopicFilter::MatchAll(
+				vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 			),
 			seq_id: SeqID::from(1),
 			tx: tx1,
@@ -493,7 +493,7 @@ mod tests {
 		let mut subscriptions = SubscriptionsInfo::new();
 		let (tx1, _rx1) = async_channel::bounded::<Bytes>(10);
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::Any,
+			topic_filter: OptimizedTopicFilter::Any,
 			seq_id: SeqID::from(1),
 			tx: tx1,
 		};
@@ -509,11 +509,11 @@ mod tests {
 		let mut subscriptions = SubscriptionsInfo::new();
 
 		let (tx1, _rx1) = async_channel::bounded::<Bytes>(10);
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAny(
-				vec![topic1, topic2].iter().cloned().collect(),
+			topic_filter: OptimizedTopicFilter::MatchAny(
+				vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 			),
 			seq_id: SeqID::from(1),
 			tx: tx1,
@@ -535,7 +535,7 @@ mod tests {
 
 		let (tx1, rx1) = async_channel::bounded::<Bytes>(10);
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::Any,
+			topic_filter: OptimizedTopicFilter::Any,
 			seq_id: SeqID::from(1),
 			tx: tx1,
 		};
@@ -555,11 +555,11 @@ mod tests {
 		let mut subscriptions = SubscriptionsInfo::new();
 
 		let (tx1, rx1) = async_channel::bounded::<Bytes>(10);
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAll(
-				vec![topic1, topic2].iter().cloned().collect(),
+			topic_filter: OptimizedTopicFilter::MatchAll(
+				vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 			),
 			seq_id: SeqID::from(1),
 			tx: tx1,
@@ -567,13 +567,13 @@ mod tests {
 		subscriptions.subscribe(sub_info1.clone());
 
 		let mut statement = signed_statement(1);
-		statement.set_topic(0, Topic::from(topic2));
+		statement.set_topic(0, topic2.clone());
 		subscriptions.notify_matching_filters(&statement);
 
 		// Should not receive yet, only one topic matched.
 		assert!(rx1.try_recv().is_err());
 
-		statement.set_topic(1, Topic::from(topic1));
+		statement.set_topic(1, topic1.clone());
 		subscriptions.notify_matching_filters(&statement);
 
 		let received = rx1.try_recv().expect("Should receive statement");
@@ -588,18 +588,20 @@ mod tests {
 		let (tx1, rx1) = async_channel::bounded::<Bytes>(10);
 		let (tx2, rx2) = async_channel::bounded::<Bytes>(10);
 
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAny(
-				vec![topic1, topic2].iter().cloned().collect(),
+			topic_filter: OptimizedTopicFilter::MatchAny(
+				vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 			),
 			seq_id: SeqID::from(1),
 			tx: tx1,
 		};
 
 		let sub_info2 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAny(vec![topic2].iter().cloned().collect()),
+			topic_filter: OptimizedTopicFilter::MatchAny(
+				vec![topic2.clone()].into_iter().collect(),
+			),
 			seq_id: SeqID::from(2),
 			tx: tx2,
 		};
@@ -608,8 +610,8 @@ mod tests {
 		subscriptions.subscribe(sub_info2.clone());
 
 		let mut statement = signed_statement(1);
-		statement.set_topic(0, Topic::from(topic1));
-		statement.set_topic(1, Topic::from(topic2));
+		statement.set_topic(0, topic1.clone());
+		statement.set_topic(1, topic2.clone());
 		subscriptions.notify_match_any_subscribers(&statement);
 
 		let received = rx1.try_recv().expect("Should receive statement");
@@ -631,23 +633,23 @@ mod tests {
 				num_workers,
 			);
 
-			let topic1 = [8u8; 32];
-			let topic2 = [9u8; 32];
+			let topic1 = Topic::from([8u8; 32]);
+			let topic2 = Topic::from([9u8; 32]);
 
 			let streams = (0..5)
 				.into_iter()
 				.map(|_| {
-					subscriptions_handle.subscribe(CheckedTopicFilter::MatchAll(
-						vec![topic1, topic2].iter().cloned().collect(),
+					subscriptions_handle.subscribe(OptimizedTopicFilter::MatchAll(
+						vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 					))
 				})
 				.collect::<Vec<_>>();
 
 			let mut statement = signed_statement(1);
-			statement.set_topic(0, Topic::from(topic2));
+			statement.set_topic(0, topic2.clone());
 			subscriptions_handle.notify(statement.clone());
 
-			statement.set_topic(1, Topic::from(topic1));
+			statement.set_topic(1, topic1.clone());
 			subscriptions_handle.notify(statement.clone());
 
 			for (_tx, mut stream) in streams {
@@ -664,16 +666,16 @@ mod tests {
 		let subscriptions_handle =
 			SubscriptionsHandle::new(Box::new(sp_core::testing::TaskExecutor::new()), 2);
 
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 
-		let (tx, mut stream) = subscriptions_handle.subscribe(CheckedTopicFilter::MatchAll(
-			vec![topic1, topic2].iter().cloned().collect(),
+		let (tx, mut stream) = subscriptions_handle.subscribe(OptimizedTopicFilter::MatchAll(
+			vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 		));
 
 		let mut statement = signed_statement(1);
-		statement.set_topic(0, Topic::from(topic1));
-		statement.set_topic(1, Topic::from(topic2));
+		statement.set_topic(0, topic1.clone());
+		statement.set_topic(1, topic2.clone());
 
 		// Send a statement and verify it's received.
 		subscriptions_handle.notify(statement.clone());
@@ -691,8 +693,8 @@ mod tests {
 
 		// Send another statement after unsubscribe.
 		let mut statement2 = signed_statement(2);
-		statement2.set_topic(0, Topic::from(topic1));
-		statement2.set_topic(1, Topic::from(topic2));
+		statement2.set_topic(0, topic1.clone());
+		statement2.set_topic(1, topic2.clone());
 		subscriptions_handle.notify(statement2.clone());
 
 		// The tx channel should be closed/disconnected since the subscription was removed.
@@ -722,19 +724,19 @@ mod tests {
 
 		let (tx1, rx1) = async_channel::bounded::<Bytes>(10);
 		let (tx2, rx2) = async_channel::bounded::<Bytes>(10);
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAll(
-				vec![topic1, topic2].iter().cloned().collect(),
+			topic_filter: OptimizedTopicFilter::MatchAll(
+				vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 			),
 			seq_id: SeqID::from(1),
 			tx: tx1,
 		};
 		let sub_info2 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAll(
-				vec![topic1, topic2].iter().cloned().collect(),
+			topic_filter: OptimizedTopicFilter::MatchAll(
+				vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 			),
 			seq_id: SeqID::from(2),
 			tx: tx2,
@@ -767,8 +769,8 @@ mod tests {
 
 		// Send a matching statement.
 		let mut statement = signed_statement(1);
-		statement.set_topic(0, Topic::from(topic1));
-		statement.set_topic(1, Topic::from(topic2));
+		statement.set_topic(0, topic1.clone());
+		statement.set_topic(1, topic2.clone());
 		subscriptions.notify_matching_filters(&statement);
 
 		// Both should receive.
@@ -816,17 +818,19 @@ mod tests {
 
 		// Create a channel with capacity 1.
 		let (tx1, rx1) = async_channel::bounded::<Bytes>(1);
-		let topic1 = [8u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
 
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAny(vec![topic1].iter().cloned().collect()),
+			topic_filter: OptimizedTopicFilter::MatchAny(
+				vec![topic1.clone()].into_iter().collect(),
+			),
 			seq_id: SeqID::from(1),
 			tx: tx1,
 		};
 		subscriptions.subscribe(sub_info1.clone());
 
 		let mut statement = signed_statement(1);
-		statement.set_topic(0, Topic::from(topic1));
+		statement.set_topic(0, topic1.clone());
 
 		// First notification should succeed.
 		subscriptions.notify_matching_filters(&statement);
@@ -849,13 +853,13 @@ mod tests {
 		let mut subscriptions = SubscriptionsInfo::new();
 
 		let (tx1, rx1) = async_channel::bounded::<Bytes>(10);
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 
 		// Subscribe to MatchAny with both topics.
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAny(
-				vec![topic1, topic2].iter().cloned().collect(),
+			topic_filter: OptimizedTopicFilter::MatchAny(
+				vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 			),
 			seq_id: SeqID::from(1),
 			tx: tx1,
@@ -864,8 +868,8 @@ mod tests {
 
 		// Create a statement that matches BOTH topics.
 		let mut statement = signed_statement(1);
-		statement.set_topic(0, Topic::from(topic1));
-		statement.set_topic(1, Topic::from(topic2));
+		statement.set_topic(0, topic1.clone());
+		statement.set_topic(1, topic2.clone());
 
 		subscriptions.notify_match_any_subscribers(&statement);
 
@@ -884,12 +888,14 @@ mod tests {
 		let mut subscriptions = SubscriptionsInfo::new();
 
 		let (tx1, rx1) = async_channel::bounded::<Bytes>(10);
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 
 		// Subscribe with MatchAll on only topic1.
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAll(vec![topic1].iter().cloned().collect()),
+			topic_filter: OptimizedTopicFilter::MatchAll(
+				vec![topic1.clone()].into_iter().collect(),
+			),
 			seq_id: SeqID::from(1),
 			tx: tx1,
 		};
@@ -897,8 +903,8 @@ mod tests {
 
 		// Create a statement that has BOTH topic1 and topic2.
 		let mut statement = signed_statement(1);
-		statement.set_topic(0, Topic::from(topic1));
-		statement.set_topic(1, Topic::from(topic2));
+		statement.set_topic(0, topic1.clone());
+		statement.set_topic(1, topic2.clone());
 
 		subscriptions.notify_matching_filters(&statement);
 
@@ -917,13 +923,13 @@ mod tests {
 		let mut subscriptions = SubscriptionsInfo::new();
 
 		let (tx1, rx1) = async_channel::bounded::<Bytes>(10);
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
-		let topic3 = [10u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
+		let topic3 = Topic::from([10u8; 32]);
 
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAll(
-				vec![topic1, topic2].iter().cloned().collect(),
+			topic_filter: OptimizedTopicFilter::MatchAll(
+				vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 			),
 			seq_id: SeqID::from(1),
 			tx: tx1,
@@ -932,7 +938,7 @@ mod tests {
 
 		// Statement with completely different topics.
 		let mut statement = signed_statement(1);
-		statement.set_topic(0, Topic::from(topic3));
+		statement.set_topic(0, topic3.clone());
 
 		subscriptions.notify_matching_filters(&statement);
 
@@ -950,13 +956,15 @@ mod tests {
 
 		let (tx1, rx1) = async_channel::bounded::<Bytes>(10);
 		// topic1 will have NO subscriptions
-		let topic1 = [1u8; 32];
+		let topic1 = Topic::from([1u8; 32]);
 		// topic2 WILL have a subscription
-		let topic2 = [2u8; 32];
+		let topic2 = Topic::from([2u8; 32]);
 
 		// Subscribe only to topic2 with MatchAll filter.
 		let sub_info1 = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAll(vec![topic2].iter().cloned().collect()),
+			topic_filter: OptimizedTopicFilter::MatchAll(
+				vec![topic2.clone()].into_iter().collect(),
+			),
 			seq_id: SeqID::from(1),
 			tx: tx1,
 		};
@@ -967,8 +975,8 @@ mod tests {
 		// Since topic1 has no subscriptions, the buggy `return` exits early,
 		// preventing the [topic2] combination from being checked.
 		let mut statement = signed_statement(1);
-		statement.set_topic(0, Topic::from(topic1));
-		statement.set_topic(1, Topic::from(topic2));
+		statement.set_topic(0, topic1.clone());
+		statement.set_topic(1, topic2.clone());
 
 		subscriptions.notify_match_all_subscribers_best(&statement);
 
@@ -988,16 +996,16 @@ mod tests {
 		let subscriptions_handle =
 			SubscriptionsHandle::new(Box::new(sp_core::testing::TaskExecutor::new()), 2);
 
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 
-		let (_tx, mut stream) = subscriptions_handle.subscribe(CheckedTopicFilter::MatchAny(
-			vec![topic1, topic2].iter().cloned().collect(),
+		let (_tx, mut stream) = subscriptions_handle.subscribe(OptimizedTopicFilter::MatchAny(
+			vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 		));
 
 		// Statement matching only topic1.
 		let mut statement1 = signed_statement(1);
-		statement1.set_topic(0, Topic::from(topic1));
+		statement1.set_topic(0, topic1.clone());
 		subscriptions_handle.notify(statement1.clone());
 
 		let received = stream.next().await.expect("Should receive statement");
@@ -1007,7 +1015,7 @@ mod tests {
 
 		// Statement matching only topic2.
 		let mut statement2 = signed_statement(2);
-		statement2.set_topic(0, Topic::from(topic2));
+		statement2.set_topic(0, topic2.clone());
 		subscriptions_handle.notify(statement2.clone());
 
 		let received = stream.next().await.expect("Should receive statement");
@@ -1021,7 +1029,7 @@ mod tests {
 		let subscriptions_handle =
 			SubscriptionsHandle::new(Box::new(sp_core::testing::TaskExecutor::new()), 2);
 
-		let (_tx, mut stream) = subscriptions_handle.subscribe(CheckedTopicFilter::Any);
+		let (_tx, mut stream) = subscriptions_handle.subscribe(OptimizedTopicFilter::Any);
 
 		// Send statements with various topics.
 		let statement1 = signed_statement(1);
@@ -1047,24 +1055,24 @@ mod tests {
 		let subscriptions_handle =
 			SubscriptionsHandle::new(Box::new(sp_core::testing::TaskExecutor::new()), 2);
 
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 
 		// Subscriber 1: MatchAll on topic1 and topic2.
-		let (_tx1, mut stream1) = subscriptions_handle.subscribe(CheckedTopicFilter::MatchAll(
-			vec![topic1, topic2].iter().cloned().collect(),
+		let (_tx1, mut stream1) = subscriptions_handle.subscribe(OptimizedTopicFilter::MatchAll(
+			vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 		));
 
 		// Subscriber 2: MatchAny on topic1.
 		let (_tx2, mut stream2) = subscriptions_handle
-			.subscribe(CheckedTopicFilter::MatchAny(vec![topic1].iter().cloned().collect()));
+			.subscribe(OptimizedTopicFilter::MatchAny(vec![topic1.clone()].into_iter().collect()));
 
 		// Subscriber 3: Any.
-		let (_tx3, mut stream3) = subscriptions_handle.subscribe(CheckedTopicFilter::Any);
+		let (_tx3, mut stream3) = subscriptions_handle.subscribe(OptimizedTopicFilter::Any);
 
 		// Statement matching only topic1.
 		let mut statement1 = signed_statement(1);
-		statement1.set_topic(0, Topic::from(topic1));
+		statement1.set_topic(0, topic1.clone());
 		subscriptions_handle.notify(statement1.clone());
 
 		// stream1 should NOT receive (needs both topics).
@@ -1081,8 +1089,8 @@ mod tests {
 
 		// Statement matching both topics.
 		let mut statement2 = signed_statement(2);
-		statement2.set_topic(0, Topic::from(topic1));
-		statement2.set_topic(1, Topic::from(topic2));
+		statement2.set_topic(0, topic1.clone());
+		statement2.set_topic(1, topic2.clone());
 		subscriptions_handle.notify(statement2.clone());
 
 		// All should receive.
@@ -1107,13 +1115,13 @@ mod tests {
 		let (tx_match_any, rx_match_any) = async_channel::bounded::<Bytes>(10);
 		let (tx_any, rx_any) = async_channel::bounded::<Bytes>(10);
 
-		let topic1 = [8u8; 32];
-		let topic2 = [9u8; 32];
+		let topic1 = Topic::from([8u8; 32]);
+		let topic2 = Topic::from([9u8; 32]);
 
 		// Subscribe with MatchAll filter.
 		let sub_match_all = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAll(
-				vec![topic1, topic2].iter().cloned().collect(),
+			topic_filter: OptimizedTopicFilter::MatchAll(
+				vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 			),
 			seq_id: SeqID::from(1),
 			tx: tx_match_all,
@@ -1122,8 +1130,8 @@ mod tests {
 
 		// Subscribe with MatchAny filter.
 		let sub_match_any = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::MatchAny(
-				vec![topic1, topic2].iter().cloned().collect(),
+			topic_filter: OptimizedTopicFilter::MatchAny(
+				vec![topic1.clone(), topic2.clone()].into_iter().collect(),
 			),
 			seq_id: SeqID::from(2),
 			tx: tx_match_any,
@@ -1132,7 +1140,7 @@ mod tests {
 
 		// Subscribe with Any filter.
 		let sub_any = SubscriptionInfo {
-			topic_filter: CheckedTopicFilter::Any,
+			topic_filter: OptimizedTopicFilter::Any,
 			seq_id: SeqID::from(3),
 			tx: tx_any,
 		};

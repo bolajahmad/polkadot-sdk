@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use sp_core::{Bytes, Encode};
-use sp_statement_store::{SubmitResult, TopicFilter};
+use sp_statement_store::{SubmitResult, Topic, TopicFilter};
 use zombienet_sdk::{subxt::ext::subxt_rpcs::rpc_params, NetworkConfigBuilder};
 
 #[tokio::test(flavor = "multi_thread")]
@@ -67,7 +67,7 @@ async fn statement_store() -> Result<(), anyhow::Error> {
 
 	// Create the statement "1,2,3" signed by dave.
 	let mut statement = sp_statement_store::Statement::new();
-	let topic = [0u8; 32]; // just a dummy topic
+	let topic: Topic = [0u8; 32].into(); // just a dummy topic
 	statement.set_plain_data(vec![1, 2, 3]);
 	statement.set_topic(0, topic);
 	statement.set_expiry_from_parts(u32::MAX, 0);
@@ -79,9 +79,7 @@ async fn statement_store() -> Result<(), anyhow::Error> {
 	let mut subscription = dave_rpc
 		.subscribe::<Bytes>(
 			"statement_subscribeStatement",
-			rpc_params![TopicFilter::MatchAll(
-				vec![topic.to_vec().into()].try_into().expect("Single topic")
-			)],
+			rpc_params![TopicFilter::MatchAll(vec![topic].try_into().expect("Single topic"))],
 			"statement_unsubscribeStatement",
 		)
 		.await?;
@@ -103,8 +101,6 @@ async fn statement_store() -> Result<(), anyhow::Error> {
 		.await
 		.is_err());
 	log::info!("Statement store test passed");
-	log::info!("Keeping network alive");
 
-	tokio::time::sleep(Duration::from_secs(24 * 60 * 60)).await;
 	Ok(())
 }

@@ -177,8 +177,9 @@ async fn statement_store_memory_stress_bench() -> Result<(), anyhow::Error> {
 
 			for statement_count in 0..statements_per_task {
 				let mut statement = Statement::new();
-				let topic =
-					|idx: usize| blake2_256(format!("{idx}{statement_count}{public:?}").as_bytes());
+				let topic = |idx: usize| -> Topic {
+					blake2_256(format!("{idx}{statement_count}{public:?}").as_bytes()).into()
+				};
 				statement.set_topic(0, topic(0));
 				statement.set_topic(1, topic(1));
 				statement.set_topic(2, topic(2));
@@ -549,9 +550,7 @@ impl Participant {
 				.subscribe::<Bytes>(
 					"statement_subscribeStatement",
 					rpc_params![TopicFilter::MatchAll(
-						vec![topic_public_key().to_vec().into(), topic_idx(*idx).to_vec().into()]
-							.try_into()
-							.expect("Two topics")
+						vec![topic_public_key(), topic_idx(*idx)].try_into().expect("Two topics")
 					)],
 					"statement_unsubscribeStatement",
 				)
@@ -623,12 +622,9 @@ impl Participant {
 				.subscribe::<Bytes>(
 					"statement_subscribeStatement",
 					rpc_params![TopicFilter::MatchAll(
-						vec![
-							topic_message().to_vec().into(),
-							topic_pair(&sender_session_key, &own_session_key).to_vec().into()
-						]
-						.try_into()
-						.expect("Two topics")
+						vec![topic_message(), topic_pair(&sender_session_key, &own_session_key)]
+							.try_into()
+							.expect("Two topics")
 					)],
 					"statement_unsubscribeStatement",
 				)
@@ -705,22 +701,22 @@ impl Participant {
 }
 
 fn topic_public_key() -> Topic {
-	blake2_256(b"public key")
+	blake2_256(b"public key").into()
 }
 
 fn topic_idx(idx: u32) -> Topic {
-	blake2_256(&idx.to_le_bytes())
+	blake2_256(&idx.to_le_bytes()).into()
 }
 
 fn topic_pair(sender: &sr25519::Public, receiver: &sr25519::Public) -> Topic {
 	let mut data = Vec::new();
 	data.extend_from_slice(sender.as_ref());
 	data.extend_from_slice(receiver.as_ref());
-	blake2_256(&data)
+	blake2_256(&data).into()
 }
 
 fn topic_message() -> Topic {
-	blake2_256(b"message")
+	blake2_256(b"message").into()
 }
 
 fn channel_public_key() -> Channel {
@@ -861,13 +857,13 @@ async fn statement_store_latency_bench() -> Result<(), anyhow::Error> {
 							info!("Subscribed {msg_idx} message(s) {topic_str:?}");
 						}
 
-						let topic = blake2_256(topic_str.as_bytes());
+						let topic: Topic = blake2_256(topic_str.as_bytes()).into();
 
 						let subscription = rpc_client
 							.subscribe::<Bytes>(
 								"statement_subscribeStatement",
 								rpc_params![TopicFilter::MatchAll(
-									vec![topic.to_vec().into()].try_into().expect("Single topic")
+									vec![topic].try_into().expect("Single topic")
 								)],
 								"statement_unsubscribeStatement",
 							)
@@ -899,7 +895,7 @@ async fn statement_store_latency_bench() -> Result<(), anyhow::Error> {
 
 							let topic_str =
 								format!("{}-{}-{}-{}", *test_run_id, client_id, round, msg_idx);
-							let topic = blake2_256(topic_str.as_bytes());
+							let topic: Topic = blake2_256(topic_str.as_bytes()).into();
 							let channel = blake2_256(msg_idx.to_le_bytes().as_ref());
 
 							// Use timestamp for priority

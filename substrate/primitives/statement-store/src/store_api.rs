@@ -17,7 +17,7 @@
 
 pub use crate::runtime_api::StatementSource;
 use crate::{Hash, Statement, Topic, MAX_ANY_TOPICS, MAX_TOPICS};
-use sp_core::{bounded_vec::BoundedVec, Bytes, ConstU32};
+use sp_core::{bounded_vec::BoundedVec, ConstU32};
 use std::collections::HashSet;
 
 /// Statement store error.
@@ -44,69 +44,57 @@ pub enum TopicFilter {
 	Any,
 	/// Matches only statements including all of the given topics.
 	/// Bytes are expected to be a 32-byte topic. Up to [`MAX_TOPICS`] topics can be provided.
-	MatchAll(BoundedVec<Bytes, ConstU32<{ MAX_TOPICS as u32 }>>),
+	MatchAll(BoundedVec<Topic, ConstU32<{ MAX_TOPICS as u32 }>>),
 	/// Matches statements including any of the given topics.
 	/// Bytes are expected to be a 32-byte topic. Up to [`MAX_ANY_TOPICS`] topics can be provided.
-	MatchAny(BoundedVec<Bytes, ConstU32<{ MAX_ANY_TOPICS as u32 }>>),
+	MatchAny(BoundedVec<Topic, ConstU32<{ MAX_ANY_TOPICS as u32 }>>),
 }
 
-/// Topic filter for statement subscriptions.
+/// Topic filter for statement subscriptions, optimized for matching.
 #[derive(Clone, Debug)]
-pub enum CheckedTopicFilter {
+pub enum OptimizedTopicFilter {
 	/// Matches all topics.
 	Any,
 	/// Matches only statements including all of the given topics.
-	/// Bytes are expected to be a 32-byte topic. Up to `4` topics can be provided.
+	/// Up to `4` topics can be provided.
 	MatchAll(HashSet<Topic>),
 	/// Matches statements including any of the given topics.
-	/// Bytes are expected to be a 32-byte topic. Up to `128` topics can be provided.
+	/// Up to `128` topics can be provided.
 	MatchAny(HashSet<Topic>),
 }
 
-impl CheckedTopicFilter {
+impl OptimizedTopicFilter {
 	/// Check if the statement matches the filter.
 	pub fn matches(&self, statement: &Statement) -> bool {
 		match self {
-			CheckedTopicFilter::Any => true,
-			CheckedTopicFilter::MatchAll(topics) =>
+			OptimizedTopicFilter::Any => true,
+			OptimizedTopicFilter::MatchAll(topics) =>
 				statement.topics().iter().filter(|topic| topics.contains(*topic)).count() ==
 					topics.len(),
-			CheckedTopicFilter::MatchAny(topics) =>
+			OptimizedTopicFilter::MatchAny(topics) =>
 				statement.topics().iter().any(|topic| topics.contains(topic)),
 		}
 	}
 }
 
-// Convert TopicFilter to CheckedTopicFilter, validating topic lengths.
-impl TryInto<CheckedTopicFilter> for TopicFilter {
-	type Error = Error;
-
-	fn try_into(self) -> Result<CheckedTopicFilter> {
-		match self {
-			TopicFilter::Any => Ok(CheckedTopicFilter::Any),
+// Convert TopicFilter to CheckedTopicFilter.
+impl From<TopicFilter> for OptimizedTopicFilter {
+	fn from(filter: TopicFilter) -> Self {
+		match filter {
+			TopicFilter::Any => OptimizedTopicFilter::Any,
 			TopicFilter::MatchAll(topics) => {
 				let mut parsed_topics = HashSet::with_capacity(topics.len());
 				for topic in topics {
-					if topic.0.len() != 32 {
-						return Err(Error::Decode("Invalid topic format".into()));
-					}
-					let mut arr = [0u8; 32];
-					arr.copy_from_slice(&topic.0);
-					parsed_topics.insert(arr);
+					parsed_topics.insert(topic);
 				}
-				Ok(CheckedTopicFilter::MatchAll(parsed_topics))
+				OptimizedTopicFilter::MatchAll(parsed_topics)
 			},
 			TopicFilter::MatchAny(topics) => {
 				let mut parsed_topics = HashSet::with_capacity(topics.len());
 				for topic in topics {
-					if topic.0.len() != 32 {
-						return Err(Error::Decode("Invalid topic format".into()));
-					}
-					let mut arr = [0u8; 32];
-					arr.copy_from_slice(&topic.0);
-					parsed_topics.insert(arr);
+					parsed_topics.insert(topic);
 				}
-				Ok(CheckedTopicFilter::MatchAny(parsed_topics))
+				OptimizedTopicFilter::MatchAny(parsed_topics)
 			},
 		}
 	}

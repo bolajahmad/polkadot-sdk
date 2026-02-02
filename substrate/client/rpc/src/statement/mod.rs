@@ -27,7 +27,7 @@ use jsonrpsee::{
 /// Re-export the API for backward compatibility.
 pub use sc_rpc_api::statement::{error::Error, StatementApiServer};
 use sp_core::Bytes;
-use sp_statement_store::{StatementSource, SubmitResult, TopicFilter};
+use sp_statement_store::{OptimizedTopicFilter, StatementSource, SubmitResult, TopicFilter};
 use std::sync::Arc;
 const LOG_TARGET: &str = "statement-store-rpc";
 
@@ -80,22 +80,10 @@ impl StatementApiServer for StatementStore {
 		_ext: &Extensions,
 		topic_filter: TopicFilter,
 	) {
-		let checked_topic_filter = match topic_filter.try_into() {
-			Ok(filter) => filter,
-			Err(e) => {
-				spawn_subscription_task(
-					&self.executor,
-					pending.reject(Error::StatementStore(format!(
-						"Error parsing topic filter: {:?}",
-						e
-					))),
-				);
-				return;
-			},
-		};
+		let optimized_topic_filter: OptimizedTopicFilter = topic_filter.into();
 
 		let (existing_statements, subscription_sender, subscription_stream) =
-			match self.store.subscribe_statement(checked_topic_filter) {
+			match self.store.subscribe_statement(optimized_topic_filter) {
 				Ok(res) => res,
 				Err(err) => {
 					spawn_subscription_task(

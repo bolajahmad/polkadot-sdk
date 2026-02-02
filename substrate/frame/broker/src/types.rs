@@ -191,7 +191,7 @@ pub struct PotentialRenewalId {
 /// renewal.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct PotentialRenewalRecord<Balance> {
-	/// The price for which the next renewal can be made.
+	/// The price for which the region was purchased.
 	pub price: Balance,
 	/// The workload which will be scheduled on the Core in the case a renewal is made, or if
 	/// incomplete, then the parts of the core which have been scheduled.

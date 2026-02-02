@@ -57,7 +57,7 @@ pub trait Market<Balance, RelayBlockNumber, AccountId> {
 	/// - `state` - market state, the caller is responsible for storing it
 	fn place_renewal_order(
 		since_timeslice_start: RelayBlockNumber,
-		who: AccountId,
+		who: &AccountId,
 		renewal: PotentialRenewalId,
 		buying_price: Balance,
 	) -> Result<RenewalOrderResult<Balance, Self::BidId>, Self::Error>;
@@ -104,7 +104,7 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 
 	fn place_renewal_order(
 		since_timeslice_start: RelayBlockNumberOf<T>,
-		who: AccountIdFor<T>,
+		who: &AccountIdFor<T>,
 		renewal: PotentialRenewalId,
 		buying_price: BalanceOf<T>,
 	) -> Result<RenewalOrderResult<BalanceOf<T>, Self::BidId>, Self::Error> {

@@ -151,7 +151,7 @@ impl<T: Config> Pallet<T> {
 	) -> Result<RegionId, DispatchError> {
 		let status = Status::<T>::get().ok_or(Error::<T>::Uninitialized)?;
 		let mut sale = SaleInfo::<T>::get().ok_or(Error::<T>::NoSales)?;
-		Self::ensure_cores_for_sale(&status, &sale)?;
+		Self::ensure_cores_for_sale(&status, &sale)?; // TODO: Move it after checking if the market allows to buy?
 
 		let now = RCBlockNumberProviderOf::<T::Coretime>::current_block_number();
 		// TODO: Check if it can be the case.
@@ -196,42 +196,66 @@ impl<T: Config> Pallet<T> {
 		let workload =
 			record.completion.drain_complete().ok_or(Error::<T>::IncompleteAssignment)?;
 
-		let old_core = core;
-
-		let core = Self::purchase_core(&who, record.price, &mut sale)?;
-
-		Self::deposit_event(Event::Renewed {
-			who,
-			old_core,
-			core,
-			price: record.price,
-			begin: sale.region_begin,
-			duration: sale.region_end.saturating_sub(sale.region_begin),
-			workload: workload.clone(),
-		});
-
-		Workplan::<T>::insert((sale.region_begin, core), &workload);
-
-		let begin = sale.region_end;
-		let end_price = sale.end_price;
-		// Renewals should never be priced lower than the current `end_price`:
-		let price_cap = cmp::max(record.price + config.renewal_bump * record.price, end_price);
 		let now = RCBlockNumberProviderOf::<T::Coretime>::current_block_number();
-		let price = Self::sale_price(&sale, now).min(price_cap);
-		log::debug!(
-			"Renew with: sale price: {:?}, price cap: {:?}, old price: {:?}",
-			price,
-			price_cap,
-			record.price
-		);
-		let new_record = PotentialRenewalRecord { price, completion: Complete(workload) };
-		PotentialRenewals::<T>::remove(renewal_id);
-		PotentialRenewals::<T>::insert(PotentialRenewalId { core, when: begin }, &new_record);
-		SaleInfo::<T>::put(&sale);
-		if let Some(workload) = new_record.completion.drain_complete() {
-			log::debug!("Recording renewable price for next run: {:?}", price);
-			Self::deposit_event(Event::Renewable { core, price, begin, workload });
-		}
+		// TODO: Check if it can be the case.
+		ensure!(now > sale.sale_start, Error::<T>::TooEarly);
+		let blocks_since_sale_begin = now.saturating_sub(sale.sale_start);
+
+		let core = match Self::place_renewal_order(
+			blocks_since_sale_begin,
+			&who,
+			renewal_id,
+			record.price,
+		)? {
+			RenewalOrderResult::BidPlaced { id, bid_price } => {
+				0 // TODO: Modify `do_renew` signature to not return `CoreIndex`.
+			},
+			RenewalOrderResult::Sold { price } => {
+				let old_core = core;
+
+				let core = Self::purchase_core(&who, record.price, &mut sale)?;
+
+				Self::deposit_event(Event::Renewed {
+					who,
+					old_core,
+					core,
+					price: record.price,
+					begin: sale.region_begin,
+					duration: sale.region_end.saturating_sub(sale.region_begin),
+					workload: workload.clone(),
+				});
+
+				Workplan::<T>::insert((sale.region_begin, core), &workload);
+
+				let begin = sale.region_end;
+				let end_price = sale.end_price;
+				// Renewals should never be priced lower than the current `end_price`:
+				let price_cap =
+					cmp::max(record.price + config.renewal_bump * record.price, end_price);
+				let now = RCBlockNumberProviderOf::<T::Coretime>::current_block_number();
+				let price = Self::sale_price(&sale, now).min(price_cap);
+				log::debug!(
+					"Renew with: sale price: {:?}, price cap: {:?}, old price: {:?}",
+					price,
+					price_cap,
+					record.price
+				);
+				let new_record = PotentialRenewalRecord { price, completion: Complete(workload) };
+				PotentialRenewals::<T>::remove(renewal_id);
+				PotentialRenewals::<T>::insert(
+					PotentialRenewalId { core, when: begin },
+					&new_record,
+				);
+				SaleInfo::<T>::put(&sale);
+				if let Some(workload) = new_record.completion.drain_complete() {
+					log::debug!("Recording renewable price for next run: {:?}", price);
+					Self::deposit_event(Event::Renewable { core, price, begin, workload });
+				}
+
+				core
+			},
+		};
+
 		Ok(core)
 	}
 

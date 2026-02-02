@@ -110,7 +110,7 @@ pub(crate) fn validate_authorization<T: Config>(
 /// This is exposed for benchmarking purposes.
 pub(crate) fn apply_delegation<T: Config>(authority: &H160, target_address: H160) {
 	if target_address.is_zero() {
-		let _ = AccountInfo::<T>::clear_delegation(authority);
+		AccountInfo::<T>::clear_delegation(authority);
 	} else {
 		if let Err(e) = AccountInfo::<T>::set_delegation(authority, target_address) {
 			log::debug!(target: LOG_TARGET, "Failed to set delegation for {authority:?}: {e:?}");

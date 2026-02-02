@@ -1600,26 +1600,7 @@ impl<T: Config> Pallet<T> {
 
 		Self::ensure_non_contract_if_signed(&origin)?;
 
-		let (eth_gas_limit, weight_limit) = if !authorization_list.is_empty() {
-			let mut meter = frame_support::weights::WeightMeter::with_limit(weight_limit);
-			evm::eip7702::process_authorizations::<T>(
-				&authorization_list,
-				U256::from(T::ChainId::get()),
-				&mut meter,
-			)?;
-
-			let auth_gas = metering::SignedGas::<T>::from_weight_fee(T::FeeInfo::weight_to_fee(
-				&meter.consumed(),
-			))
-			.to_ethereum_gas()
-			.unwrap_or_default();
-
-			(eth_gas_limit.saturating_sub(auth_gas.into()), meter.remaining())
-		} else {
-			(eth_gas_limit, weight_limit)
-		};
-
-		let mut call = Call::<T>::eth_call {
+		let mut call = Call::<T>::eth_call_with_authorization_list {
 			dest,
 			value,
 			weight_limit,
@@ -1628,25 +1609,39 @@ impl<T: Config> Pallet<T> {
 			transaction_encoded: transaction_encoded.clone(),
 			effective_gas_price,
 			encoded_len,
+			authorization_list: authorization_list.clone(),
 		}
 		.into();
 		let info = T::FeeInfo::dispatch_info(&call);
 		let base_info = T::FeeInfo::base_dispatch_info(&mut call);
 		drop(call);
 
+		let extra_weight = base_info.total_weight();
+
+		let limits = TransactionLimits::EthereumGas {
+			eth_gas_limit: eth_gas_limit.saturated_into(),
+			maybe_weight_limit: Some(weight_limit),
+			eth_tx_info: EthTxInfo::new(encoded_len, extra_weight),
+		};
+
+		let mut meter = TransactionMeter::new(limits)?;
+
+		if !authorization_list.is_empty() {
+			evm::eip7702::process_authorizations::<T>(
+				&authorization_list,
+				U256::from(T::ChainId::get()),
+				&mut meter,
+			)?;
+		}
+
 		block_storage::with_ethereum_context::<T>(transaction_encoded, || {
-			let extra_weight = base_info.total_weight();
-			let output = Self::bare_call(
+			let output = Self::bare_call_internal(
 				origin,
 				dest,
 				value,
-				TransactionLimits::EthereumGas {
-					eth_gas_limit: eth_gas_limit.saturated_into(),
-					maybe_weight_limit: Some(weight_limit),
-					eth_tx_info: EthTxInfo::new(encoded_len, extra_weight),
-				},
 				data,
 				ExecConfig::new_eth_tx(effective_gas_price, encoded_len, extra_weight),
+				&mut meter,
 			);
 
 			block_storage::EthereumCallResult::new::<T>(
@@ -1679,6 +1674,21 @@ impl<T: Config> Pallet<T> {
 			Err(error) => return ContractResult { result: Err(error), ..Default::default() },
 		};
 
+		Self::bare_call_internal(origin, dest, evm_value, data, exec_config, &mut transaction_meter)
+	}
+
+	/// Internal implementation of [`Self::bare_call`].
+	///
+	/// Accepts an existing transaction meter, allowing callers to manage meter creation
+	/// and authorization before execution.
+	fn bare_call_internal(
+		origin: OriginFor<T>,
+		dest: H160,
+		evm_value: U256,
+		data: Vec<u8>,
+		exec_config: ExecConfig<T>,
+		transaction_meter: &mut TransactionMeter<T>,
+	) -> ContractResult<ExecReturnValue, BalanceOf<T>> {
 		let mut storage_deposit = Default::default();
 
 		let try_call = || {
@@ -1686,7 +1696,7 @@ impl<T: Config> Pallet<T> {
 			let result = ExecStack::<T, ContractBlob<T>>::run_call(
 				origin.clone(),
 				dest,
-				&mut transaction_meter,
+				transaction_meter,
 				evm_value,
 				data,
 				&exec_config,
@@ -1774,7 +1784,7 @@ impl<T: Config> Pallet<T> {
 					)?;
 					executable
 				},
-				Code::Upload(code) =>
+				Code::Upload(code) => {
 					if T::AllowEVMBytecode::get() {
 						ensure!(data.is_empty(), <Error<T>>::EvmConstructorNonEmptyData);
 						let origin = T::UploadOrigin::ensure_origin(origin)?;
@@ -1782,7 +1792,8 @@ impl<T: Config> Pallet<T> {
 						executable
 					} else {
 						return Err(<Error<T>>::CodeRejected.into());
-					},
+					}
+				},
 				Code::Existing(code_hash) => {
 					let executable = ContractBlob::from_storage(code_hash, &mut transaction_meter)?;
 					ensure!(executable.code_info().is_pvm(), <Error<T>>::EvmConstructedFromHash);
@@ -1929,33 +1940,37 @@ impl<T: Config> Pallet<T> {
 			}
 		};
 
-		// EIP-7702: Process authorizations and adjust gas limit
-		let eth_gas_limit = if !call_info.authorization_list.is_empty() {
-			let mut meter = frame_support::weights::WeightMeter::new();
-			if let Err(e) = evm::eip7702::process_authorizations::<T>(
-				&call_info.authorization_list,
-				U256::from(T::ChainId::get()),
-				&mut meter,
-			) {
-				return Err(EthTransactError::Message(format!(
-					"Authorization processing failed: {e:?}"
-				)));
-			}
-
-			let auth_gas = metering::SignedGas::<T>::from_weight_fee(T::FeeInfo::weight_to_fee(
-				&meter.consumed(),
-			))
-			.to_ethereum_gas()
-			.unwrap_or_default();
-
-			call_info.eth_gas_limit.saturating_sub(auth_gas.into())
-		} else {
-			call_info.eth_gas_limit
-		};
-
+		// Create TransactionLimits with full gas limit
 		let transaction_limits = TransactionLimits::EthereumGas {
 			eth_gas_limit: eth_gas_limit.saturated_into(),
 			weight_limit: Self::evm_max_extrinsic_weight(),
+			eth_tx_info: EthTxInfo::new(call_info.encoded_len, base_weight),
+		};
+
+		// EIP-7702: Process authorizations using TransactionMeter
+		let mut transaction_meter = TransactionMeter::new(transaction_limits.clone())
+			.map_err(|e| EthTransactError::Message(format!("Failed to create meter: {e:?}")))?;
+
+		if !call_info.authorization_list.is_empty() {
+			evm::eip7702::process_authorizations::<T>(
+				&call_info.authorization_list,
+				U256::from(T::ChainId::get()),
+				&mut transaction_meter,
+			)
+			.map_err(|e| {
+				EthTransactError::Message(format!("Authorization processing failed: {e:?}"))
+			})?;
+		}
+
+		// Get remaining gas after authorization processing
+		let eth_gas_limit = transaction_meter.eth_gas_left().ok_or_else(|| {
+			EthTransactError::Message("Out of gas after authorization processing".to_string())
+		})?;
+
+		// Recreate limits with adjusted gas for bare_call
+		let transaction_limits = TransactionLimits::EthereumGas {
+			eth_gas_limit,
+			maybe_weight_limit: None,
 			eth_tx_info: EthTxInfo::new(call_info.encoded_len, base_weight),
 		};
 
@@ -2237,10 +2252,12 @@ impl<T: Config> Pallet<T> {
 	{
 		match tracer_type {
 			TracerType::CallTracer(config) => CallTracer::new(config.unwrap_or_default()).into(),
-			TracerType::PrestateTracer(config) =>
-				PrestateTracer::new(config.unwrap_or_default()).into(),
-			TracerType::ExecutionTracer(config) =>
-				ExecutionTracer::new(config.unwrap_or_default()).into(),
+			TracerType::PrestateTracer(config) => {
+				PrestateTracer::new(config.unwrap_or_default()).into()
+			},
+			TracerType::ExecutionTracer(config) => {
+				ExecutionTracer::new(config.unwrap_or_default()).into()
+			},
 		}
 	}
 
@@ -2629,8 +2646,8 @@ impl<T: Config> Pallet<T> {
 			return Ok(());
 		};
 
-		if exec::is_precompile::<T, ContractBlob<T>>(&address) ||
-			<AccountInfo<T>>::is_contract(&address)
+		if exec::is_precompile::<T, ContractBlob<T>>(&address)
+			|| <AccountInfo<T>>::is_contract(&address)
 		{
 			log::debug!(
 				target: crate::LOG_TARGET,

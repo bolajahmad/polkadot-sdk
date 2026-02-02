@@ -144,9 +144,9 @@ pub mod pallet {
 					);
 				},
 				Err(e) => {
-					log::error!(
-						target: LOG_TARGET,
-						"🚨 Failed to mint ED into DAP satellite: {e:?}"
+					frame_support::defensive!(
+						"Failed to mint ED into DAP satellite: {:?}",
+						e
 					);
 				},
 			}
@@ -412,9 +412,12 @@ pub mod currency {
 			// Credit the satellite account instead of reducing total issuance.
 			let satellite = Pallet::<T>::satellite_account();
 			let _ =
-				T::Currency::increase_balance(&satellite, actual, BestEffort).inspect_err(|_| {
+				T::Currency::increase_balance(&satellite, actual, BestEffort).inspect_err(|e| {
+					// Try to restore balance to source account.
+					let _ = T::Currency::increase_balance(who, actual, BestEffort);
 					frame_support::defensive!(
-						"Failed to credit DAP satellite - Loss of funds due to overflow"
+						"Failed to credit DAP satellite: {:?}",
+						e
 					);
 				});
 

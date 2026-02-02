@@ -132,10 +132,7 @@ pub mod pallet {
 					);
 				},
 				Err(e) => {
-					log::error!(
-						target: LOG_TARGET,
-						"🚨 Failed to mint ED into DAP buffer: {e:?}"
-					);
+					frame_support::defensive!("Failed to mint ED into DAP buffer: {:?}", e);
 				},
 			}
 		}
@@ -338,8 +335,10 @@ pub mod currency {
 
 			// Credit the buffer account instead of reducing total issuance.
 			let buffer = Pallet::<T>::buffer_account();
-			let _ = T::Currency::increase_balance(&buffer, actual, BestEffort).inspect_err(|_| {
-				defensive!("Failed to credit DAP buffer - Loss of funds due to overflow");
+			let _ = T::Currency::increase_balance(&buffer, actual, BestEffort).inspect_err(|e| {
+				// Try to restore balance to source account - should never happen.
+				let _ = T::Currency::increase_balance(who, actual, BestEffort);
+				defensive!("Failed to credit DAP buffer: {:?}", e);
 			});
 
 			// Mark funds as inactive so they don't participate in governance voting.

@@ -83,10 +83,16 @@ pub enum AccountType<T: Config> {
 	EOA,
 
 	/// An account that has delegated its code execution to another address (EIP-7702).
-	/// Contains the target address and optionally ContractInfo if the target is a contract.
+	///
 	/// Per EIP-7702, delegation chains are not followed - if target is itself delegated,
-	/// contract_info is None and no code can be executed.
-	Delegated { target: H160, contract_info: Option<ContractInfo<T>> },
+	/// `contract_info` is `None` and no code will be executed.
+	Delegated {
+		/// The address this account delegates code execution to.
+		target: H160,
+		/// Contract info copied from the target at delegation time.
+		/// `None` if target is not a contract or is itself delegated.
+		contract_info: Option<ContractInfo<T>>,
+	},
 }
 
 /// Information for managing an account and its sub trie abstraction.

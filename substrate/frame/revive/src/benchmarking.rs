@@ -519,6 +519,7 @@ mod benchmarks {
 			TransactionSigned::default().signed_payload(),
 			effective_gas_price,
 			0,
+			Vec::new(),
 		);
 
 		// contract should have received the value

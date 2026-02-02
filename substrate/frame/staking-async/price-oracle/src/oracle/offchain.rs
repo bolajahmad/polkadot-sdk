@@ -63,7 +63,7 @@
 //! response format.
 
 use crate::{ocw_log, oracle};
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_system::{
 	offchain::{SendSignedTransaction, Signer},
@@ -74,9 +74,8 @@ use sp_core::{ConstU32, Get};
 use sp_runtime::{
 	offchain::{http, storage::StorageValueRef, Duration},
 	traits::Zero,
-	BoundedVec, FixedU128,
+	BoundedVec, FixedU128, Percent,
 };
-use alloc::vec;
 
 /// Abstraction type around the functionality of the offchain worker.
 pub struct OracleOffchainWorker<T>(core::marker::PhantomData<T>);
@@ -172,8 +171,28 @@ pub struct Endpoint {
 	pub requires_api_key: bool,
 	/// Which parsing method should be used to extract the price from the response body.
 	pub parsing_method: ParsingMethod,
+	/// Our confidence score in this endpoint.
+	///
+	/// This is left here for future-compatibility, and is not used now.
+	pub confidence: Percent,
 }
 
+/// `Default` implementation for `Endpoint` to be used only for testing setups.
+#[cfg(feature = "std")]
+impl Default for Endpoint {
+	fn default() -> Self {
+		Endpoint {
+			url: Default::default(),
+			method: Default::default(),
+			headers: Default::default(),
+			body: Default::default(),
+			deadline: Default::default(),
+			requires_api_key: Default::default(),
+			parsing_method: Default::default(),
+			confidence: Default::default(),
+		}
+	}
+}
 
 /// Different HTTP methods.
 #[derive(
@@ -244,7 +263,6 @@ pub enum ParsingMethod {
 	/// Response format: `[{"id": "45219", ..., "price_usd": "1.70", ...}]`
 	CoinLoreFree,
 }
-
 
 /// Some data that can be added to the request.
 #[derive(
@@ -385,14 +403,19 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 		let url =
 			core::str::from_utf8(&endpoint.url).map_err(|_| OffchainError::InvalidEndpoint)?;
 
-		ocw_log!(debug, "fetch_endpoint: url={:?}, method={:?}, timeout={}ms", url, endpoint.method, timeout_ms);
+		ocw_log!(
+			debug,
+			"fetch_endpoint: url={:?}, method={:?}, timeout={}ms",
+			url,
+			endpoint.method,
+			timeout_ms
+		);
 
 		// Resolve body data.
 		let body_bytes = resolve_data(&endpoint.body)?;
 
 		// Start building the request.
-		let mut request =
-			http::Request::new(url).method(endpoint.method.into()).deadline(deadline);
+		let mut request = http::Request::new(url).method(endpoint.method.into()).deadline(deadline);
 
 		// Add headers, resolving any offchain database references.
 		for Header { name, value } in endpoint.headers.iter() {
@@ -634,27 +657,14 @@ mod unit_tests {
 	fn validate_endpoint_accepts_valid_endpoint() {
 		let endpoint = Endpoint {
 			url: b"https://api.example.com/price".to_vec().try_into().unwrap(),
-			method: Method::Get,
-			headers: Default::default(),
-			body: RequestData::default(),
-			deadline: None,
-			requires_api_key: false,
-			parsing_method: ParsingMethod::CryptoCompareFree,
+			..Default::default()
 		};
 		assert!(Worker::validate_endpoint(&endpoint).is_ok());
 	}
 
 	#[test]
 	fn validate_endpoint_rejects_invalid_utf8_url() {
-		let endpoint = Endpoint {
-			url: vec![0xff, 0xfe].try_into().unwrap(),
-			method: Method::Get,
-			headers: Default::default(),
-			body: RequestData::default(),
-			deadline: None,
-			requires_api_key: false,
-			parsing_method: ParsingMethod::CryptoCompareFree,
-		};
+		let endpoint = Endpoint { url: vec![0xff, 0xfe].try_into().unwrap(), ..Default::default() };
 		assert!(Worker::validate_endpoint(&endpoint).is_err());
 	}
 
@@ -663,47 +673,36 @@ mod unit_tests {
 		// requires_api_key=true but no OffchainDatabase reference -> should fail.
 		let endpoint = Endpoint {
 			url: b"https://api.example.com/price".to_vec().try_into().unwrap(),
-			method: Method::Get,
+			requires_api_key: true,
 			headers: Default::default(),
 			body: RequestData::Raw(Default::default()),
-			deadline: None,
-			requires_api_key: true,
-			parsing_method: ParsingMethod::CryptoCompareFree,
+			..Default::default()
 		};
 		assert!(Worker::validate_endpoint(&endpoint).is_err());
 
 		// requires_api_key=true with OffchainDatabase in body -> should pass.
 		let endpoint = Endpoint {
 			url: b"https://api.example.com/price".to_vec().try_into().unwrap(),
-			method: Method::Get,
-			headers: Default::default(),
-			body: RequestData::OffchainDatabase(b"api_key".to_vec().try_into().unwrap()),
-			deadline: None,
 			requires_api_key: true,
-			parsing_method: ParsingMethod::CryptoCompareFree,
+			body: RequestData::OffchainDatabase(b"api_key".to_vec().try_into().unwrap()),
+			..Default::default()
 		};
 		assert!(Worker::validate_endpoint(&endpoint).is_ok());
 
 		// requires_api_key=true with OffchainDatabase in header -> should pass.
 		let endpoint = Endpoint {
 			url: b"https://api.example.com/price".to_vec().try_into().unwrap(),
-			method: Method::Get,
 			headers: vec![Header {
 				name: b"Authorization".to_vec().try_into().unwrap(),
 				value: RequestData::OffchainDatabase(b"api_key".to_vec().try_into().unwrap()),
 			}]
 			.try_into()
 			.unwrap(),
-			body: RequestData::default(),
-			deadline: None,
-			requires_api_key: true,
-			parsing_method: ParsingMethod::CryptoCompareFree,
+			..Default::default()
 		};
 		assert!(Worker::validate_endpoint(&endpoint).is_ok());
 	}
 }
 
 #[cfg(test)]
-mod ocw_with_localhost_tests {
-
-}
+mod ocw_with_localhost_tests {}

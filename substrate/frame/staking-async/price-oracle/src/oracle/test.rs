@@ -30,13 +30,8 @@ mod setup {
 			assert_eq!(System::block_number(), 7);
 			assert_eq!(StorageManager::<T>::tracked_assets(), vec![1]);
 			assert_eq!(
-				oracle::Authorities::<T>::get(),
-				vec![
-					(1, Percent::from_percent(100)),
-					(2, Percent::from_percent(100)),
-					(3, Percent::from_percent(100)),
-					(4, Percent::from_percent(100)),
-				]
+				oracle::Authorities::<T>::get().keys().cloned().collect::<Vec<_>>(),
+				vec![1, 2, 3, 4,]
 			);
 		})
 	}

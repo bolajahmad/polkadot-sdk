@@ -21,7 +21,8 @@ Next:
 
 V0: next week
 
-- [ ] Add confidence to the endpoint, last over-engineering!
+- [x] Add confidence to the endpoint, last over-engineering!
+- [x] Authorities should be stored in BTree for easy retreival
 - Tests for OCW struct actually running:
 	- [ ] local http server running, recoding incoming requests.
 	- [ ] test all sorts of endpoint params: body, header, method,
@@ -47,9 +48,6 @@ V1:
 
  */
 
-
-
-
 pub mod offchain;
 pub mod weights;
 
@@ -73,7 +71,7 @@ pub mod pallet {
 	use frame_support::{
 		dispatch::DispatchResult,
 		pallet_prelude::*,
-		traits::{Defensive, DefensiveTruncateInto, OneSessionHandler, Time},
+		traits::{Defensive, OneSessionHandler, Time},
 		Parameter,
 	};
 	use frame_system::{
@@ -250,18 +248,17 @@ pub mod pallet {
 	/// Stored value is `(who, confidence)`.
 	#[pallet::storage]
 	pub type Authorities<T: Config> =
-		StorageValue<_, BoundedVec<(T::AccountId, Percent), T::MaxAuthorities>, ValueQuery>;
+		StorageValue<_, BoundedBTreeMap<T::AccountId, Percent, T::MaxAuthorities>, ValueQuery>;
 
 	/// Wrapper struct managing the price-related storage items in this pallet.
 	pub(crate) struct StorageManager<T: Config>(core::marker::PhantomData<T>);
 
 	impl<T: Config> StorageManager<T> {
-
 		/// All of the assets that we are tracking and their list of feeds.
 		pub(crate) fn tracked_assets_with_endpoints() -> Vec<(T::AssetId, Vec<Endpoint>)> {
 			Endpoints::<T>::iter()
-			.map(|(asset_id, endpoints)| (asset_id, endpoints.into_inner()))
-			.collect()
+				.map(|(asset_id, endpoints)| (asset_id, endpoints.into_inner()))
+				.collect()
 		}
 
 		/// All of the assets that we are tracking.
@@ -276,7 +273,9 @@ pub mod pallet {
 		) -> DispatchResult {
 			ensure!(!Self::is_tracked(asset_id), Error::<T>::AssetAlreadyTracked);
 			ensure!(
-				endpoints.iter().all(|e| offchain::OracleOffchainWorker::<T>::validate_endpoint(e).is_ok()),
+				endpoints
+					.iter()
+					.all(|e| offchain::OracleOffchainWorker::<T>::validate_endpoint(e).is_ok()),
 				Error::<T>::InvalidEndpoint
 			);
 			Endpoints::<T>::insert(asset_id, endpoints);
@@ -664,9 +663,13 @@ pub mod pallet {
 					.expect("failed to register genesis asset");
 			}
 			if let Some(authorities) = &self.maybe_authorities {
-				let bounded_authorities =
-					BoundedVec::<_, T::MaxAuthorities>::try_from(authorities.clone())
-						.expect("genesis authorities should fit");
+				let bounded_authorities = BoundedBTreeMap::<_, _, T::MaxAuthorities>::try_from(
+					authorities
+						.into_iter()
+						.cloned()
+						.collect::<alloc::collections::BTreeMap<_, _>>(),
+				)
+				.expect("genesis authorities should fit");
 				Authorities::<T>::put(bounded_authorities);
 			}
 		}
@@ -711,8 +714,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin).and_then(|who| {
 				Authorities::<T>::get()
-					.into_iter()
-					.find_map(|(a, _c)| if a == who { Some(a) } else { None })
+					.contains_key(&who)
+					.then_some(who)
 					.ok_or(sp_runtime::traits::BadOrigin)
 			})?;
 
@@ -898,9 +901,12 @@ pub mod pallet {
 		where
 			I: Iterator<Item = (&'a T::AccountId, T::AuthorityId)>,
 		{
-			let authorities =
-				validators.map(|(who, _keys)| (who.clone(), Percent::one())).collect::<Vec<_>>();
-			let bounded: BoundedVec<_, _> = authorities.defensive_truncate_into();
+			let mut bounded = BoundedBTreeMap::<_, _, T::MaxAuthorities>::new();
+			validators.for_each(|(who, _keys)| {
+				let _ = bounded
+					.try_insert(who.clone(), One::one())
+					.defensive_proof("genesis authorities exceeded max authorities");
+			});
 			Authorities::<T>::put(bounded);
 		}
 
@@ -909,11 +915,13 @@ pub mod pallet {
 			I: Iterator<Item = (&'a T::AccountId, T::AuthorityId)>,
 		{
 			if changed {
-				let authorities = validators
-					.map(|(who, _keys)| (who.clone(), Percent::one()))
-					.collect::<Vec<_>>();
-				let count = authorities.len() as u32;
-				let bounded: BoundedVec<_, _> = authorities.defensive_truncate_into();
+				let mut bounded = BoundedBTreeMap::<_, _, T::MaxAuthorities>::new();
+				validators.for_each(|(who, _keys)| {
+					let _ = bounded
+						.try_insert(who.clone(), One::one())
+						.defensive_proof("new session authorities exceeded max authorities");
+				});
+				let count = bounded.len() as u32;
 				Authorities::<T>::put(bounded);
 				Self::deposit_event(Event::<T>::NewValidatorsAnnounced { count });
 			}

@@ -5,6 +5,7 @@ use crate::{
 use alloc::{string::ToString, vec, vec::Vec};
 use cumulus_primitives_core::ParaId;
 use frame_support::build_struct_json_patch;
+use pallet_staking_async_price_oracle::oracle::offchain::{Endpoint, Method, ParsingMethod};
 use parachains_common::AuraId;
 use polkadot_sdk::{
 	sp_runtime::{BoundedVec, FixedU128},
@@ -13,7 +14,7 @@ use polkadot_sdk::{
 use serde_json::Value;
 use sp_genesis_builder::PresetId;
 use sp_keyring::Sr25519Keyring;
-use pallet_staking_async_price_oracle::oracle::offchain::{Method, ParsingMethod, Endpoint};
+use sp_runtime::traits::One;
 
 /// The default XCM version to set in genesis config.
 const SAFE_XCM_VERSION: u32 = xcm::prelude::XCM_VERSION;
@@ -73,6 +74,7 @@ fn testnet_genesis(
 							.into_bytes()
 							.try_into()
 							.unwrap(),
+						confidence: One::one(),
 					},
 					Endpoint {
 						body: Default::default(),
@@ -86,6 +88,7 @@ fn testnet_genesis(
 							.into_bytes()
 							.try_into()
 							.unwrap(),
+						confidence: One::one(),
 					},
 					Endpoint {
 						body: Default::default(),
@@ -99,10 +102,10 @@ fn testnet_genesis(
 							.into_bytes()
 							.try_into()
 							.unwrap(),
+						confidence: One::one(),
 					}
-					],
-				)
-			],
+				],
+			)],
 		}
 	})
 }

@@ -274,8 +274,9 @@ impl ExtBuilder {
 	fn build(self) -> sp_io::TestExternalities {
 		let default_endpoint = Endpoint {
 			body: Default::default(),
-			deadline: None,
 			headers: Default::default(),
+			deadline: None,
+			confidence: Default::default(),
 			method: Method::Get,
 			parsing_method: ParsingMethod::CryptoCompareFree,
 			requires_api_key: false,

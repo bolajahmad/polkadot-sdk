@@ -115,7 +115,6 @@ fn whitelisted_pallet_account<T: Config>() -> T::AccountId {
 		<T as frame_system::Config>::Hash: frame_support::traits::IsType<H256>,
 		OriginFor<T>: From<Origin<T>>,
 )]
-#[benchmarks(where T: Config)]
 mod benchmarks {
 	use super::*;
 

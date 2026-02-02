@@ -109,11 +109,11 @@ impl StatementApiServer for StatementStore {
 				},
 			};
 
-		spawn_subscription_task(&self.executor, async {
+		spawn_subscription_task(
+			&self.executor,
 			PendingSubscription::from(pending)
-				.pipe_from_stream(subscription_stream, BoundedVecDeque::new(128))
-				.await;
-		});
+				.pipe_from_stream(subscription_stream, BoundedVecDeque::new(128)),
+		);
 
 		// Send existing statements before returning, to make sure we did not miss any statements.
 		self.executor.spawn(

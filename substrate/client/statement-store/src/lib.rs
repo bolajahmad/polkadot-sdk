@@ -53,7 +53,7 @@ mod subscription;
 use crate::subscription::{SubscriptionStatementsStream, SubscriptionsHandle};
 use futures::FutureExt;
 use metrics::MetricsLink as PrometheusMetrics;
-use parking_lot::RwLock;
+use parking_lot::{lock_api::RwLockUpgradableReadGuard, RwLock};
 use prometheus_endpoint::Registry as PrometheusRegistry;
 use sc_keystore::LocalKeystore;
 use sp_api::ProvideRuntimeApi;
@@ -73,7 +73,7 @@ pub use sp_statement_store::{Error, StatementStore, MAX_TOPICS};
 use std::{
 	collections::{BTreeMap, HashMap, HashSet},
 	sync::Arc,
-	time::Instant,
+	time::{Duration, Instant},
 };
 pub use subscription::StatementStoreSubscriptionApi;
 
@@ -95,11 +95,11 @@ pub const MAX_STATEMENT_SIZE: usize =
 	sc_network_statement::config::MAX_STATEMENT_NOTIFICATION_SIZE as usize - 1;
 
 /// Maximum number of statements to expire in a single iteration.
-const MAX_EXPIRY_STATEMENTS_PER_ITERATION: usize = 1_000;
+const MAX_EXPIRY_STATEMENTS_PER_ITERATION: usize = 10_000;
 /// Maximum number of accounts to check for expiry in a single iteration.
 const MAX_EXPIRY_ACCOUNTS_PER_ITERATION: usize = 10_000;
 /// Maximum time in milliseconds to spend checking for expiry in a single iteration.
-const MAX_EXPIRY_TIME_MS_PER_ITERATION: u128 = 100;
+const MAX_EXPIRY_TIME_PER_ITERATION: Duration = Duration::from_millis(100);
 
 /// Number of subscription filter worker tasks.
 const NUM_FILTER_WORKERS: usize = 1;
@@ -312,17 +312,15 @@ impl Index {
 		match_any_topics: impl ExactSizeIterator<Item = &'a Topic>,
 		mut f: impl FnMut(&Hash) -> Result<()>,
 	) -> Result<()> {
-		let key_set = self.by_dec_key.get(&key);
-		if key_set.map_or(0, |s| s.len()) == 0 {
-			// Key does not exist in the index.
-			return Ok(())
-		}
+		let Some(key_set) = self.by_dec_key.get(&key).filter(|k| !k.is_empty()) else {
+			return Ok(());
+		};
 
 		for t in match_any_topics {
 			let set = self.by_topic.get(t);
 
 			for item in set.iter().flat_map(|set| set.iter()) {
-				if key_set.map_or(false, |s| s.contains(item)) {
+				if key_set.contains(item) {
 					log::trace!(
 						target: LOG_TARGET,
 						"Iterating by topic/key: statement {:?}",
@@ -341,7 +339,7 @@ impl Index {
 		mut f: impl FnMut(&Hash) -> Result<()>,
 	) -> Result<()> {
 		let key_set = self.by_dec_key.get(&key);
-		if key_set.map_or(0, |s| s.len()) == 0 {
+		if key_set.map_or(true, |s| s.is_empty()) {
 			// Key does not exist in the index.
 			return Ok(())
 		}
@@ -365,7 +363,7 @@ impl Index {
 			return Ok(())
 		}
 		let key_set = self.by_dec_key.get(&key);
-		if key_set.map_or(0, |s| s.len()) == 0 {
+		if key_set.map_or(true, |s| s.is_empty()) {
 			// Key does not exist in the index.
 			return Ok(())
 		}
@@ -808,11 +806,10 @@ impl Store {
 		let current_time = self.timestamp();
 
 		let (needs_expiry, num_accounts_checked) = {
-			let index = self.index.read();
+			let index = self.index.upgradable_read();
 			if index.accounts_to_check_for_expiry_stmts.is_empty() {
 				let existing_accounts = index.accounts.keys().cloned().collect::<Vec<_>>();
-				drop(index);
-				let mut index = self.index.write();
+				let mut index = RwLockUpgradableReadGuard::upgrade(index);
 				index.accounts_to_check_for_expiry_stmts = existing_accounts;
 				return
 			}
@@ -821,9 +818,9 @@ impl Store {
 			let mut num_accounts_checked = 0;
 			let start = Instant::now();
 
-			for accounts in index.accounts_to_check_for_expiry_stmts.iter().rev() {
+			for account in index.accounts_to_check_for_expiry_stmts.iter().rev() {
 				num_accounts_checked += 1;
-				if let Some(account_rec) = index.accounts.get(accounts) {
+				if let Some(account_rec) = index.accounts.get(account) {
 					needs_expiry.extend(
 						account_rec
 							.by_priority
@@ -840,7 +837,7 @@ impl Store {
 
 				if needs_expiry.len() >= MAX_EXPIRY_STATEMENTS_PER_ITERATION ||
 					num_accounts_checked >= MAX_EXPIRY_ACCOUNTS_PER_ITERATION ||
-					start.elapsed().as_millis() >= MAX_EXPIRY_TIME_MS_PER_ITERATION
+					start.elapsed() >= MAX_EXPIRY_TIME_PER_ITERATION
 				{
 					break
 				}

@@ -89,7 +89,7 @@ impl SubscriptionsHandle {
 	) -> SubscriptionsHandle {
 		let mut subscriptions_matchers_senders = Vec::with_capacity(num_matcher_workers);
 
-		for _ in 0..num_matcher_workers {
+		for task in 0..num_matcher_workers {
 			let (subscription_matcher_sender, subscription_matcher_receiver) =
 				async_channel::bounded(MATCHERS_TASK_CHANNEL_BUFFER_SIZE);
 			subscriptions_matchers_senders.push(subscription_matcher_sender);
@@ -100,7 +100,7 @@ impl SubscriptionsHandle {
 					let mut subscriptions = SubscriptionsInfo::new();
 					log::debug!(
 						target: LOG_TARGET,
-						"Started statement subscription matcher task"
+						"Started statement subscription matcher task: {task}"
 					);
 					loop {
 						let res = subscription_matcher_receiver.recv().await;
@@ -118,7 +118,7 @@ impl SubscriptionsHandle {
 								// Expected when the subscription manager is dropped at shutdown.
 								log::error!(
 									target: LOG_TARGET,
-									"Statement subscription matcher channel closed"
+									"Statement subscription matcher channel closed: {task}"
 								);
 								break
 							},
@@ -216,8 +216,7 @@ impl SubscriptionsInfo {
 			.insert(subscription_info.seq_id, subscription_info.topic_filter.clone());
 		match &subscription_info.topic_filter {
 			CheckedTopicFilter::Any => {
-				self.subscriptions_any
-					.insert(subscription_info.seq_id, subscription_info.clone());
+				self.subscriptions_any.insert(subscription_info.seq_id, subscription_info);
 			},
 			CheckedTopicFilter::MatchAll(topics) =>
 				for topic in topics {
@@ -455,6 +454,7 @@ impl Stream for SubscriptionStatementsStream {
 		self.rx.poll_next_unpin(cx)
 	}
 }
+
 #[cfg(test)]
 mod tests {
 

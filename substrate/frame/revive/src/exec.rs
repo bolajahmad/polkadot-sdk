@@ -1074,7 +1074,7 @@ where
 							if let Some(info) = AccountInfo::<T>::load_contract(&address) {
 								CachedContract::Cached(info)
 							} else {
-								CachedContract::None
+								return Ok(None);
 							}
 						},
 						(None, Some(precompile)) if precompile.has_contract_info() => {
@@ -2258,7 +2258,6 @@ where
 			return code.len() as u64;
 		}
 
-		// load_contract follows EIP-7702 delegation (one level)
 		<AccountInfo<T>>::load_contract(&address)
 			.and_then(|contract| CodeInfoOf::<T>::get(contract.code_hash))
 			.map(|info| info.code_len())

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770148212056,
+  "lastUpdate": 1770160249399,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -22980,6 +22980,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.006452643749999995,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "60601340+lexnv@users.noreply.github.com",
+            "name": "Alexandru Vasile",
+            "username": "lexnv"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "4535807e489a0e71e15e420729ee2d09efa32195",
+          "message": "auth-discovery: Ensure DHT published addresses have ports (#10954)\n\nWe have seen instances in production where validators will propagate\nmultiaddresses without ports.\nThese addresses are effectively unreachable from the networking layer\nperspective.\nThey might be discovered via:\n- identify protocol\n- or simply a wrongly configured CLI for public addresses\n\nTo close the gap on this issue, this PR checks that the published\naddresses will always contain a port.\n\nCloses:\n- https://github.com/paritytech/polkadot-sdk/issues/10466\n\nPart of:\n- https://github.com/paritytech/polkadot-sdk/issues/10425\n\n---------\n\nSigned-off-by: Alexandru Vasile <alexandru.vasile@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-03T21:52:12Z",
+          "tree_id": "4ea966b3227373ed5ba3c795f900f32ecaecde86",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/4535807e489a0e71e15e420729ee2d09efa32195"
+        },
+        "date": 1770160225380,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009247093649999991,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0026783126100000006,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006672917660000004,
             "unit": "seconds"
           }
         ]

@@ -159,6 +159,8 @@ impl<T: Config> Pallet<T> {
 		let blocks_since_sale_begin = now.saturating_sub(sale.sale_start);
 		match Self::place_order(blocks_since_sale_begin, &who, price_limit)? {
 			OrderResult::BidPlaced { id, bid_price } => {
+				Self::charge(&who, bid_price)?;
+
 				Self::deposit_event(Event::BidPlaced { bid_id: id, price: bid_price });
 			},
 			OrderResult::Sold { price } => {
@@ -200,6 +202,8 @@ impl<T: Config> Pallet<T> {
 
 		match Self::place_renewal_order(blocks_since_sale_begin, &who, renewal_id, record.price)? {
 			RenewalOrderResult::BidPlaced { id, bid_price } => {
+				Self::charge(&who, bid_price)?;
+
 				Self::deposit_event(Event::BidPlaced { bid_id: id, price: bid_price });
 			},
 			RenewalOrderResult::Sold { price } => {

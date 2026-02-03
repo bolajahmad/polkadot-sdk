@@ -98,6 +98,12 @@ struct Metrics {
 	propagated_statements_chunks: Histogram,
 	pending_statements: Gauge<U64>,
 	ignored_statements: Counter<U64>,
+	peers_connected: Gauge<U64>,
+	statements_received: Counter<U64>,
+	duplicate_statements_received: Counter<U64>,
+	bytes_sent_total: Counter<U64>,
+	bytes_received_total: Counter<U64>,
+	send_latency_seconds: Histogram,
 }
 
 impl Metrics {
@@ -144,6 +150,52 @@ impl Metrics {
 				Counter::new(
 					"substrate_sync_ignored_statements",
 					"Number of statements ignored due to exceeding MAX_PENDING_STATEMENTS limit",
+				)?,
+				r,
+			)?,
+			peers_connected: register(
+				Gauge::new(
+					"substrate_sync_statement_peers_connected",
+					"Number of peers connected using the statement protocol",
+				)?,
+				r,
+			)?,
+			statements_received: register(
+				Counter::new(
+					"substrate_sync_statements_received",
+					"Total number of statements received from peers",
+				)?,
+				r,
+			)?,
+			duplicate_statements_received: register(
+				Counter::new(
+					"substrate_sync_duplicate_statements_received",
+					"Number of duplicate statements received from the same peer",
+				)?,
+				r,
+			)?,
+			bytes_sent_total: register(
+				Counter::new(
+					"substrate_sync_statement_bytes_sent_total",
+					"Total bytes sent for statement protocol messages",
+				)?,
+				r,
+			)?,
+			bytes_received_total: register(
+				Counter::new(
+					"substrate_sync_statement_bytes_received_total",
+					"Total bytes received for statement protocol messages",
+				)?,
+				r,
+			)?,
+			send_latency_seconds: register(
+				Histogram::with_opts(
+					HistogramOpts::new(
+						"substrate_sync_statement_send_latency_seconds",
+						"Time to send statement messages to peers",
+					)
+					// Buckets from 1ms to ~10s: 0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
+					.buckets(vec![0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]),
 				)?,
 				r,
 			)?,
@@ -503,19 +555,28 @@ where
 			ChunkResult::Send(0) => SendChunkResult::Empty,
 			ChunkResult::Send(chunk_end) => {
 				let chunk = &statements[..chunk_end];
-				if let Err(e) = timeout(
+				let encoded = chunk.encode();
+				let bytes_to_send = encoded.len() as u64;
+
+				let start = std::time::Instant::now();
+				let send_result = timeout(
 					SEND_TIMEOUT,
-					self.notification_service.send_async_notification(peer, chunk.encode()),
+					self.notification_service.send_async_notification(peer, encoded),
 				)
-				.await
-				{
+				.await;
+				let elapsed = start.elapsed();
+
+				if let Err(e) = send_result {
 					log::debug!(target: LOG_TARGET, "Failed to send notification to {peer}: {e:?}");
 					return SendChunkResult::Failed;
 				}
+
 				log::trace!(target: LOG_TARGET, "Sent {} statements to {}", chunk.len(), peer);
 				self.metrics.as_ref().map(|metrics| {
 					metrics.propagated_statements.inc_by(chunk.len() as u64);
 					metrics.propagated_statements_chunks.observe(chunk.len() as f64);
+					metrics.bytes_sent_total.inc_by(bytes_to_send);
+					metrics.send_latency_seconds.observe(elapsed.as_secs_f64());
 				});
 				SendChunkResult::Sent(chunk_end)
 			},
@@ -581,6 +642,10 @@ where
 				);
 				debug_assert!(_was_in.is_none());
 
+				self.metrics.as_ref().map(|metrics| {
+					metrics.peers_connected.set(self.peers.len() as u64);
+				});
+
 				if !self.sync.is_major_syncing() && !role.is_light() {
 					let hashes = self.statement_store.statement_hashes();
 					if !hashes.is_empty() {
@@ -594,8 +659,16 @@ where
 				debug_assert!(_peer.is_some());
 				self.pending_initial_syncs.remove(&peer);
 				self.initial_sync_peer_queue.retain(|p| *p != peer);
+				self.metrics.as_ref().map(|metrics| {
+					metrics.peers_connected.set(self.peers.len() as u64);
+				});
 			},
 			NotificationEvent::NotificationReceived { peer, notification } => {
+				let bytes_received = notification.len() as u64;
+				self.metrics.as_ref().map(|metrics| {
+					metrics.bytes_received_total.inc_by(bytes_received);
+				});
+
 				// Accept statements only when node is not major syncing
 				if self.sync.is_major_syncing() {
 					log::trace!(
@@ -618,6 +691,11 @@ where
 	#[cfg_attr(not(any(test, feature = "test-helpers")), doc(hidden))]
 	pub fn on_statements(&mut self, who: PeerId, statements: Statements) {
 		log::trace!(target: LOG_TARGET, "Received {} statements from {}", statements.len(), who);
+
+		self.metrics.as_ref().map(|metrics| {
+			metrics.statements_received.inc_by(statements.len() as u64);
+		});
+
 		if let Some(ref mut peer) = self.peers.get_mut(&who) {
 			let mut statements_left = statements.len() as u64;
 			for s in statements {
@@ -648,6 +726,9 @@ where
 								target: LOG_TARGET,
 								"Already received the statement from the same peer {who}.",
 							);
+							self.metrics.as_ref().map(|metrics| {
+								metrics.duplicate_statements_received.inc();
+							});
 							self.network.report_peer(who, rep::DUPLICATE_STATEMENT);
 						}
 					}

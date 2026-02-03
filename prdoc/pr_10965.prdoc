@@ -2,10 +2,7 @@ title: 'fatxpool: Do not remove listener for finalized view'
 doc:
 - audience: Node Dev
   description: |-
-    Instead of immediately removing the listener for finalized view, lets keep them around while the view is still in the `active_views`. Once the next block is finalized, we will remove it. This should fix manual-seal problems where new blocks are immeditaly finalized.
-
-
-    fixes #10332
+    The transaction pool is now able to handle events for active but finalized views. This improves transaction handling for manual-seal nodes which immediately finalize.
 crates:
 - name: sc-transaction-pool
   bump: patch

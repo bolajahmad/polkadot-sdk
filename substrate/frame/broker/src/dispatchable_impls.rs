@@ -157,7 +157,7 @@ impl<T: Config> Pallet<T> {
 		// TODO: Check if it can be the case.
 		ensure!(now > sale.sale_start, Error::<T>::TooEarly);
 		let blocks_since_sale_begin = now.saturating_sub(sale.sale_start);
-		match Self::place_order(blocks_since_sale_begin, &who, Some(price_limit))? {
+		match Self::place_order(blocks_since_sale_begin, &who, price_limit)? {
 			OrderResult::BidPlaced { id, bid_price } => {
 				Self::deposit_event(Event::BidPlaced { bid_id: id, price: bid_price });
 			},

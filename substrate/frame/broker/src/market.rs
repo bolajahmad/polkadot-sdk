@@ -39,14 +39,11 @@ pub trait Market<Balance, RelayBlockNumber, AccountId> {
 	/// This method may or may not create a bid, according to the market rules.
 	///
 	/// - `since_timeslice_start` - amount of blocks passed since the current timeslice start
-	/// - `price` - maximum price which the buyer is willing to pay (or None if it's defined by the
-	///   market itself)
-	/// - `state` - market state, the caller is responsible for storing it
+	/// - `price_limit` - maximum price which the buyer is willing to pay
 	fn place_order(
 		since_timeslice_start: RelayBlockNumber,
 		who: &AccountId,
-		// TODO: Don't we want to specify the price every time?
-		price: Option<Balance>,
+		price_limit: Balance,
 	) -> Result<OrderResult<Balance, Self::BidId>, Self::Error>;
 
 	/// Place an order for bulk coretime renewal.
@@ -55,7 +52,6 @@ pub trait Market<Balance, RelayBlockNumber, AccountId> {
 	///
 	/// - `since_timeslice_start` - amount of blocks passed since the current timeslice start
 	/// - `buying_price` - price which was paid for this region the last time it was sold
-	/// - `state` - market state, the caller is responsible for storing it
 	fn place_renewal_order(
 		since_timeslice_start: RelayBlockNumber,
 		who: &AccountId,
@@ -111,8 +107,8 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 
 	fn place_order(
 		since_timeslice_start: RelayBlockNumberOf<T>,
-		who: &AccountIdFor<T>,
-		price: Option<BalanceOf<T>>,
+		_who: &AccountIdFor<T>,
+		price_limit: BalanceOf<T>,
 	) -> Result<OrderResult<BalanceOf<T>, Self::BidId>, Self::Error> {
 		// TODO: Store this info in the dedicated storage item?
 		let sale = SaleInfo::<T>::get().ok_or(MarketError::NoSales)?;
@@ -121,13 +117,11 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 		let through = FixedU64::from_rational(num, sale.leadin_length.saturated_into());
 		let sell_price = leadin_factor_at(through).saturating_mul_int(sale.end_price);
 
-		if let Some(price_limit) = price {
-			if price_limit < sell_price {
-				return Err(MarketError::Overpriced);
-			}
+		if price_limit < sell_price {
+			Err(MarketError::Overpriced)
+		} else {
+			Ok(OrderResult::Sold { price: sell_price })
 		}
-
-		Ok(OrderResult::Sold { price: sell_price })
 	}
 
 	fn place_renewal_order(

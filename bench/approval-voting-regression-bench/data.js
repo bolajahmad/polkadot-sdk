@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769813841841,
+  "lastUpdate": 1770148145469,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "olivarra1@gmail.com",
-            "name": "Victor Oliva",
-            "username": "voliva"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "4a869b92b7d7397bfbb30bcafce103461714ec08",
-          "message": "feat(revive): add contract instantiated event (#8789)\n\n# Description\n\nThis PR adds the `Instantiated` event for pallet-revive for the top\nframe. Addresses issue #8677\n\nThis might need refreshing the weights of bot `instantiate` and\n`instantiate_with_code`, as it emits a new event.\n\n## Integration\n\nNo additional work is needed to integrate this feature. The pallet will\nemit on `Instantiated` event every time `instantiate` or\n`instantiate_with_code` successfully performs an instantiation.\n\n# Checklist\n\n* [x] My PR includes a detailed description as outlined in the\n\"Description\" and its two subsections above.\n* [x] My PR follows the [labeling requirements](\n\nhttps://github.com/paritytech/polkadot-sdk/blob/master/docs/contributor/CONTRIBUTING.md#Process\n) of this project (at minimum one label for `T` required)\n* External contributors: ask maintainers to put the right label on your\nPR.\n* [x] I have made corresponding changes to the documentation (if\napplicable)\n* [x] I have added tests that prove my fix is effective or that my\nfeature works (if applicable)\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Alexander Theißen <alex.theissen@me.com>",
-          "timestamp": "2025-06-25T16:38:35Z",
-          "tree_id": "0f3c48d1688322d218ac8af508e54aa115e30aa3",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/4a869b92b7d7397bfbb30bcafce103461714ec08"
-        },
-        "date": 1750873656406,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 52943.90000000001,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 63627.869999999995,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.339752687082315,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.00001882658,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.856170518720017,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.3742261298700003,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005755715650000005,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.00001882658,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.3616386736599986,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.3930404013699986,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.47348939185002914,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.363981555120002,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.8840386511999885,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.00001909361,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.00001909361,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting",
             "value": 0.00002126756,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a78b18a5cc547141bfd5c10eb17593239e1e2509",
+          "message": "benchmarking: fix DB read/write counts (#10947)\n\nPR #10802 added `reset_read_write_count()` at the end of commit_db() to\nprevent warmup operations from appearing in benchmarking results.\nHowever, commit_db is called twice: one on `on_before_start()` closure\nbefore benchmark, and one after benchmark execution after benchmark.\nThis PR whitelists the warmup key used in commit_db so that it doesn't\nappear in the read/write count.\n\nWe also regenerated staking-async weights (wrongly benchmarked in\n#10802) and conviction-voting to check both v1 and v2 benchmarking.\n\nDriven-by: update `try-runtime-cli` to v0.10.1 as an attempt to fix the\nissue for which CI regularly fails in the check-migration (WAH) job in\n./try-runtime create-snapshot --uri\nwss://westend-asset-hub-rpc.polkadot.io:443 snapshot.raw`\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-03T17:57:06Z",
+          "tree_id": "3370bccb812c896e324de40f014df2faaa6beb9c",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a78b18a5cc547141bfd5c10eb17593239e1e2509"
+        },
+        "date": 1770148121310,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 63642.23,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 52945.8,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.00002013321,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.67715161265,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.847365602669967,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8121427327999713,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.005439340679999997,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.687998257333264,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.00001923306,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3634530295099987,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.6541105759500008,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.6407872858799992,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.00001923306,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.00002013321,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.6942810251999982,
             "unit": "seconds"
           }
         ]

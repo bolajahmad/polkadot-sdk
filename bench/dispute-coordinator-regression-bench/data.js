@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769813906815,
+  "lastUpdate": 1770148212056,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -22931,6 +22931,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.006491227629999996,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a78b18a5cc547141bfd5c10eb17593239e1e2509",
+          "message": "benchmarking: fix DB read/write counts (#10947)\n\nPR #10802 added `reset_read_write_count()` at the end of commit_db() to\nprevent warmup operations from appearing in benchmarking results.\nHowever, commit_db is called twice: one on `on_before_start()` closure\nbefore benchmark, and one after benchmark execution after benchmark.\nThis PR whitelists the warmup key used in commit_db so that it doesn't\nappear in the read/write count.\n\nWe also regenerated staking-async weights (wrongly benchmarked in\n#10802) and conviction-voting to check both v1 and v2 benchmarking.\n\nDriven-by: update `try-runtime-cli` to v0.10.1 as an attempt to fix the\nissue for which CI regularly fails in the check-migration (WAH) job in\n./try-runtime create-snapshot --uri\nwss://westend-asset-hub-rpc.polkadot.io:443 snapshot.raw`\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-03T17:57:06Z",
+          "tree_id": "3370bccb812c896e324de40f014df2faaa6beb9c",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a78b18a5cc547141bfd5c10eb17593239e1e2509"
+        },
+        "date": 1770148188202,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009162740249999982,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.002713106140000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006452643749999995,
             "unit": "seconds"
           }
         ]

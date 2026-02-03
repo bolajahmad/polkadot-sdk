@@ -198,7 +198,7 @@ impl<T: Config> Pallet<T> {
 
 		let now = RCBlockNumberProviderOf::<T::Coretime>::current_block_number();
 		// TODO: Check if it can be the case.
-		ensure!(now > sale.sale_start, Error::<T>::TooEarly);
+		//ensure!(now > sale.sale_start, Error::<T>::TooEarly);
 		let blocks_since_sale_begin = now.saturating_sub(sale.sale_start);
 
 		let core = match Self::place_renewal_order(
@@ -213,13 +213,13 @@ impl<T: Config> Pallet<T> {
 			RenewalOrderResult::Sold { price } => {
 				let old_core = core;
 
-				let core = Self::purchase_core(&who, record.price, &mut sale)?;
+				let core = Self::purchase_core(&who, price, &mut sale)?;
 
 				Self::deposit_event(Event::Renewed {
 					who,
 					old_core,
 					core,
-					price: record.price,
+					price,
 					begin: sale.region_begin,
 					duration: sale.region_end.saturating_sub(sale.region_begin),
 					workload: workload.clone(),
@@ -230,15 +230,14 @@ impl<T: Config> Pallet<T> {
 				let begin = sale.region_end;
 				let end_price = sale.end_price;
 				// Renewals should never be priced lower than the current `end_price`:
-				let price_cap =
-					cmp::max(record.price + config.renewal_bump * record.price, end_price);
+				let price_cap = cmp::max(price + config.renewal_bump * price, end_price);
 				let now = RCBlockNumberProviderOf::<T::Coretime>::current_block_number();
 				let price = Self::sale_price(&sale, now).min(price_cap);
 				log::debug!(
 					"Renew with: sale price: {:?}, price cap: {:?}, old price: {:?}",
 					price,
 					price_cap,
-					record.price
+					price
 				);
 				let new_record = PotentialRenewalRecord { price, completion: Complete(workload) };
 				PotentialRenewals::<T>::remove(renewal_id);
@@ -673,6 +672,7 @@ impl<T: Config> Pallet<T> {
 		Ok(())
 	}
 
+	// TODO: Remove as this logic belongs to Market impl.
 	/// If there is an ongoing sale returns the current price of a core.
 	pub fn current_price() -> Result<BalanceOf<T>, DispatchError> {
 		let status = Status::<T>::get().ok_or(Error::<T>::Uninitialized)?;

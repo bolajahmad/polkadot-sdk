@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770148112598,
+  "lastUpdate": 1770160150199,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "117115317+lrubasze@users.noreply.github.com",
-            "name": "Lukasz Rubaszewski",
-            "username": "lrubasze"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "dbfed5a584d5f16602f0094ae2ac153fd62912be",
-          "message": "Make zombienet CI great again (#8748)\n\nThis PR re-enables Zombienet CI tests.\n\n\nChanges:\n- Enable Zombienet Polkadot and Substrate tests\n- Zombienet Cumulus will be enabled separately, when being migrated to\n`zombienet-sdk`\n- Switch zombienet from `k8s` to `native` provider\n`k8s` turned out to be unstable for both `zombienet` and\n`zombienet-sdk`. Issues observed:\n  - problem with launching a pod\n- pods (and thus nodes) were not spawned at the same time (differences\nup to 120s), which affected some tests\n  - `kubectl` command failed \n  Observed many times for:\n    - kubectl cp\n    - kubectl exec\n    - kubectl logs\nIf we ever want to switch back to `k8s` we must ensure above issues no\nlonger exist.\n- Tweaks some tests to make sure they constantly pass\nAuthors of those tests are kindly asked to review the changes.\n- Some improvements and fixes `zombienet` and `zombienet-sdk` frameworks\n- Assign more beefy runners for more demanding tests\nRule of thumb: use large runner if spawned network consist of more than\n4 nodes\n- Disable some tests to let their authors to stabilize them\nCreated a dedicated `.github/zombienet-flaky-tests` file for more\nclarity\nATM there are 16 flaky tests. Their authors are kindly asked to fix them\nand re-enable.\n\n---------\n\nCo-authored-by: Javier Viola <javier@parity.io>\nCo-authored-by: Javier Viola <363911+pepoviola@users.noreply.github.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Anthony Lazam <xlzm.tech@gmail.com>",
-          "timestamp": "2025-06-26T10:01:28Z",
-          "tree_id": "f2cb70189cb93c0c4946240369572a0947e05f70",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/dbfed5a584d5f16602f0094ae2ac153fd62912be"
-        },
-        "date": 1750937224636,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.009090629126666751,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1571879249200001,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022522697613333333,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013507431739999997,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "bitfield-distribution",
             "value": 0.022766309600000003,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "60601340+lexnv@users.noreply.github.com",
+            "name": "Alexandru Vasile",
+            "username": "lexnv"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "4535807e489a0e71e15e420729ee2d09efa32195",
+          "message": "auth-discovery: Ensure DHT published addresses have ports (#10954)\n\nWe have seen instances in production where validators will propagate\nmultiaddresses without ports.\nThese addresses are effectively unreachable from the networking layer\nperspective.\nThey might be discovered via:\n- identify protocol\n- or simply a wrongly configured CLI for public addresses\n\nTo close the gap on this issue, this PR checks that the published\naddresses will always contain a port.\n\nCloses:\n- https://github.com/paritytech/polkadot-sdk/issues/10466\n\nPart of:\n- https://github.com/paritytech/polkadot-sdk/issues/10425\n\n---------\n\nSigned-off-by: Alexandru Vasile <alexandru.vasile@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-03T21:52:12Z",
+          "tree_id": "4ea966b3227373ed5ba3c795f900f32ecaecde86",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/4535807e489a0e71e15e420729ee2d09efa32195"
+        },
+        "date": 1770160126275,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.1483183290600001,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007112830833333334,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009984776153333319,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.023449870273333326,
             "unit": "seconds"
           }
         ]

@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769813776228,
+  "lastUpdate": 1770148079745,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "117115317+lrubasze@users.noreply.github.com",
-            "name": "Lukasz Rubaszewski",
-            "username": "lrubasze"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "dbfed5a584d5f16602f0094ae2ac153fd62912be",
-          "message": "Make zombienet CI great again (#8748)\n\nThis PR re-enables Zombienet CI tests.\n\n\nChanges:\n- Enable Zombienet Polkadot and Substrate tests\n- Zombienet Cumulus will be enabled separately, when being migrated to\n`zombienet-sdk`\n- Switch zombienet from `k8s` to `native` provider\n`k8s` turned out to be unstable for both `zombienet` and\n`zombienet-sdk`. Issues observed:\n  - problem with launching a pod\n- pods (and thus nodes) were not spawned at the same time (differences\nup to 120s), which affected some tests\n  - `kubectl` command failed \n  Observed many times for:\n    - kubectl cp\n    - kubectl exec\n    - kubectl logs\nIf we ever want to switch back to `k8s` we must ensure above issues no\nlonger exist.\n- Tweaks some tests to make sure they constantly pass\nAuthors of those tests are kindly asked to review the changes.\n- Some improvements and fixes `zombienet` and `zombienet-sdk` frameworks\n- Assign more beefy runners for more demanding tests\nRule of thumb: use large runner if spawned network consist of more than\n4 nodes\n- Disable some tests to let their authors to stabilize them\nCreated a dedicated `.github/zombienet-flaky-tests` file for more\nclarity\nATM there are 16 flaky tests. Their authors are kindly asked to fix them\nand re-enable.\n\n---------\n\nCo-authored-by: Javier Viola <javier@parity.io>\nCo-authored-by: Javier Viola <363911+pepoviola@users.noreply.github.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Anthony Lazam <xlzm.tech@gmail.com>",
-          "timestamp": "2025-06-26T10:01:28Z",
-          "tree_id": "f2cb70189cb93c0c4946240369572a0947e05f70",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/dbfed5a584d5f16602f0094ae2ac153fd62912be"
-        },
-        "date": 1750937197646,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.193603456933335,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.1968029291666667,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-recovery",
             "value": 11.208899398366668,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a78b18a5cc547141bfd5c10eb17593239e1e2509",
+          "message": "benchmarking: fix DB read/write counts (#10947)\n\nPR #10802 added `reset_read_write_count()` at the end of commit_db() to\nprevent warmup operations from appearing in benchmarking results.\nHowever, commit_db is called twice: one on `on_before_start()` closure\nbefore benchmark, and one after benchmark execution after benchmark.\nThis PR whitelists the warmup key used in commit_db so that it doesn't\nappear in the read/write count.\n\nWe also regenerated staking-async weights (wrongly benchmarked in\n#10802) and conviction-voting to check both v1 and v2 benchmarking.\n\nDriven-by: update `try-runtime-cli` to v0.10.1 as an attempt to fix the\nissue for which CI regularly fails in the check-migration (WAH) job in\n./try-runtime create-snapshot --uri\nwss://westend-asset-hub-rpc.polkadot.io:443 snapshot.raw`\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-03T17:57:06Z",
+          "tree_id": "3370bccb812c896e324de40f014df2faaa6beb9c",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a78b18a5cc547141bfd5c10eb17593239e1e2509"
+        },
+        "date": 1770148055637,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.11047521359999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.385733466600003,
             "unit": "seconds"
           }
         ]

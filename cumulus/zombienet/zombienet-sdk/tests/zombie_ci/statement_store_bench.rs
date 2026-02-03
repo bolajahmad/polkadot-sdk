@@ -5,22 +5,26 @@
 
 use anyhow::anyhow;
 use codec::{Decode, Encode};
+use futures::StreamExt;
 use log::{debug, info, trace};
 use sc_statement_store::{DEFAULT_MAX_TOTAL_SIZE, DEFAULT_MAX_TOTAL_STATEMENTS};
-use sp_core::{blake2_256, hexdisplay::HexDisplay, sr25519, Bytes, Pair};
+use serde_json::json;
+use sp_core::{blake2_256, sr25519, Bytes, Pair};
 use sp_statement_store::{
 	statement_allowance_key, Channel, Statement, StatementAllowance, SubmitResult, Topic,
 };
-use std::{
-	cell::Cell,
-	collections::HashMap,
-	path::{Path, PathBuf},
-	sync::Arc,
-	time::Duration,
-};
+use std::{cell::Cell, collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{sync::Barrier, time::timeout};
 use zombienet_sdk::{
-	subxt::{backend::rpc::RpcClient, ext::subxt_rpcs::rpc_params},
+	subxt::{
+		backend::rpc::RpcClient,
+		config::polkadot::PolkadotExtrinsicParamsBuilder,
+		dynamic::Value,
+		ext::{scale_value::value, subxt_rpcs::rpc_params},
+		tx::{signer::Signer, DynamicPayload, TxStatus},
+		utils::H256,
+		OnlineClient, PolkadotConfig,
+	},
 	LocalFileSystem, Network, NetworkConfigBuilder,
 };
 
@@ -32,6 +36,13 @@ const MAX_RETRIES: u32 = 100;
 const RETRY_DELAY_MS: u64 = 500;
 const PROPAGATION_DELAY_MS: u64 = 2000;
 const TIMEOUT_MS: u64 = 3000;
+
+/// Batch size for set_storage calls to avoid exceeding transaction size limits.
+const SET_STORAGE_BATCH_SIZE: usize = 5000;
+/// Maximum retries for batch submission when finalization fails.
+const BATCH_SUBMIT_MAX_RETRIES: u32 = 5;
+/// Timeout in seconds to wait for batch finalization before retrying.
+const BATCH_FINALIZATION_TIMEOUT_SECS: u64 = 120;
 
 /// Single-node benchmark.
 ///
@@ -316,53 +327,316 @@ async fn statement_store_memory_stress_bench() -> Result<(), anyhow::Error> {
 	Ok(())
 }
 
-/// Creates a custom chain spec with injected statement allowances.
+/// Creates storage items for statement allowances.
 ///
-/// Returns the path to the temporary chain spec file.
-///
-/// The chain spec template generates by:
-/// `polkadot-parachain build-spec --chain people-westend-local --raw`
-fn create_chain_spec_with_allowances(
-	participant_count: u32,
-	base_dir: &Path,
-) -> Result<PathBuf, anyhow::Error> {
-	let chain_spec_template = include_str!("people-westend-local-spec.json");
-	let mut chain_spec: serde_json::Value = serde_json::from_str(chain_spec_template)
-		.map_err(|e| anyhow!("Failed to parse chain spec JSON: {}", e))?;
-	let genesis = chain_spec
-		.get_mut("genesis")
-		.and_then(|g| g.get_mut("raw"))
-		.and_then(|r| r.get_mut("top"))
-		.and_then(|t| t.as_object_mut())
-		.ok_or_else(|| anyhow!("Failed to access genesis.raw.top in chain spec"))?;
-
+/// Returns a vector of (key, value) pairs for use with frame_system::set_storage.
+fn create_statement_allowance_items(participant_count: u32) -> Vec<(Vec<u8>, Vec<u8>)> {
 	// Use static maximum values for benchmarks
 	let allowance = StatementAllowance { max_count: 100_000, max_size: 1_000_000 };
-	let allowance_hex = format!("0x{}", HexDisplay::from(&allowance.encode()));
+	let allowance_encoded = allowance.encode();
 
+	let mut items = Vec::with_capacity(participant_count as usize);
 	for idx in 0..participant_count {
 		let keypair = get_keypair(idx);
 		let account_id = keypair.public();
-
 		let storage_key = statement_allowance_key(account_id.0);
-		let storage_key_hex = format!("0x{}", HexDisplay::from(&storage_key));
-
-		genesis.insert(storage_key_hex, serde_json::Value::String(allowance_hex.clone()));
+		items.push((storage_key.to_vec(), allowance_encoded.clone()));
 	}
 
-	let chain_spec_path = base_dir.join("people-westend-custom.json");
-	let chain_spec_json = serde_json::to_string_pretty(&chain_spec)
-		.map_err(|e| anyhow!("Failed to serialize chain spec: {}", e))?;
-
-	std::fs::write(&chain_spec_path, chain_spec_json)
-		.map_err(|e| anyhow!("Failed to write chain spec to file: {}", e))?;
-
-	info!("Created custom chain spec at: {}", chain_spec_path.display());
-
-	Ok(chain_spec_path)
+	items
 }
 
-/// Spawns a network using a custom chain spec with injected statement allowances.
+/// Creates a sudo -> frame_system::set_storage call to set statement allowances.
+fn create_set_storage_call(
+	items: Vec<(Vec<u8>, Vec<u8>)>,
+) -> zombienet_sdk::subxt::tx::DynamicPayload {
+	let items_value: Vec<Value> = items
+		.into_iter()
+		.map(|(key, value)| value!((Value::from_bytes(key), Value::from_bytes(value))))
+		.collect();
+
+	zombienet_sdk::subxt::tx::dynamic(
+		"Sudo",
+		"sudo",
+		vec![value! {
+			System(set_storage { items: items_value })
+		}],
+	)
+}
+
+/// Represents a pending batch that has been submitted but may not yet be finalized.
+struct PendingBatch<Tx> {
+	batch_idx: usize,
+	tx_stream: Tx,
+}
+
+/// Submits an extrinsic with an explicit nonce and waits for it to be included in a block.
+/// Returns the transaction stream for continued monitoring of finalization status.
+async fn submit_extrinsic_and_wait_for_in_block<S: Signer<PolkadotConfig>>(
+	client: &OnlineClient<PolkadotConfig>,
+	call: &DynamicPayload,
+	signer: &S,
+	nonce: u64,
+) -> Result<
+	zombienet_sdk::subxt::tx::TxProgress<PolkadotConfig, OnlineClient<PolkadotConfig>>,
+	anyhow::Error,
+> {
+	let extensions = PolkadotExtrinsicParamsBuilder::new().immortal().nonce(nonce).build();
+
+	let mut tx = client
+		.tx()
+		.create_signed(call, signer, extensions)
+		.await?
+		.submit_and_watch()
+		.await?;
+
+	// Wait for InBestBlock before returning the stream for finalization monitoring
+	while let Some(status) = tx.next().await.transpose()? {
+		match status {
+			TxStatus::InBestBlock(tx_in_block) => {
+				tx_in_block.wait_for_success().await?;
+				let block_hash = tx_in_block.block_hash();
+				debug!("[Best] In block: {:#?}", block_hash);
+				return Ok(tx);
+			},
+			TxStatus::InFinalizedBlock(ref tx_in_block) => {
+				// Already finalized, still return the stream
+				tx_in_block.wait_for_success().await?;
+				let block_hash = tx_in_block.block_hash();
+				debug!("[Finalized] In block: {:#?}", block_hash);
+				return Ok(tx);
+			},
+			TxStatus::Error { message } |
+			TxStatus::Invalid { message } |
+			TxStatus::Dropped { message } => {
+				return Err(anyhow!("Error submitting tx: {message}"));
+			},
+			_ => continue,
+		}
+	}
+
+	Err(anyhow!("Transaction event stream ended without being included in a block"))
+}
+
+/// Waits for a transaction to be finalized, given its stream.
+/// Returns Ok(()) if finalized, Err if dropped/invalid/timeout.
+async fn wait_for_tx_finalization<Tx>(
+	tx_stream: &mut Tx,
+	batch_idx: usize,
+	timeout_secs: u64,
+) -> Result<H256, anyhow::Error>
+where
+	Tx: futures::Stream<
+			Item = Result<
+				TxStatus<PolkadotConfig, OnlineClient<PolkadotConfig>>,
+				zombienet_sdk::subxt::Error,
+			>,
+		> + Unpin,
+{
+	let watch_future = async {
+		while let Some(status) = tx_stream.next().await.transpose()? {
+			match status {
+				TxStatus::InFinalizedBlock(ref tx_in_block) => {
+					tx_in_block.wait_for_success().await?;
+					let block_hash = tx_in_block.block_hash();
+					debug!("Batch {} [Finalized] In block: {:#?}", batch_idx, block_hash);
+					return Ok(block_hash);
+				},
+				TxStatus::Error { message } |
+				TxStatus::Invalid { message } |
+				TxStatus::Dropped { message } => {
+					return Err(anyhow!("Batch {} tx error: {message}", batch_idx));
+				},
+				_ => continue,
+			}
+		}
+		Err(anyhow!("Batch {} transaction stream ended without finalization", batch_idx))
+	};
+
+	match timeout(Duration::from_secs(timeout_secs), watch_future).await {
+		Ok(result) => result,
+		Err(_) => Err(anyhow!(
+			"Batch {} timeout waiting for finalization after {}s",
+			batch_idx,
+			timeout_secs
+		)),
+	}
+}
+
+/// Gets the current nonce for an account.
+async fn get_account_nonce(
+	client: &OnlineClient<PolkadotConfig>,
+	account_id: &<PolkadotConfig as zombienet_sdk::subxt::Config>::AccountId,
+) -> Result<u64, anyhow::Error> {
+	let nonce = client.tx().account_nonce(account_id).await?;
+	Ok(nonce)
+}
+
+/// Sets statement allowances for participants via sudo -> frame_system::set_storage extrinsic.
+///
+/// Submits batches of storage items, waiting for each to be included in a block before
+/// proceeding to the next. After all batches are submitted, waits for finalization.
+/// If any batch fails to finalize, retries from the first failed batch.
+async fn set_statement_allowances(
+	para_client: &OnlineClient<PolkadotConfig>,
+	participant_count: u32,
+) -> Result<(), anyhow::Error> {
+	info!(
+		"Setting statement allowances for {} participants via sudo extrinsics (batch size: {})...",
+		participant_count, SET_STORAGE_BATCH_SIZE
+	);
+
+	let items = create_statement_allowance_items(participant_count);
+	let total_batches = (items.len() + SET_STORAGE_BATCH_SIZE - 1) / SET_STORAGE_BATCH_SIZE;
+
+	let alice = zombienet_sdk::subxt_signer::sr25519::dev::alice();
+	let alice_account_id = <zombienet_sdk::subxt_signer::sr25519::Keypair as Signer<
+		PolkadotConfig,
+	>>::account_id(&alice);
+
+	// Collect all batches for potential resubmission
+	let batches: Vec<Vec<(Vec<u8>, Vec<u8>)>> =
+		items.chunks(SET_STORAGE_BATCH_SIZE).map(|b| b.to_vec()).collect();
+
+	let submit_start = std::time::Instant::now();
+	let mut retry_count = 0;
+	let mut start_batch_idx = 0; // First batch to submit (skip already finalized ones)
+
+	while start_batch_idx < total_batches {
+		// Get current nonce at the start of each submission round
+		let mut current_nonce = get_account_nonce(para_client, &alice_account_id).await?;
+		info!(
+			"Starting submission from batch {} with nonce {}{}",
+			start_batch_idx + 1,
+			current_nonce,
+			if retry_count > 0 { format!(" (retry {})", retry_count) } else { String::new() }
+		);
+
+		// Phase 1: Submit batches starting from start_batch_idx and wait for InBestBlock (fast)
+		let mut pending_batches = Vec::new();
+		let mut submission_failed = false;
+
+		for batch_idx in start_batch_idx..total_batches {
+			let batch = &batches[batch_idx];
+			info!(
+				"Submitting batch {}/{} ({} items) with nonce {}...",
+				batch_idx + 1,
+				total_batches,
+				batch.len(),
+				current_nonce
+			);
+
+			let set_storage_call = create_set_storage_call(batch.clone());
+			match submit_extrinsic_and_wait_for_in_block(
+				para_client,
+				&set_storage_call,
+				&alice,
+				current_nonce,
+			)
+			.await
+			{
+				Ok(tx_stream) => {
+					info!("Batch {}/{} is in block, continuing...", batch_idx + 1, total_batches);
+					pending_batches.push(PendingBatch { batch_idx, tx_stream });
+					current_nonce += 1;
+				},
+				Err(e) => {
+					info!(
+						"Batch {}/{} submission failed ({}), will retry from this batch",
+						batch_idx + 1,
+						total_batches,
+						e
+					);
+					submission_failed = true;
+					break;
+				},
+			}
+		}
+
+		if !pending_batches.is_empty() {
+			let submit_elapsed = submit_start.elapsed();
+			info!(
+				"{} batches submitted and in blocks in {:.2}s, waiting for finalization...",
+				pending_batches.len(),
+				submit_elapsed.as_secs_f64()
+			);
+		}
+
+		// Phase 2: Wait for all pending batches to be finalized
+		let mut first_failed_batch_idx: Option<usize> = None;
+
+		for pending in &mut pending_batches {
+			match wait_for_tx_finalization(
+				&mut pending.tx_stream,
+				pending.batch_idx,
+				BATCH_FINALIZATION_TIMEOUT_SECS,
+			)
+			.await
+			{
+				Ok(block_hash) => {
+					info!(
+						"Batch {}/{} finalized in block {:?}",
+						pending.batch_idx + 1,
+						total_batches,
+						block_hash
+					);
+				},
+				Err(e) => {
+					info!(
+						"Batch {}/{} finalization failed ({})",
+						pending.batch_idx + 1,
+						total_batches,
+						e
+					);
+					if first_failed_batch_idx.is_none() {
+						first_failed_batch_idx = Some(pending.batch_idx);
+					}
+					// Continue checking others to log their status, but we'll retry from the first
+					// failure
+				},
+			}
+		}
+
+		// Determine next action based on results
+		if submission_failed || first_failed_batch_idx.is_some() {
+			// Some batches failed - retry from the first failed batch
+			let failed_idx = first_failed_batch_idx.unwrap_or(
+				pending_batches.last().map(|p| p.batch_idx + 1).unwrap_or(start_batch_idx),
+			);
+
+			retry_count += 1;
+			if retry_count >= BATCH_SUBMIT_MAX_RETRIES {
+				return Err(anyhow!(
+					"Failed to finalize batch {} after {} retries",
+					failed_idx + 1,
+					retry_count
+				));
+			}
+
+			// Update start_batch_idx to retry from the first failed batch
+			start_batch_idx = failed_idx;
+			info!(
+				"Will retry from batch {}/{} after re-fetching nonce...",
+				start_batch_idx + 1,
+				total_batches
+			);
+		} else {
+			// All batches finalized successfully
+			let total_elapsed = submit_start.elapsed();
+			info!(
+				"Statement allowances set and finalized for all {} participants in {:.2}s ({} batches)",
+				participant_count,
+				total_elapsed.as_secs_f64(),
+				total_batches
+			);
+			break;
+		}
+	}
+
+	Ok(())
+}
+
+/// Spawns a network and sets statement allowances via sudo -> set_storage extrinsic.
 async fn spawn_network(
 	collators: &[&str],
 	participant_count: u32,
@@ -377,31 +651,42 @@ async fn spawn_network(
 	std::fs::create_dir_all(&base_dir)
 		.map_err(|e| anyhow!("Failed to create base directory: {}", e))?;
 
-	let chain_spec_path = create_chain_spec_with_allowances(participant_count, &base_dir)?;
-
 	let config = NetworkConfigBuilder::new()
 		.with_relaychain(|r| {
 			r.with_chain("westend-local")
 				.with_default_command("polkadot")
 				.with_default_image(images.polkadot.as_str())
 				.with_default_args(vec!["-lparachain=debug".into()])
+				.with_genesis_overrides(json!({
+					"configuration": {
+						"config": {
+							"needed_approvals": 2,
+							"scheduler_params": {
+								"max_validators_per_core": 1,
+								"lookahead": 6
+							}
+						}
+					}
+				}))
 				.with_node(|node| node.with_name("validator-0"))
 				.with_node(|node| node.with_name("validator-1"))
 		})
 		.with_parachain(|p| {
 			let p = p
-				.with_id(2400)
-				.with_chain_spec_path(chain_spec_path.to_str().expect("Valid UTF-8 path"))
+				.with_id(2001)
+				// people-chain-westend does not have sudo and we need it for set_storage to set
+				// allowances.
+				.with_chain("glutton-westend-local-2001")
 				.with_default_command("polkadot-parachain")
 				.with_default_image(images.cumulus.as_str())
 				.with_default_args(vec![
 					"--force-authoring".into(),
-					"-lstatement-store=info,statement-gossip=info,error".into(),
+					"-lstatement-store=debug,statement-gossip=debug,info".into(),
 					"--enable-statement-store".into(),
 					"--rpc-max-connections=50000".into(),
 				])
 				// Have to set outside of the loop below, so that `p` has the right type.
-				.with_collator(|n| n.with_name(collators[0]));
+				.with_collator(|n| n.with_name(collators[0]).invulnerable(false));
 
 			collators[1..]
 				.iter()
@@ -419,6 +704,18 @@ async fn spawn_network(
 	let spawn_fn = zombienet_sdk::environment::get_spawn_fn();
 	let network = spawn_fn(config).await?;
 	assert!(network.wait_until_is_up(60).await.is_ok());
+
+	// Wait for the parachain to produce blocks
+	info!("Waiting for parachain to produce blocks...");
+	let first_collator = collators[0];
+	let node = network.get_node(first_collator)?;
+	node.wait_metric("block_height{status=\"best\"}", |height| height >= 1.0)
+		.await?;
+	info!("Parachain is producing blocks");
+
+	// Set statement allowances for participants
+	let para_client = node.wait_client::<PolkadotConfig>().await?;
+	set_statement_allowances(&para_client, participant_count).await?;
 
 	Ok(network)
 }

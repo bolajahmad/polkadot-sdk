@@ -500,6 +500,7 @@ impl SetWeightLimit for RuntimeCall {
 		match self {
 			Self::Contracts(
 				Call::eth_call { weight_limit, .. } |
+				Call::eth_call_with_authorization_list { weight_limit, .. } |
 				Call::eth_instantiate_with_code { weight_limit, .. },
 			) => {
 				let old = *weight_limit;

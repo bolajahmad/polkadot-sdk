@@ -531,6 +531,7 @@ mod test {
 			builder.check().unwrap();
 		let expected_effective_gas_price =
 			ExtBuilder::default().build().execute_with(|| Pallet::<Test>::evm_base_fee());
+		let tx_input = tx.input.clone().to_vec();
 
 		match call {
 			RuntimeCall::Contracts(crate::Call::eth_call::<Test> {
@@ -544,7 +545,30 @@ mod test {
 				..
 			}) if dest == tx.to.unwrap() &&
 				value == tx.value.unwrap_or_default().as_u64().into() &&
-				data == tx.input.to_vec() &&
+				data == tx_input &&
+				transaction_encoded == signed_transaction.signed_payload() &&
+				effective_gas_price == expected_effective_gas_price =>
+			{
+				assert_eq!(encoded_len, expected_encoded_len);
+				assert!(
+					weight_limit.all_gte(weight_required),
+					"Assert failed: weight_limit={weight_limit:?} >= weight_required={weight_required:?}"
+				);
+			},
+			RuntimeCall::Contracts(crate::Call::eth_call_with_authorization_list::<Test> {
+				dest,
+				value,
+				weight_limit,
+				data,
+				transaction_encoded,
+				effective_gas_price,
+				encoded_len,
+				authorization_list,
+				..
+			}) if authorization_list.is_empty() &&
+				dest == tx.to.unwrap() &&
+				value == tx.value.unwrap_or_default().as_u64().into() &&
+				data == tx_input &&
 				transaction_encoded == signed_transaction.signed_payload() &&
 				effective_gas_price == expected_effective_gas_price =>
 			{

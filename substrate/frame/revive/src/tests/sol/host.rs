@@ -62,7 +62,7 @@ fn create_delegated_eoa(target: &H160) -> H160 {
 	// Process the authorization to set up delegation
 	let result = builder::eth_call_with_authorization_list(*target)
 		.authorization_list(vec![auth])
-		.eth_gas_limit(1_000_000u64.into())
+		.eth_gas_limit(crate::test_utils::ETH_GAS_LIMIT.into())
 		.build();
 	assert_ok!(result);
 

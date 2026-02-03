@@ -451,7 +451,7 @@ fn test_runtime_set_authorization() {
 
 		let result = builder::eth_call_with_authorization_list(target_contract.addr)
 			.authorization_list(vec![auth])
-			.eth_gas_limit(1_000_000u64.into())
+			.eth_gas_limit(crate::test_utils::ETH_GAS_LIMIT.into())
 			.build();
 
 		assert_ok!(result);
@@ -499,7 +499,7 @@ fn test_runtime_clear_authorization() {
 		let auth1 = signer.sign_authorization(chain_id, target_contract.addr, nonce);
 		let result1 = builder::eth_call_with_authorization_list(target_contract.addr)
 			.authorization_list(vec![auth1])
-			.eth_gas_limit(1_000_000u64.into())
+			.eth_gas_limit(crate::test_utils::ETH_GAS_LIMIT.into())
 			.build();
 		assert_ok!(result1);
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
@@ -509,7 +509,7 @@ fn test_runtime_clear_authorization() {
 		let auth2 = signer.sign_authorization(chain_id, H160::zero(), new_nonce);
 		let result2 = builder::eth_call_with_authorization_list(target_contract.addr)
 			.authorization_list(vec![auth2])
-			.eth_gas_limit(1_000_000u64.into())
+			.eth_gas_limit(crate::test_utils::ETH_GAS_LIMIT.into())
 			.build();
 		assert_ok!(result2);
 
@@ -559,7 +559,7 @@ fn test_runtime_delegation_resolution() {
 		let auth = signer.sign_authorization(chain_id, target_contract.addr, nonce);
 		let result = builder::eth_call_with_authorization_list(target_contract.addr)
 			.authorization_list(vec![auth])
-			.eth_gas_limit(1_000_000u64.into())
+			.eth_gas_limit(crate::test_utils::ETH_GAS_LIMIT.into())
 			.build();
 		assert_ok!(result);
 
@@ -569,7 +569,9 @@ fn test_runtime_delegation_resolution() {
 			Some(target_contract.addr)
 		);
 
-		let call_result = builder::eth_call(authority).eth_gas_limit(1_000_000u64.into()).build();
+		let call_result = builder::eth_call(authority)
+			.eth_gas_limit(crate::test_utils::ETH_GAS_LIMIT.into())
+			.build();
 
 		assert_ok!(&call_result);
 	});

@@ -609,7 +609,7 @@ impl Peerset {
 		log::trace!(target: LOG_TARGET, "{}: inbound substream from {peer:?}", self.protocol);
 
 		if self.peerstore_handle.is_banned(&peer) {
-			log::debug!(
+			log::info!(
 				target: LOG_TARGET,
 				"{}: rejecting banned peer {peer:?}",
 				self.protocol,
@@ -627,7 +627,7 @@ impl Peerset {
 		match state {
 			// disconnected peers that are reserved-only peers are rejected
 			PeerState::Disconnected if should_reject => {
-				log::trace!(
+				log::info!(
 					target: LOG_TARGET,
 					"{}: rejecting non-reserved peer {peer:?} in reserved-only mode (prev state: {state:?})",
 					self.protocol,
@@ -641,9 +641,9 @@ impl Peerset {
 			// available), accept the peer and then just ignore the back-off timer when it expires
 			PeerState::Backoff => {
 				if !is_reserved_peer && self.num_in == self.max_in {
-					log::trace!(
+					log::info!(
 						target: LOG_TARGET,
-						"{}: ({peer:?}) is backed-off and cannot accept, reject inbound substream",
+						"{}: non-reserved peer ({peer:?}) is backed-off and no slots are available, reject inbound substream",
 						self.protocol,
 					);
 
@@ -654,6 +654,11 @@ impl Peerset {
 				// expires. Then, the peer will be in the disconnected state, subject to further
 				// rejection if the peer is not reserved by then.
 				if should_reject {
+					log::info!(
+						target: LOG_TARGET,
+						"{}: non-reserved peer ({peer:?}) is backed-off in reserved-only mode, reject inbound substream",
+						self.protocol,
+					);
 					return ValidationResult::Reject;
 				}
 			},
@@ -673,7 +678,7 @@ impl Peerset {
 			// issue is fixed, this approach can be re-evaluated if need be.
 			PeerState::Opening { direction: Direction::Outbound(reserved) } => {
 				if should_reject {
-					log::trace!(
+					log::info!(
 						target: LOG_TARGET,
 						"{}: rejecting inbound substream from {peer:?} ({reserved:?}) in reserved-only mode that was marked outbound",
 						self.protocol,
@@ -692,7 +697,7 @@ impl Peerset {
 				return ValidationResult::Accept;
 			},
 			PeerState::Canceled { direction } => {
-				log::trace!(
+				log::info!(
 					target: LOG_TARGET,
 					"{}: {peer:?} is canceled, rejecting substream should_reject={should_reject}",
 					self.protocol,
@@ -736,7 +741,7 @@ impl Peerset {
 			return ValidationResult::Accept;
 		}
 
-		log::trace!(
+		log::info!(
 			target: LOG_TARGET,
 			"{}: reject {peer:?}, not a reserved peer and no free inbound slots",
 			self.protocol,

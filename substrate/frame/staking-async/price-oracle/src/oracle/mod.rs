@@ -15,6 +15,119 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! ## The Main Price Oracle Pallet
+//!
+//! This pallet is the heart of the [price oracle system](`crate`). It is composed of:
+//!
+//! * Tracking assets for which we want to calculate a price, and their _suggested_ endpoints.
+//! * Set of calls that collators can submit to express opinion about the price of each asset.
+//! * Configurable tallying
+//! * Default offchain worker implementation that will automatically generate the vote transaction.
+//!
+//! ## Overview
+//!
+//! The overall flow of operations is as follows:
+//!
+//! * The offchain workers will run every [`crate::oracle::Config::PriceUpdateInterval`] blocks. The
+//!   inner details of how the offchain workers operate, how they build the HTTP request is
+//!   documented in the [`crate::oracle::offchain`] module and is based on the endpoint information
+//!   in [`crate::offchain::Endpoint`].
+//! * At the end of each block, we attempt to do a [`crate::oracle::Config::TallyManager`]
+//! * If tally succeeds, we update our price, stored in [`crate::oracle::Price`], and possibly
+//!   update our history.
+//! 	* And we report the price update to [`crate::oracle::Config::OnPriceUpdate`], which should send
+//!    it to the destination chian(s).
+//!
+//! ## Design Choices
+//!
+//! ### Asset Tracking
+//!
+//! This pallet only allows price updates for assets that are being tracked in
+//! [`crate::oracle::TrackedAssets`].
+//!
+//! ### Authorities and Voting
+//!
+//! The current set of authorities that are eligible to vote is stored in
+//! [`crate::oracle::Authorities`]. This storage item is updated upon a new session change, which is
+//! managed by [`crate::client`]. The authorities are stored as a `BTreeMap` of `(authority,
+//! confidence)` tuples for fast inclusion checks.
+//!
+//! The [`crate::oracle::Call::vote`] is guarded by a signed origin that is one of the said
+//! authorities.
+//!
+//! ### Time Tracking
+//!
+//! This pallet has 3 notions of time:
+//!
+//! * The local block number
+//! * The relay block number, provided via [`crate::oracle::Config::RelayBlockNumberProvider`]
+//! * The canonical timestamp, provided via [`crate::oracle::Config::TimeProvider`]
+//!
+//! Any price update will record all 3 data-points as a `crate::Oracle::TimePoint`.
+//!
+//! ### Vote Age
+//!
+//! This pallet ensures that all votes that are accepted, upon dispatch, are no more than
+//! [`crate::oracle::Config::MaxVoteAge`] blocks old. Moreover, upon tallying, it will double check
+//! this. In other words, a guarantee that the [`crate::Config::TallyManager`] has access to is that
+//! all votes are no more than [`crate::oracle::Config::MaxVoteAge`] blocks old.
+//!
+//! The vote-age is always measured only on the basis of the local block number.
+//!
+//! ### Tallying
+//!
+//! This pallet makes no assumptions about what tally algorithm is being used. It collects sensible
+//! information about the votes (represented in [`crate::oracle::Tally::tally`]), and passes it to
+//! the [`crate::Config::TallyManager`].
+//!
+//! This pallet makes an assumption that tallying happens at the end of each block.
+//!
+//! #### Extra Information
+//!
+//! The tally manager, often implemented in the runtime, has freedom to collect more information if
+//! needed. For example, as it stands, we don't report the _confidence_ associated with each voter
+//! to the tally manager.
+//!
+//! #### Keeping or Yanking Votes
+//!
+//! The [`crate::oracle::Config::TallyManager`], in the case that a tally is not successful, is
+//! responsible to report back to this pallet what it should do with the existing votes:
+//!
+//! * [`crate::oracle::TallyOuterError::KeepVotes`]: The votes IFF they still respect
+//!   [`crate::oracle::Config::MaxVoteAge`].
+//! * [`crate::oracle::TallyOuterError::YankVotes`]: Yank all votes.
+//!
+//! ### History Tracking
+//!
+//! This pallet tracks up to [`crate::oracle::Config::HistoryDepth`] price/vote data-points for each
+//! asset.
+//!
+//! Assuming `HistoryDepth = N`:
+//! * The price history is kept as the most recent record in [`crate::oracle::PriceHistory`], and
+//!   the remaining `N-1` in [`crate::oracle::PriceHistory`].
+//! * All N voting records are kept in [`crate::oracle::BlockVotes`].
+//!
+//! Both are automatically pruned if [`crate::oracle::Config::TallyManager`] returns a successful
+//! new price.
+//!
+//! ### Confidence
+//!
+//! This pallet employs a notion of confidence in multiple places, yet they have not all been
+//! implemented yet.
+//!
+//! * Price confidence: a notion of how strong a price is. Received from
+//!   [`crate::oracle::Config::TallyManager`] and reported to
+//!   [`crate::oracle::Config::OnPriceUpdate`].
+//! * Endpoint confidence: a notion of how reliable one of the endpoints in
+//!   [`crate::oracle::TrackedAssets`] is.
+//! 	* The long term plan for this would be for authorities to signal that an endpoint is not
+//!    reliable, allowing for automatic shutdown of one.
+//! 	* Privileged calls (fellowship etc.) can always do this too.
+//! * Authority confidence: A notion of how reliable an authorities votes are.
+//! 	* The long term plan for this would be for the tally algorithm to return a confidence score for
+//!    each authority, gradually signaling those who are consistently diverging from the majority.
+//! 	* Privileged calls (fellowship etc.) can always do this too.
+
 /*
 Doc: why time is the way it is. We record 3 points, but the voting stuff is all around local block number. This will work best with dual-core. in general, single-core in mind for now.
 Next:
@@ -35,7 +148,7 @@ V0: next week
 	- [x] tests
 - [x] Tests for existing tx-extension (minimal)
 - [x] vote should be operational
-- [ ] Cleanup test runtime (remove tx-extension, make it more realistic)
+- [x] Cleanup test runtime (remove tx-extension, make it more realistic)
 - [ ] One papi test for quick-ish sanity test
 - [ ] Westend integration
 - [ ] doc cleanup
@@ -216,7 +329,7 @@ pub mod pallet {
 		/// Price was updated after tallying votes.
 		PriceUpdated {
 			asset_id: T::AssetId,
-			old_price: FixedU128,
+			old_price: Option<FixedU128>,
 			new_price: FixedU128,
 			vote_count: u32,
 		},
@@ -257,6 +370,13 @@ pub mod pallet {
 	pub(crate) struct StorageManager<T: Config>(core::marker::PhantomData<T>);
 
 	impl<T: Config> StorageManager<T> {
+		/// Current best price of an asset.
+		pub(crate) fn current_price(
+			asset_id: T::AssetId,
+		) -> Option<PriceData<BlockNumberFor<T>, MomentOf<T>>> {
+			Price::<T>::get(&asset_id)
+		}
+
 		/// All of the assets that we are tracking and their list of feeds.
 		pub(crate) fn tracked_assets_with_endpoints() -> Vec<(T::AssetId, Vec<Endpoint>)> {
 			Endpoints::<T>::iter()
@@ -400,13 +520,6 @@ pub mod pallet {
 	#[cfg(any(test, feature = "std", feature = "try-runtime"))]
 	#[allow(unused)]
 	impl<T: Config> StorageManager<T> {
-		/// Current best price of an asset.
-		pub(crate) fn current_price(
-			asset_id: T::AssetId,
-		) -> Option<PriceData<BlockNumberFor<T>, MomentOf<T>>> {
-			Price::<T>::get(&asset_id)
-		}
-
 		/// Ensure all storage items tracked by this type are valid.
 		///
 		/// We look into 4 mappings and their keys:
@@ -814,10 +927,12 @@ pub mod pallet {
 				.into_iter()
 				.map(|(who, vote)| (who, vote.price, vote.produced_in))
 				.collect::<Vec<_>>();
-			log!(debug, "tallying asset {:?} with {} votes", asset_id, votes.len());
+			let vote_count = votes.len() as u32;
+			log!(debug, "tallying asset {:?} with {} votes", asset_id, vote_count);
 			match T::TallyManager::tally(asset_id, votes) {
 				Ok((price, confidence)) => {
 					// will store the new price, and prune old voting data as per `HistoryDepth`.
+					let old_price = StorageManager::<T>::current_price(asset_id).map(|p| p.price);
 					match StorageManager::<T>::update(
 						asset_id,
 						price,
@@ -826,6 +941,12 @@ pub mod pallet {
 					) {
 						Ok(new_price) => {
 							log!(info, "updated price for asset {:?}: {:?}", asset_id, new_price);
+							Self::deposit_event(Event::<T>::PriceUpdated {
+								asset_id,
+								old_price,
+								new_price: new_price.price,
+								vote_count,
+							});
 							T::OnPriceUpdate::on_price_update(asset_id, new_price);
 						},
 						Err(_) => {

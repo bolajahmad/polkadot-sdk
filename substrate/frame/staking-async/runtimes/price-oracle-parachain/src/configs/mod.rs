@@ -29,11 +29,11 @@ use super::{
 	weights::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight},
 	AccountId, Aura, Balance, Balances, Block, BlockNumber, ConsensusHook, Hash, MessageQueue,
 	Nonce, PalletInfo, ParachainSystem, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
-	RuntimeHoldReason, RuntimeOrigin, RuntimeTask, Session, SessionKeys, Signature, System,
-	WeightToFee, XcmpQueue, AVERAGE_ON_INITIALIZE_RATIO, CENTS, EXISTENTIAL_DEPOSIT, HOURS,
-	MAXIMUM_BLOCK_WEIGHT, MICRO_UNIT, NORMAL_DISPATCH_RATIO, SLOT_DURATION, VERSION,
+	RuntimeHoldReason, RuntimeOrigin, RuntimeTask, SessionKeys, Signature, System, XcmpQueue,
+	AVERAGE_ON_INITIALIZE_RATIO, MAXIMUM_BLOCK_WEIGHT, NORMAL_DISPATCH_RATIO, SLOT_DURATION,
+	VERSION,
 };
-use crate::{OracleRcClient, TxExtension, UncheckedExtrinsic, MINUTES};
+use crate::{OracleRcClient, SudoKeyAsExtraSigner, TxExtension, UncheckedExtrinsic};
 use codec::Encode;
 use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
 use cumulus_primitives_core::{AggregateMessageOrigin, ParaId};
@@ -41,29 +41,23 @@ use frame_support::{
 	derive_impl,
 	dispatch::DispatchClass,
 	parameter_types,
-	traits::{
-		ConstBool, ConstU32, ConstU64, ConstU8, EitherOfDiverse, TransformOrigin, VariantCountOf,
-	},
-	weights::{ConstantMultiplier, Weight},
-	PalletId,
+	traits::{ConstBool, ConstU32, ConstU64, TransformOrigin, VariantCountOf},
+	weights::Weight,
 };
 use frame_system::{
 	limits::{BlockLength, BlockWeights},
 	EnsureRoot,
 };
 use pallet_staking_async_price_oracle as price_oracle;
-use pallet_xcm::{EnsureXcm, IsVoiceOfBody};
 use parachains_common::message_queue::{NarrowOriginToSibling, ParaIdToSibling};
-use polkadot_runtime_common::{
-	xcm_sender::ExponentialPrice, BlockHashCount, SlowAdjustingFeeUpdate,
-};
+use polkadot_runtime_common::{xcm_sender::NoPriceForMessageDelivery, BlockHashCount};
 use polkadot_sdk::{
 	frame_support::traits::Get,
 	frame_system::offchain::{CreateBare, CreateTransaction, CreateTransactionBase},
 	sp_runtime::{
 		generic::SignedPayload,
 		traits::{Convert, Verify},
-		FixedU128, SaturatedConversion,
+		SaturatedConversion,
 	},
 	staging_parachain_info as parachain_info, staging_xcm as xcm, *,
 };
@@ -72,8 +66,7 @@ use polkadot_sdk::{staging_xcm_builder as xcm_builder, staging_xcm_executor as x
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_runtime::Perbill;
 use sp_version::RuntimeVersion;
-use xcm::latest::prelude::AssetId;
-use xcm_config::{RelayLocation, XcmOriginToTransactDispatchOrigin};
+use xcm_config::XcmOriginToTransactDispatchOrigin;
 
 parameter_types! {
 	pub const Version: RuntimeVersion = VERSION;
@@ -163,14 +156,15 @@ impl pallet_authorship::Config for Runtime {
 }
 
 parameter_types! {
-	pub const ExistentialDeposit: Balance = EXISTENTIAL_DEPOSIT;
+	/// Existential deposit - minimal for internal use only.
+	pub const ExistentialDeposit: Balance = 1;
 }
 
+/// Balances pallet is only used for internal trait bounds (session key deposits, XCM).
+/// No accounts are populated with balances in genesis.
 impl pallet_balances::Config for Runtime {
 	type MaxLocks = ConstU32<50>;
-	/// The type for recording an account's balance.
 	type Balance = Balance;
-	/// The ubiquitous event type.
 	type RuntimeEvent = RuntimeEvent;
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
@@ -183,21 +177,6 @@ impl pallet_balances::Config for Runtime {
 	type FreezeIdentifier = RuntimeFreezeReason;
 	type MaxFreezes = VariantCountOf<RuntimeFreezeReason>;
 	type DoneSlashHandler = ();
-}
-
-parameter_types! {
-	/// Relay Chain `TransactionByteFee` / 10
-	pub const TransactionByteFee: Balance = 10 * MICRO_UNIT;
-}
-
-impl pallet_transaction_payment::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = pallet_transaction_payment::FungibleAdapter<Balances, ()>;
-	type WeightToFee = WeightToFee;
-	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
-	type FeeMultiplierUpdate = SlowAdjustingFeeUpdate<Self>;
-	type OperationalFeeMultiplier = ConstU8<5>;
-	type WeightInfo = ();
 }
 
 impl pallet_sudo::Config for Runtime {
@@ -258,21 +237,8 @@ impl pallet_message_queue::Config for Runtime {
 
 impl cumulus_pallet_aura_ext::Config for Runtime {}
 
-parameter_types! {
-	/// The asset ID for the asset that we use to pay for message delivery fees.
-	pub FeeAssetId: AssetId = AssetId(xcm_config::RelayLocation::get());
-	/// The base fee for the message delivery fees.
-	pub const ToSiblingBaseDeliveryFee: u128 = CENTS.saturating_mul(3);
-	pub const ToParentBaseDeliveryFee: u128 = CENTS.saturating_mul(3);
-}
-
-/// The price for delivering XCM messages to sibling parachains.
-pub type PriceForSiblingParachainDelivery =
-	ExponentialPrice<FeeAssetId, ToSiblingBaseDeliveryFee, TransactionByteFee, XcmpQueue>;
-
-/// The price for delivering XCM messages to relay chain.
-pub type PriceForParentDelivery =
-	ExponentialPrice<FeeAssetId, ToParentBaseDeliveryFee, TransactionByteFee, ParachainSystem>;
+/// The price for delivering XCM messages to relay chain. No fees on this chain.
+pub type PriceForParentDelivery = NoPriceForMessageDelivery<()>;
 
 impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
@@ -286,7 +252,8 @@ impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type ControllerOrigin = EnsureRoot<AccountId>;
 	type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
 	type WeightInfo = ();
-	type PriceForSiblingDelivery = PriceForSiblingParachainDelivery;
+	// No fees on this chain.
+	type PriceForSiblingDelivery = NoPriceForMessageDelivery<cumulus_primitives_core::ParaId>;
 }
 
 pub struct ValidatorIdOf;
@@ -370,7 +337,6 @@ where
 			// The `System::block_number` is initialized with `n+1`,
 			// so the actual block number is `n`.
 			.saturating_sub(1);
-		let tip = 0;
 		let tx_ext: TxExtension = (
 			frame_system::AuthorizeCall::<Runtime>::new(),
 			frame_system::CheckNonZeroSender::<Runtime>::new(),
@@ -383,7 +349,7 @@ where
 			)),
 			frame_system::CheckNonce::<Runtime>::from(nonce),
 			frame_system::CheckWeight::<Runtime>::new(),
-			// pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip), // TODO
+			price_oracle::extension::OnlyOracleAuthorities::<Runtime, SudoKeyAsExtraSigner>::default(),
 			price_oracle::extension::SetPriorityFromProducedIn::<Runtime>::default(),
 			frame_metadata_hash_extension::CheckMetadataHash::<Runtime>::new(true),
 		)

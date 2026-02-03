@@ -7,10 +7,7 @@ use cumulus_primitives_core::ParaId;
 use frame_support::build_struct_json_patch;
 use pallet_staking_async_price_oracle::oracle::offchain::{Endpoint, Method, ParsingMethod};
 use parachains_common::AuraId;
-use polkadot_sdk::{
-	sp_runtime::{BoundedVec, FixedU128},
-	staging_xcm as xcm, *,
-};
+use polkadot_sdk::{staging_xcm as xcm, *};
 use serde_json::Value;
 use sp_genesis_builder::PresetId;
 use sp_keyring::Sr25519Keyring;

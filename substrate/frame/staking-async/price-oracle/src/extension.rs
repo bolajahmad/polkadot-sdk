@@ -15,6 +15,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+extern crate alloc;
+
 use super::oracle::Call as OracleCall;
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::{
@@ -84,9 +86,8 @@ where
 
 		// Check if our call `IsSubType` of the `RuntimeCall`
 		if let Some(OracleCall::vote { produced_in, .. }) = call.is_sub_type() {
+			log::debug!(target: "runtime::price-oracle::priority-extension", "Setting priority for vote call");
 			priority = (*produced_in).saturated_into();
-		} else {
-			log::warn!(target: "runtime::price-oracle::priority-extension", "Unknown call, not setting priority")
 		}
 
 		let validity = ValidTransaction { priority, ..Default::default() };
@@ -117,31 +118,37 @@ where
 }
 
 /// Transaction extension that will block any incoming transactions from any signed account, to any
-/// call in the runtime, except for the oracle authority calls.
+/// call in the runtime, except for oracle authorities and extra allowed signers.
+///
+/// `ExtraSigners` is a `Get` type that returns a list of additional account IDs that are allowed
+/// to submit transactions. This can be used to allow sudo key holders or other privileged accounts.
 #[derive(Encode, Decode, DecodeWithMemTracking, Clone, Eq, PartialEq, TypeInfo)]
-#[scale_info(skip_type_params(T))]
-pub struct OnlyOracleAuthorities<T>(core::marker::PhantomData<T>);
+#[scale_info(skip_type_params(T, ExtraSigners))]
+pub struct OnlyOracleAuthorities<T, ExtraSigners = ()>(
+	core::marker::PhantomData<(T, ExtraSigners)>,
+);
 
-impl<T> Default for OnlyOracleAuthorities<T> {
+impl<T, ExtraSigners> Default for OnlyOracleAuthorities<T, ExtraSigners> {
 	fn default() -> Self {
 		Self(core::marker::PhantomData)
 	}
 }
 
-impl<T> core::fmt::Debug for OnlyOracleAuthorities<T> {
+impl<T, ExtraSigners> core::fmt::Debug for OnlyOracleAuthorities<T, ExtraSigners> {
 	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
 		write!(f, "OnlyOracleAuthorities")
 	}
 }
 
-impl<T: super::oracle::Config> TransactionExtension<<T as frame_system::Config>::RuntimeCall>
-	for OnlyOracleAuthorities<T>
+impl<T, ExtraSigners> TransactionExtension<<T as frame_system::Config>::RuntimeCall>
+	for OnlyOracleAuthorities<T, ExtraSigners>
 where
 	T: super::oracle::Config + frame_system::Config + Send + Sync,
 	<T as frame_system::Config>::RuntimeCall: Dispatchable<Info = DispatchInfo>,
 	<<T as frame_system::Config>::RuntimeCall as Dispatchable>::RuntimeOrigin:
 		AsSystemOriginSigner<T::AccountId> + Clone,
 	<T as frame_system::Config>::RuntimeCall: IsSubType<OracleCall<T>>,
+	ExtraSigners: Get<alloc::vec::Vec<T::AccountId>> + Clone + Eq + Send + Sync + 'static,
 {
 	const IDENTIFIER: &'static str = "OnlyOracleAuthorities";
 	type Implicit = ();
@@ -149,7 +156,7 @@ where
 	type Pre = ();
 
 	fn weight(&self, _call: &<T as frame_system::Config>::RuntimeCall) -> Weight {
-		// 1 storage read
+		// 1 storage read for authorities, ExtraSigners::get() may add more
 		T::DbWeight::get().reads(1)
 	}
 
@@ -165,10 +172,20 @@ where
 	) -> ValidateResult<Self::Val, <T as frame_system::Config>::RuntimeCall> {
 		let caller = origin.caller();
 		match (caller.is_root(), caller.as_signed()) {
-			(true, _) => return Ok((ValidTransaction::default(), (), origin)),
+			(true, _) => {
+				log::debug!(target: "runtime::price-oracle::only-oracle-authorities", "Allowing root origin");
+				return Ok((ValidTransaction::default(), (), origin));
+			},
 			(false, Some(signer))
 				if crate::oracle::Authorities::<T>::get().contains_key(signer) =>
-				return Ok((ValidTransaction::default(), (), origin)),
+			{
+				log::debug!(target: "runtime::price-oracle::only-oracle-authorities", "Allowing oracle authority");
+				return Ok((ValidTransaction::default(), (), origin));
+			},
+			(false, Some(signer)) if ExtraSigners::get().contains(signer) => {
+				log::debug!(target: "runtime::price-oracle::only-oracle-authorities", "Allowing extra signer");
+				return Ok((ValidTransaction::default(), (), origin));
+			},
 			_ => return Err(TransactionValidityError::Invalid(InvalidTransaction::BadSigner)),
 		}
 	}
@@ -254,14 +271,41 @@ mod tests {
 
 	mod only_oracle_authorities {
 		use super::*;
+		use core::cell::RefCell;
+
+		std::thread_local! {
+			static EXTRA_SIGNERS: RefCell<Vec<u64>> = RefCell::new(vec![]);
+		}
+
+		#[derive(Clone, Eq, PartialEq)]
+		pub struct MockExtraSigners;
+		impl Get<Vec<u64>> for MockExtraSigners {
+			fn get() -> Vec<u64> {
+				EXTRA_SIGNERS.with(|s| s.borrow().clone())
+			}
+		}
+
+		fn set_extra_signers(signers: Vec<u64>) {
+			EXTRA_SIGNERS.with(|s| *s.borrow_mut() = signers);
+		}
+
+		type TestExtension = OnlyOracleAuthorities<Runtime, MockExtraSigners>;
 
 		fn validate_with(
 			origin: RuntimeOrigin,
 			call: &RuntimeCall,
 		) -> ValidateResult<(), RuntimeCall> {
-			let ext = OnlyOracleAuthorities::<Runtime>::default();
+			let ext = TestExtension::default();
 			let info = call.get_dispatch_info();
-			ext.validate(origin, call, &info, 0, (), &TxBaseImplication(()), TransactionSource::External)
+			ext.validate(
+				origin,
+				call,
+				&info,
+				0,
+				(),
+				&TxBaseImplication(()),
+				TransactionSource::External,
+			)
 		}
 
 		#[test]
@@ -288,6 +332,20 @@ mod tests {
 			ExtBuilder::default().build_and_execute(|| {
 				assert!(validate_with(RuntimeOrigin::root(), &vote_call(7)).is_ok());
 				assert!(validate_with(RuntimeOrigin::root(), &non_oracle_call()).is_ok());
+			});
+		}
+
+		#[test]
+		fn allows_extra_signers() {
+			ExtBuilder::default().build_and_execute(|| {
+				set_extra_signers(vec![42]);
+				assert!(validate_with(RuntimeOrigin::signed(42), &vote_call(7)).is_ok());
+				assert!(validate_with(RuntimeOrigin::signed(42), &non_oracle_call()).is_ok());
+				// Non-extra signer still rejected
+				assert!(matches!(
+					validate_with(RuntimeOrigin::signed(99), &vote_call(7)),
+					Err(TransactionValidityError::Invalid(InvalidTransaction::BadSigner))
+				));
 			});
 		}
 	}

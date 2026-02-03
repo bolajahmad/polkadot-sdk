@@ -15,8 +15,6 @@ mod weights;
 
 extern crate alloc;
 use alloc::vec::Vec;
-use smallvec::smallvec;
-
 use polkadot_sdk::{staging_parachain_info as parachain_info, *};
 
 use sp_runtime::{
@@ -29,15 +27,10 @@ use sp_runtime::{
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-use frame_support::weights::{
-	constants::WEIGHT_REF_TIME_PER_SECOND, Weight, WeightToFeeCoefficient, WeightToFeeCoefficients,
-	WeightToFeePolynomial,
-};
+use frame_support::weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight};
 pub use genesis_config_presets::PARACHAIN_ID;
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 pub use sp_runtime::{MultiAddress, Perbill, Permill};
-
-use weights::ExtrinsicBaseWeight;
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
@@ -46,7 +39,7 @@ pub type Signature = MultiSignature;
 /// to the public key of our transaction signing scheme.
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
-/// Balance of an account.
+/// Balance of an account. Only used for internal trait bounds, not for actual balances.
 pub type Balance = u128;
 
 /// Index of a transaction in the chain.
@@ -73,13 +66,21 @@ pub type SignedBlock = generic::SignedBlock<Block>;
 /// BlockId type as expected by this runtime.
 pub type BlockId = generic::BlockId<Block>;
 
+/// Extra signers allowed to submit transactions (in addition to oracle authorities).
+/// Returns the sudo key if set.
+#[derive(Clone, Eq, PartialEq)]
+pub struct SudoKeyAsExtraSigner;
+impl frame_support::traits::Get<Vec<AccountId>> for SudoKeyAsExtraSigner {
+	fn get() -> Vec<AccountId> {
+		pallet_sudo::Key::<Runtime>::get().into_iter().collect()
+	}
+}
+
 /// The extension to the basic transaction logic.
 #[docify::export(template_signed_extra)]
 pub type TxExtension = cumulus_pallet_weight_reclaim::StorageWeightReclaim<
 	Runtime,
 	(
-		// TODO: a global extension that filters only signed txs from the oracle key of validators
-		// can come in.
 		frame_system::AuthorizeCall<Runtime>,
 		frame_system::CheckNonZeroSender<Runtime>,
 		frame_system::CheckSpecVersion<Runtime>,
@@ -88,7 +89,8 @@ pub type TxExtension = cumulus_pallet_weight_reclaim::StorageWeightReclaim<
 		frame_system::CheckEra<Runtime>,
 		frame_system::CheckNonce<Runtime>,
 		frame_system::CheckWeight<Runtime>,
-		// pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+		// Rejects any transaction not from oracle authorities, sudo key, or root.
+		pallet_staking_async_price_oracle::extension::OnlyOracleAuthorities<Runtime, SudoKeyAsExtraSigner>,
 		pallet_staking_async_price_oracle::extension::SetPriorityFromProducedIn<Runtime>,
 		frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
 	),
@@ -106,33 +108,6 @@ pub type Executive = frame_executive::Executive<
 	Runtime,
 	AllPalletsWithSystem,
 >;
-
-/// Handles converting a weight scalar to a fee value, based on the scale and granularity of the
-/// node's balance type.
-///
-/// This should typically create a mapping between the following ranges:
-///   - `[0, MAXIMUM_BLOCK_WEIGHT]`
-///   - `[Balance::min, Balance::max]`
-///
-/// Yet, it can be used for any other sort of change to weight-fee. Some examples being:
-///   - Setting it to `0` will essentially disable the weight fee.
-///   - Setting it to `1` will cause the literal `#[weight = x]` values to be charged.
-pub struct WeightToFee;
-impl WeightToFeePolynomial for WeightToFee {
-	type Balance = Balance;
-	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
-		// in Rococo, extrinsic base weight (smallest non-zero weight) is mapped to 1 MILLI_UNIT:
-		// in our template, we map to 1/10 of that, or 1/10 MILLI_UNIT
-		let p = MILLI_UNIT / 10;
-		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
-		smallvec![WeightToFeeCoefficient {
-			degree: 1,
-			negative: false,
-			coeff_frac: Perbill::from_rational(p % q, q),
-			coeff_integer: p / q,
-		}]
-	}
-}
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -195,15 +170,6 @@ pub use block_times::*;
 pub const MINUTES: BlockNumber = 60_000 / (MILLI_SECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
-
-// Unit = the base number of indivisible units for balances
-pub const UNIT: Balance = 1_000_000_000_000;
-pub const CENTS: Balance = UNIT / 100;
-pub const MILLI_UNIT: Balance = 1_000_000_000;
-pub const MICRO_UNIT: Balance = 1_000_000;
-
-/// The existential deposit. Set to 1/10 of the Connected Relay Chain.
-pub const EXISTENTIAL_DEPOSIT: Balance = MILLI_UNIT;
 
 /// We assume that ~5% of the block weight is consumed by `on_initialize` handlers. This is
 /// used to limit the maximal weight of a single extrinsic.
@@ -277,11 +243,9 @@ mod runtime {
 	#[runtime::pallet_index(4)]
 	pub type WeightReclaim = cumulus_pallet_weight_reclaim;
 
-	// Monetary stuff.
+	// Balances - only for internal trait bounds (session, xcm), not user-facing.
 	#[runtime::pallet_index(10)]
 	pub type Balances = pallet_balances;
-	#[runtime::pallet_index(11)]
-	pub type TransactionPayment = pallet_transaction_payment;
 
 	// Governance
 	#[runtime::pallet_index(15)]

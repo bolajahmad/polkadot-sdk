@@ -514,6 +514,13 @@ pub mod pallet {
 			/// The timeslice associated with the potential renewal that was removed.
 			timeslice: Timeslice,
 		},
+		/// The bid was placed on coretime auction.
+		BidPlaced {
+			/// Unique ID of the bid that was placed.
+			bid_id: BidIdOf<T>,
+			/// Bid amount.
+			price: BalanceOf<T>,
+		},
 	}
 
 	#[pallet::error]

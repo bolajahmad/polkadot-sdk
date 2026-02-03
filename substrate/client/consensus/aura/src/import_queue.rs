@@ -388,13 +388,14 @@ where
 	}
 
 	/// Create a new AURA block import with an empty authorities tracker.
-	/// Usually you should _not_ use this method, as it will not have any initial authorities
-	/// imported. Use [`AuraBlockImport::new`] instead.
+	/// This is useful when the AURA API is missing.
 	pub fn new_empty(
 		block_import: BI,
 		client: Arc<Client>,
+		compatibility_mode: CompatibilityMode<NumberFor<Block>>,
 	) -> (Self, Arc<AuthoritiesTracker<P, Block, Client>>) {
-		let authorities_tracker = Arc::new(AuthoritiesTracker::new_empty(client));
+		let authorities_tracker =
+			Arc::new(AuthoritiesTracker::new_empty(client, compatibility_mode));
 		(
 			Self { block_import, authorities_tracker: authorities_tracker.clone() },
 			authorities_tracker,
@@ -450,7 +451,8 @@ where
 			if with_state {
 				// First block being imported from warp sync needs to update the authorities tracker
 				// from the runtime.
-				self.authorities_tracker.import_from_runtime(&post_header)?;
+				self.authorities_tracker
+					.import_from_runtime(post_header.hash(), *post_header.number())?;
 			} else {
 				self.authorities_tracker.import_from_header(&post_header)?;
 			};

@@ -877,7 +877,8 @@ mod tests {
 		let mut net = AuraTestNet::new(3);
 		let peer = net.peer(0);
 		let client = peer.client().as_client();
-		let tracker = AuthoritiesTracker::<AuthorityPair, _, _>::new_empty(client);
+		let tracker =
+			AuthoritiesTracker::<AuthorityPair, _, _>::new_empty(client, CompatibilityMode::None);
 		let parent_header = TestHeader {
 			parent_hash: Default::default(),
 			number: 0,

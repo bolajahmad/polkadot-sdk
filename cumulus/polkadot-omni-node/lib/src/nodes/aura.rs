@@ -54,9 +54,10 @@ use cumulus_primitives_core::{
 };
 use cumulus_relay_chain_interface::{OverseerHandle, RelayChainInterface};
 use futures::{prelude::*, FutureExt};
+use polkadot_cli::service::HeaderMetadata;
 use polkadot_primitives::{CollatorPair, UpgradeGoAhead};
 use prometheus_endpoint::Registry;
-use sc_client_api::{Backend, BlockchainEvents};
+use sc_client_api::{Backend, BlockchainEvents, HeaderBackend};
 use sc_client_db::DbHash;
 use sc_consensus::{
 	import_queue::{BasicQueue, Verifier as VerifierT},
@@ -81,9 +82,10 @@ use sp_runtime::{
 use sp_transaction_storage_proof::runtime_api::TransactionStorageApi;
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
-struct Verifier<Block, Client, AuraId> {
+struct Verifier<Block: BlockT, Client, AuraId: AuraIdT> {
 	client: Arc<Client>,
 	aura_verifier: Box<dyn VerifierT<Block>>,
+	authorities_tracker: Arc<AuthoritiesTracker<AuraId::BoundedPair, Block, Client>>,
 	relay_chain_verifier: Box<dyn VerifierT<Block>>,
 	_phantom: PhantomData<AuraId>,
 }
@@ -91,7 +93,11 @@ struct Verifier<Block, Client, AuraId> {
 #[async_trait::async_trait]
 impl<Block: BlockT, Client, AuraId> VerifierT<Block> for Verifier<Block, Client, AuraId>
 where
-	Client: ProvideRuntimeApi<Block> + Send + Sync,
+	Client: HeaderBackend<Block>
+		+ HeaderMetadata<Block, Error = sp_blockchain::Error>
+		+ ProvideRuntimeApi<Block>
+		+ Send
+		+ Sync,
 	Client::Api: AuraRuntimeApi<Block, AuraId>,
 	AuraId: AuraIdT + Sync,
 {
@@ -100,6 +106,13 @@ where
 		block_import: BlockImportParams<Block>,
 	) -> Result<BlockImportParams<Block>, String> {
 		if self.client.runtime_api().has_aura_api(*block_import.header.parent_hash()) {
+			if self.authorities_tracker.is_empty() {
+				// Initialize the authorities if the AURA API has just become available.
+				self.authorities_tracker.import_from_runtime(
+					*block_import.header.parent_hash(),
+					*block_import.header.number() - 1u32.into(),
+				)?;
+			}
 			self.aura_verifier.verify(block_import).await
 		} else {
 			self.relay_chain_verifier.verify(block_import).await
@@ -146,7 +159,7 @@ where
 				client.clone(),
 				inherent_data_providers,
 				telemetry_handle,
-				authorities_tracker,
+				authorities_tracker.clone(),
 			)
 			.map_err(|e| sc_service::Error::Other(e))?;
 
@@ -154,6 +167,7 @@ where
 			client,
 			aura_verifier: Box::new(equivocation_aura_verifier),
 			relay_chain_verifier,
+			authorities_tracker,
 			_phantom: Default::default(),
 		};
 
@@ -714,9 +728,14 @@ where
 		let (slot_based_block_import, handle) =
 			SlotBasedBlockImport::new(client.clone(), client.clone());
 
+		let finalized_hash = client.info().finalized_hash;
 		let (aura_block_import, authorities_tracker) =
-			AuraBlockImport::new(slot_based_block_import, client, &CompatibilityMode::None)
-				.map_err(|e| sc_service::Error::Other(e))?;
+			if client.runtime_api().has_aura_api(finalized_hash) {
+				AuraBlockImport::new(slot_based_block_import, client, &CompatibilityMode::None)
+					.map_err(|e| sc_service::Error::Other(e))?
+			} else {
+				AuraBlockImport::new_empty(slot_based_block_import, client, CompatibilityMode::None)
+			};
 
 		Ok((aura_block_import, handle, authorities_tracker))
 	}

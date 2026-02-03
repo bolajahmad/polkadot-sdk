@@ -43,7 +43,7 @@ use log::{debug, info};
 use parachains_common_types::Hash;
 use polkadot_primitives::CollatorPair;
 use prometheus_endpoint::Registry;
-use sc_client_api::Backend;
+use sc_client_api::{Backend, HeaderBackend};
 use sc_consensus::DefaultImportQueue;
 use sc_consensus_aura::{AuraBlockImport, AuthoritiesTracker, CompatibilityMode};
 use sc_executor::{HeapAllocStrategy, DEFAULT_HEAP_ALLOC_STRATEGY};
@@ -167,9 +167,13 @@ where
 		Self::BlockImportAuxiliaryData,
 		Arc<AuthoritiesTracker<AuraId::BoundedPair, Block, ParachainClient<Block, RuntimeApi>>>,
 	)> {
-		let (block_import, authorities_tracker) =
+		let finalized_hash = client.info().finalized_hash;
+		let (block_import, authorities_tracker) = if client.runtime_api().has_aura_api(finalized_hash) {
 			AuraBlockImport::new(client.clone(), client, &CompatibilityMode::None)
-				.map_err(|e| sc_service::Error::Other(e))?;
+				.map_err(|e| sc_service::Error::Other(e))?
+		} else {
+			AuraBlockImport::new_empty(client.clone(), client, CompatibilityMode::None)
+		};
 		Ok((block_import, (), authorities_tracker))
 	}
 }

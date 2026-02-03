@@ -156,25 +156,21 @@ where
 	fn validate(
 		&self,
 		origin: <T as frame_system::Config>::RuntimeOrigin,
-		call: &<T as frame_system::Config>::RuntimeCall,
+		_call: &<T as frame_system::Config>::RuntimeCall,
 		_info: &DispatchInfoOf<<T as frame_system::Config>::RuntimeCall>,
 		_len: usize,
 		_self_implicit: Self::Implicit,
 		_inherited_implication: &impl Encode,
 		_source: TransactionSource,
 	) -> ValidateResult<Self::Val, <T as frame_system::Config>::RuntimeCall> {
-		if let Some(_) = call.is_sub_type() {
-			let caller = origin.caller();
-			match (caller.is_root(), caller.as_signed()) {
-				(true, _) => return Ok((ValidTransaction::default(), (), origin)),
-				(false, Some(signer))
-					if crate::oracle::Authorities::<T>::get().contains_key(signer) =>
-					return Ok((ValidTransaction::default(), (), origin)),
-				_ => return Err(TransactionValidityError::Invalid(InvalidTransaction::BadSigner)),
-			}
+		let caller = origin.caller();
+		match (caller.is_root(), caller.as_signed()) {
+			(true, _) => return Ok((ValidTransaction::default(), (), origin)),
+			(false, Some(signer))
+				if crate::oracle::Authorities::<T>::get().contains_key(signer) =>
+				return Ok((ValidTransaction::default(), (), origin)),
+			_ => return Err(TransactionValidityError::Invalid(InvalidTransaction::BadSigner)),
 		}
-
-		Err(TransactionValidityError::Invalid(InvalidTransaction::BadSigner))
 	}
 
 	fn prepare(
@@ -196,5 +192,103 @@ where
 		_result: &DispatchResult,
 	) -> Result<Weight, TransactionValidityError> {
 		Ok(Default::default())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::oracle::mock::{ExtBuilder, Runtime, RuntimeCall, RuntimeOrigin};
+	use frame_support::dispatch::GetDispatchInfo;
+	use sp_runtime::{
+		traits::{TransactionExtension, TxBaseImplication},
+		FixedU128,
+	};
+
+	fn vote_call(produced_in: u64) -> RuntimeCall {
+		RuntimeCall::PriceOracle(crate::oracle::Call::vote {
+			asset_id: 1,
+			price: FixedU128::from_u32(100),
+			produced_in,
+		})
+	}
+
+	fn non_oracle_call() -> RuntimeCall {
+		RuntimeCall::System(frame_system::Call::remark { remark: vec![] })
+	}
+
+	mod set_priority_from_produced_in {
+		use super::*;
+
+		fn validate_priority(call: &RuntimeCall) -> TransactionPriority {
+			let ext = SetPriorityFromProducedIn::<Runtime>::default();
+			let info = call.get_dispatch_info();
+			ext.validate(
+				RuntimeOrigin::signed(1),
+				call,
+				&info,
+				0,
+				(),
+				&TxBaseImplication(()),
+				TransactionSource::External,
+			)
+			.unwrap()
+			.0
+			.priority
+		}
+
+		#[test]
+		fn sets_priority_for_vote_call() {
+			ExtBuilder::default().build_and_execute(|| {
+				assert_eq!(validate_priority(&vote_call(42)), 42);
+			});
+		}
+
+		#[test]
+		fn noop_for_non_oracle_call() {
+			ExtBuilder::default().build_and_execute(|| {
+				assert_eq!(validate_priority(&non_oracle_call()), 0);
+			});
+		}
+	}
+
+	mod only_oracle_authorities {
+		use super::*;
+
+		fn validate_with(
+			origin: RuntimeOrigin,
+			call: &RuntimeCall,
+		) -> ValidateResult<(), RuntimeCall> {
+			let ext = OnlyOracleAuthorities::<Runtime>::default();
+			let info = call.get_dispatch_info();
+			ext.validate(origin, call, &info, 0, (), &TxBaseImplication(()), TransactionSource::External)
+		}
+
+		#[test]
+		fn allows_authority_for_any_call() {
+			ExtBuilder::default().build_and_execute(|| {
+				let authority = RuntimeOrigin::signed(1);
+				assert!(validate_with(authority.clone(), &vote_call(7)).is_ok());
+				assert!(validate_with(authority, &non_oracle_call()).is_ok());
+			});
+		}
+
+		#[test]
+		fn rejects_non_authority() {
+			ExtBuilder::default().build_and_execute(|| {
+				assert!(matches!(
+					validate_with(RuntimeOrigin::signed(99), &vote_call(7)),
+					Err(TransactionValidityError::Invalid(InvalidTransaction::BadSigner))
+				));
+			});
+		}
+
+		#[test]
+		fn allows_root() {
+			ExtBuilder::default().build_and_execute(|| {
+				assert!(validate_with(RuntimeOrigin::root(), &vote_call(7)).is_ok());
+				assert!(validate_with(RuntimeOrigin::root(), &non_oracle_call()).is_ok());
+			});
+		}
 	}
 }

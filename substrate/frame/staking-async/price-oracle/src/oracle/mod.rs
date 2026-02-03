@@ -32,8 +32,8 @@ V0: next week
 - [x] Benchmarking for on_init
 - New tx extension to:
 	- [x] Should also read the authorities, and block any tx from other than these folks, if signed origin
-	- [ ] tests
-- [ ] Tests for existing tx-extension (minimal)
+	- [x] tests
+- [x] Tests for existing tx-extension (minimal)
 - [x] vote should be operational
 - [ ] Cleanup test runtime (remove tx-extension, make it more realistic)
 - [ ] One papi test for quick-ish sanity test

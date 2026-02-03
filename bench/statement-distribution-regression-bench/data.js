@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769813874450,
+  "lastUpdate": 1770148178304,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "karol.k91@gmail.com",
-            "name": "Karol Kokoszka",
-            "username": "karolk91"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "cc5065dab6ab4c40d2901981481afdad8e34d4c2",
-          "message": "transfer_assets benchmarking and weights for coretime chains (#8752)\n\nIntroduces implementation of `set_up_complex_asset_transfer()` to\ncorrectly benchmark weights for `transfer_assets` extrinsics on Rococo\nCoretime and Westend Coretime. Introducing also test scenarios to cover\ncommon xcm teleport use cases\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-25T10:15:30Z",
-          "tree_id": "b73dcd429b1c64f19dff4df585da6daa472bf178",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/cc5065dab6ab4c40d2901981481afdad8e34d4c2"
-        },
-        "date": 1750851473845,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 127.95399999999997,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04576824219399994,
-            "unit": "seconds"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.03414215436800001,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.06385397173399994,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a78b18a5cc547141bfd5c10eb17593239e1e2509",
+          "message": "benchmarking: fix DB read/write counts (#10947)\n\nPR #10802 added `reset_read_write_count()` at the end of commit_db() to\nprevent warmup operations from appearing in benchmarking results.\nHowever, commit_db is called twice: one on `on_before_start()` closure\nbefore benchmark, and one after benchmark execution after benchmark.\nThis PR whitelists the warmup key used in commit_db so that it doesn't\nappear in the read/write count.\n\nWe also regenerated staking-async weights (wrongly benchmarked in\n#10802) and conviction-voting to check both v1 and v2 benchmarking.\n\nDriven-by: update `try-runtime-cli` to v0.10.1 as an attempt to fix the\nissue for which CI regularly fails in the check-migration (WAH) job in\n./try-runtime create-snapshot --uri\nwss://westend-asset-hub-rpc.polkadot.io:443 snapshot.raw`\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-03T17:57:06Z",
+          "tree_id": "3370bccb812c896e324de40f014df2faaa6beb9c",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a78b18a5cc547141bfd5c10eb17593239e1e2509"
+        },
+        "date": 1770148154169,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 128.038,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.039056603385999984,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06629258670399996,
             "unit": "seconds"
           }
         ]

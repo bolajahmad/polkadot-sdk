@@ -94,6 +94,7 @@ pub enum TickAction<AccountId, Balance, BidId> {
 pub enum MarketError {
 	NoSales,
 	Overpriced,
+	BidNotExist,
 }
 
 // TODO: Proper conversion
@@ -141,13 +142,13 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 		id: Self::BidId,
 		maybe_check_owner: Option<AccountIdFor<T>>,
 	) -> Result<(), Self::Error> {
-		todo!()
+		Err(MarketError::BidNotExist)
 	}
 
 	fn tick(
 		since_timeslice_start: RelayBlockNumberOf<T>,
 	) -> Result<Vec<TickAction<AccountIdFor<T>, BalanceOf<T>, Self::BidId>>, Self::Error> {
-		todo!()
+		Ok(vec![])
 	}
 }
 

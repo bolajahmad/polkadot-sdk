@@ -136,7 +136,7 @@ pub mod substrate_execution {
 					let stipend = if *add_stipend {
 						let weight_stipend = determine_call_stipend::<T>();
 						if weight_left.any_lt(weight_stipend) {
-							return Err(<Error<T>>::OutOfGas.into())
+							return Err(<Error<T>>::OutOfGas.into());
 						}
 
 						weight_limit.saturating_accrue(weight_stipend);
@@ -362,7 +362,7 @@ pub mod ethereum_execution {
 					let (gas_limit, stipend) = if *add_stipend {
 						let weight_stipend = determine_call_stipend::<T>();
 						if weight_left.any_lt(weight_stipend) {
-							return Err(<Error<T>>::OutOfGas.into())
+							return Err(<Error<T>>::OutOfGas.into());
 						}
 
 						(

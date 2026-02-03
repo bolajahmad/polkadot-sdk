@@ -229,58 +229,37 @@ fn extcodehash_works(fixture_type: FixtureType) {
 		let host_code_hash = test_utils::get_contract(&host_addr).code_hash;
 		let target_code_hash = test_utils::get_contract(&target_addr).code_hash;
 
-		// Test case 1: Regular contract - returns its own code hash
-		{
-			let result = call_extcodehash(&host_addr, &host_addr);
-			assert_eq!(
-				result, host_code_hash,
-				"EXTCODEHASH for regular contract should return its code hash"
-			);
+		struct TestCase<'a> {
+			name: &'a str,
+			addr: H160,
+			expected: H256,
 		}
 
-		// Test case 2: Delegated EOA - returns target's code hash (EIP-7702)
-		{
-			let delegated_eoa = create_delegated_eoa(&target_addr);
-			let result = call_extcodehash(&host_addr, &delegated_eoa);
-			assert_eq!(
-				result, target_code_hash,
-				"EXTCODEHASH for delegated EOA should return target's code hash"
-			);
-		}
+		let delegated_eoa = create_delegated_eoa(&target_addr);
 
-		// Test case 2b: Delegation chain - returns EMPTY_CODE_HASH (chains not followed per
-		// EIP-7702)
-		{
-			// delegated_eoa -> target_addr (contract)
-			// DJANGO -> delegated_eoa (another delegated account)
-			<Test as Config>::Currency::set_balance(&DJANGO, 100_000_000);
-			let delegated_eoa = create_delegated_eoa(&target_addr);
-			assert_ok!(AccountInfo::<Test>::set_delegation(&DJANGO_ADDR, delegated_eoa));
-			let result = call_extcodehash(&host_addr, &DJANGO_ADDR);
-			assert_eq!(
-				result, EMPTY_CODE_HASH,
-				"EXTCODEHASH for delegation chain should return EMPTY_CODE_HASH (no chain following)"
-			);
-		}
+		// delegated_eoa -> target_addr (contract)
+		// DJANGO -> delegated_eoa (another delegated account)
+		<Test as Config>::Currency::set_balance(&DJANGO, 100_000_000);
+		let chained_delegated_eoa = create_delegated_eoa(&target_addr);
+		assert_ok!(AccountInfo::<Test>::set_delegation(&DJANGO_ADDR, chained_delegated_eoa,));
 
-		// Test case 3: Regular EOA - returns EMPTY_CODE_HASH
-		{
-			<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
-			let result = call_extcodehash(&host_addr, &CHARLIE_ADDR);
-			assert_eq!(
-				result, EMPTY_CODE_HASH,
-				"EXTCODEHASH for regular EOA should return EMPTY_CODE_HASH"
-			);
-		}
+		<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
 
-		// Test case 4: Non-existent address - returns zero
-		{
-			let result = call_extcodehash(&host_addr, &H160::from_low_u64_be(0xdead));
-			assert_eq!(
-				result,
-				H256::zero(),
-				"EXTCODEHASH for non-existent address should return zero"
-			);
+		let cases = vec![
+			TestCase { name: "regular contract", addr: host_addr, expected: host_code_hash },
+			TestCase { name: "delegated EOA", addr: delegated_eoa, expected: target_code_hash },
+			TestCase { name: "delegation chain", addr: DJANGO_ADDR, expected: EMPTY_CODE_HASH },
+			TestCase { name: "regular EOA", addr: CHARLIE_ADDR, expected: EMPTY_CODE_HASH },
+			TestCase {
+				name: "non-existent",
+				addr: H160::from_low_u64_be(0xdead),
+				expected: H256::zero(),
+			},
+		];
+
+		for tc in cases {
+			let result = call_extcodehash(&host_addr, &tc.addr);
+			assert_eq!(result, tc.expected, "EXTCODEHASH for {} failed", tc.name);
 		}
 	});
 }

@@ -1656,7 +1656,7 @@ impl<T: Config> Pallet<T> {
 
 			let mut meter = match TransactionMeter::new(limits) {
 				Ok(meter) => meter,
-				Err(error) => {
+				Err(error) =>
 					return block_storage::EthereumCallResult {
 						receipt_gas_info: ReceiptGasInfo {
 							gas_used: U256::zero(),
@@ -1669,8 +1669,7 @@ impl<T: Config> Pallet<T> {
 							},
 							error,
 						}),
-					}
-				},
+					},
 			};
 
 			let output = Self::bare_call_internal(
@@ -1822,7 +1821,7 @@ impl<T: Config> Pallet<T> {
 					)?;
 					executable
 				},
-				Code::Upload(code) => {
+				Code::Upload(code) =>
 					if T::AllowEVMBytecode::get() {
 						ensure!(data.is_empty(), <Error<T>>::EvmConstructorNonEmptyData);
 						let origin = T::UploadOrigin::ensure_origin(origin)?;
@@ -1830,8 +1829,7 @@ impl<T: Config> Pallet<T> {
 						executable
 					} else {
 						return Err(<Error<T>>::CodeRejected.into());
-					}
-				},
+					},
 				Code::Existing(code_hash) => {
 					let executable = ContractBlob::from_storage(code_hash, &mut transaction_meter)?;
 					ensure!(executable.code_info().is_pvm(), <Error<T>>::EvmConstructedFromHash);
@@ -2290,12 +2288,10 @@ impl<T: Config> Pallet<T> {
 	{
 		match tracer_type {
 			TracerType::CallTracer(config) => CallTracer::new(config.unwrap_or_default()).into(),
-			TracerType::PrestateTracer(config) => {
-				PrestateTracer::new(config.unwrap_or_default()).into()
-			},
-			TracerType::ExecutionTracer(config) => {
-				ExecutionTracer::new(config.unwrap_or_default()).into()
-			},
+			TracerType::PrestateTracer(config) =>
+				PrestateTracer::new(config.unwrap_or_default()).into(),
+			TracerType::ExecutionTracer(config) =>
+				ExecutionTracer::new(config.unwrap_or_default()).into(),
 		}
 	}
 
@@ -2684,8 +2680,8 @@ impl<T: Config> Pallet<T> {
 			return Ok(());
 		};
 
-		if exec::is_precompile::<T, ContractBlob<T>>(&address)
-			|| <AccountInfo<T>>::is_contract(&address)
+		if exec::is_precompile::<T, ContractBlob<T>>(&address) ||
+			<AccountInfo<T>>::is_contract(&address)
 		{
 			log::debug!(
 				target: crate::LOG_TARGET,

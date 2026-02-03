@@ -312,20 +312,18 @@ impl<T: Config> Token<T> for RuntimeCosts {
 				cost_args!(seal_call, 1, dust_transfer.into(), 0)
 			},
 			CallInputCloned(len) => cost_args!(seal_call, 0, 0, len),
-			Instantiate { input_data_len, balance_transfer, dust_transfer } => {
+			Instantiate { input_data_len, balance_transfer, dust_transfer } =>
 				T::WeightInfo::seal_instantiate(
 					balance_transfer.into(),
 					dust_transfer.into(),
 					input_data_len,
-				)
-			},
-			Create { init_code_len, balance_transfer, dust_transfer } => {
+				),
+			Create { init_code_len, balance_transfer, dust_transfer } =>
 				T::WeightInfo::evm_instantiate(
 					balance_transfer.into(),
 					dust_transfer.into(),
 					init_code_len,
-				)
-			},
+				),
 			HashSha256(len) => T::WeightInfo::sha2_256(len),
 			Ripemd160(len) => T::WeightInfo::ripemd_160(len),
 			HashKeccak256(len) => T::WeightInfo::seal_hash_keccak_256(len),
@@ -345,9 +343,8 @@ impl<T: Config> Token<T> for RuntimeCosts {
 			Blake2F(rounds) => T::WeightInfo::blake2f(rounds),
 			Modexp(gas) => Weight::from_parts(gas.saturating_mul(WEIGHT_PER_GAS), 0),
 			ValidateAuthorization => T::WeightInfo::validate_authorization(),
-			ApplyDelegation { is_new_account } => {
-				T::WeightInfo::apply_delegation(is_new_account as u32)
-			},
+			ApplyDelegation { is_new_account } =>
+				T::WeightInfo::apply_delegation(is_new_account as u32),
 		}
 	}
 }

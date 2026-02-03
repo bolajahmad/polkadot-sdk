@@ -59,7 +59,7 @@ sp-keyring.default-features = true
 sp-keyring.workspace = true
 xcm.default-features = true
 xcm.workspace = true
-yet-another-parachain-runtime.workspace = true
+#yet-another-parachain-runtime.workspace = true
 
 [dev-dependencies]
 assert_cmd = { workspace = true }
@@ -89,7 +89,7 @@ runtime-benchmarks = [
 	"people-westend-runtime/runtime-benchmarks",
 	"rococo-parachain-runtime/runtime-benchmarks",
 	"xcm/runtime-benchmarks",
-	"yet-another-parachain-runtime/runtime-benchmarks",
+	#"yet-another-parachain-runtime/runtime-benchmarks",
 ]
 try-runtime = [
 	"polkadot-omni-node-lib/try-runtime",

@@ -789,14 +789,15 @@ pub fn check_genesis_storage(storage: &Storage) -> sp_blockchain::Result<()> {
 	if storage.top.iter().any(|(k, _)| well_known_keys::is_child_storage_key(k)) {
 		return Err(sp_blockchain::Error::InvalidState)
 	}
-
-	if storage
-		.children_default
-		.keys()
-		.any(|child_key| !well_known_keys::is_child_storage_key(child_key))
-	{
-		return Err(sp_blockchain::Error::InvalidState)
-	}
+	// [DOPPELGANGER] TODO(JAVIER): validate this change with Emeric or Basti, I think we don't need
+	// to run this anymore.
+	// if storage
+	// 	.children_default
+	// 	.keys()
+	// 	.any(|child_key| !well_known_keys::is_child_storage_key(child_key))
+	// {
+	// 	return Err(sp_blockchain::Error::InvalidState)
+	// }
 
 	Ok(())
 }

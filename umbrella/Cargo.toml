@@ -1013,6 +1013,11 @@ tuples-96 = [
 	"frame-support?/tuples-96",
 ]
 
+doppelganger = [
+	"polkadot-cli/doppelganger",
+	"polkadot-omni-node-lib/doppelganger",
+]
+
 [package.edition]
 workspace = true
 
@@ -1024,6 +1029,12 @@ workspace = true
 
 [package.repository]
 workspace = true
+
+
+[dependencies.doppelganger]
+default-features = false
+optional = false
+path = "../doppelganger"
 
 [dependencies.assets-common]
 default-features = false

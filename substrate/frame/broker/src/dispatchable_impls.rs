@@ -660,16 +660,4 @@ impl<T: Config> Pallet<T> {
 
 		Ok(())
 	}
-
-	// TODO: Remove as this logic belongs to Market impl.
-	/// If there is an ongoing sale returns the current price of a core.
-	pub fn current_price() -> Result<BalanceOf<T>, DispatchError> {
-		let status = Status::<T>::get().ok_or(Error::<T>::Uninitialized)?;
-		let sale = SaleInfo::<T>::get().ok_or(Error::<T>::NoSales)?;
-
-		Self::ensure_cores_for_sale(&status, &sale)?;
-
-		let now = RCBlockNumberProviderOf::<T::Coretime>::current_block_number();
-		Ok(Self::sale_price(&sale, now))
-	}
 }

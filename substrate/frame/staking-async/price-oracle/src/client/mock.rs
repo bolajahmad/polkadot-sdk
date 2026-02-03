@@ -20,36 +20,30 @@
 use crate::client as pallet_price_oracle_client;
 use frame_support::derive_impl;
 use frame_system::EnsureRoot;
-use sp_core::sr25519::Signature;
-use sp_runtime::{
-	traits::{IdentifyAccount, IdentityLookup, Verify},
-	BuildStorage,
-};
-
-type Block = frame_system::mocking::MockBlock<Test>;
+use sp_runtime::BuildStorage;
+pub type Block = frame_system::mocking::MockBlock<Runtime>;
+pub type T = Runtime;
 
 frame_support::construct_runtime!(
-	pub enum Test {
+	pub enum Runtime {
 		System: frame_system,
 		PriceOracleClient: pallet_price_oracle_client,
 	}
 );
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
-impl frame_system::Config for Test {
+impl frame_system::Config for Runtime {
 	type Block = Block;
-	type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
-	type Lookup = IdentityLookup<Self::AccountId>;
 	type AccountData = ();
 }
 
-impl pallet_price_oracle_client::Config for Test {
+impl pallet_price_oracle_client::Config for Runtime {
 	type RelayChainOrigin = EnsureRoot<Self::AccountId>;
 	type WeightInfo = ();
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	let storage = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+	let storage = frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
 	let mut ext = sp_io::TestExternalities::from(storage);
 	ext.execute_with(|| System::set_block_number(1));
 	ext

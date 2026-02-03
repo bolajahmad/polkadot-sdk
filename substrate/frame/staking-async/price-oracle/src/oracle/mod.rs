@@ -31,7 +31,7 @@ V0: next week
 	- [x] e2e tests where pallet moves forward, and 1 OCW is submitting stuff (stretch)
 - [x] Benchmarking for on_init
 - New tx extension to:
-	- [ ] Should also read the authorities, and block any tx from other than these folks, if signed origin
+	- [x] Should also read the authorities, and block any tx from other than these folks, if signed origin
 	- [ ] tests
 - [ ] Tests for existing tx-extension (minimal)
 - [x] vote should be operational
@@ -691,6 +691,11 @@ pub mod pallet {
 			#[cfg(test)]
 			let _ = Self::do_try_state(local_block_number)
 				.defensive_proof("try_state should not fail; qed");
+		}
+
+		fn on_initialize(_local_block_number: BlockNumberFor<T>) -> Weight {
+			let assets_to_tally = StorageManager::<T>::tracked_assets().len() as u32;
+			T::WeightInfo::on_finalize_per_asset().saturating_mul(assets_to_tally as u64)
 		}
 
 		fn offchain_worker(block_number: BlockNumberFor<T>) {

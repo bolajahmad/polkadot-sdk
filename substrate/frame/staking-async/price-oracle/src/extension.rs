@@ -18,7 +18,10 @@
 use super::oracle::Call as OracleCall;
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use frame_support::{
-	dispatch::DispatchInfo, pallet_prelude::TransactionSource, traits::IsSubType, weights::Weight,
+	dispatch::DispatchInfo,
+	pallet_prelude::{InvalidTransaction, TransactionSource},
+	traits::{CallerTrait, Get, IsSubType, OriginTrait},
+	weights::Weight,
 };
 use scale_info::TypeInfo;
 use sp_runtime::{
@@ -109,6 +112,89 @@ where
 		_len: usize,
 		_result: &DispatchResult,
 	) -> Result<Weight, TransactionValidityError> {
-		Ok(Weight::zero())
+		Ok(Default::default())
+	}
+}
+
+/// Transaction extension that will block any incoming transactions from any signed account, to any
+/// call in the runtime, except for the oracle authority calls.
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, Eq, PartialEq, TypeInfo)]
+#[scale_info(skip_type_params(T))]
+pub struct OnlyOracleAuthorities<T>(core::marker::PhantomData<T>);
+
+impl<T> Default for OnlyOracleAuthorities<T> {
+	fn default() -> Self {
+		Self(core::marker::PhantomData)
+	}
+}
+
+impl<T> core::fmt::Debug for OnlyOracleAuthorities<T> {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+		write!(f, "OnlyOracleAuthorities")
+	}
+}
+
+impl<T: super::oracle::Config> TransactionExtension<<T as frame_system::Config>::RuntimeCall>
+	for OnlyOracleAuthorities<T>
+where
+	T: super::oracle::Config + frame_system::Config + Send + Sync,
+	<T as frame_system::Config>::RuntimeCall: Dispatchable<Info = DispatchInfo>,
+	<<T as frame_system::Config>::RuntimeCall as Dispatchable>::RuntimeOrigin:
+		AsSystemOriginSigner<T::AccountId> + Clone,
+	<T as frame_system::Config>::RuntimeCall: IsSubType<OracleCall<T>>,
+{
+	const IDENTIFIER: &'static str = "OnlyOracleAuthorities";
+	type Implicit = ();
+	type Val = ();
+	type Pre = ();
+
+	fn weight(&self, _call: &<T as frame_system::Config>::RuntimeCall) -> Weight {
+		// 1 storage read
+		T::DbWeight::get().reads(1)
+	}
+
+	fn validate(
+		&self,
+		origin: <T as frame_system::Config>::RuntimeOrigin,
+		call: &<T as frame_system::Config>::RuntimeCall,
+		_info: &DispatchInfoOf<<T as frame_system::Config>::RuntimeCall>,
+		_len: usize,
+		_self_implicit: Self::Implicit,
+		_inherited_implication: &impl Encode,
+		_source: TransactionSource,
+	) -> ValidateResult<Self::Val, <T as frame_system::Config>::RuntimeCall> {
+		if let Some(_) = call.is_sub_type() {
+			let caller = origin.caller();
+			match (caller.is_root(), caller.as_signed()) {
+				(true, _) => return Ok((ValidTransaction::default(), (), origin)),
+				(false, Some(signer))
+					if crate::oracle::Authorities::<T>::get().contains_key(signer) =>
+					return Ok((ValidTransaction::default(), (), origin)),
+				_ => return Err(TransactionValidityError::Invalid(InvalidTransaction::BadSigner)),
+			}
+		}
+
+		Err(TransactionValidityError::Invalid(InvalidTransaction::BadSigner))
+	}
+
+	fn prepare(
+		self,
+		_val: Self::Val,
+		_origin: &sp_runtime::traits::DispatchOriginOf<<T as frame_system::Config>::RuntimeCall>,
+		_call: &<T as frame_system::Config>::RuntimeCall,
+		_info: &DispatchInfoOf<<T as frame_system::Config>::RuntimeCall>,
+		_len: usize,
+	) -> Result<Self::Pre, TransactionValidityError> {
+		Ok(())
+	}
+
+	fn post_dispatch_details(
+		_pre: Self::Pre,
+		_info: &DispatchInfoOf<<T as frame_system::Config>::RuntimeCall>,
+		_post_info: &PostDispatchInfoOf<<T as frame_system::Config>::RuntimeCall>,
+		_len: usize,
+		_result: &DispatchResult,
+	) -> Result<Weight, TransactionValidityError> {
+		Ok(Default::default())
 	}
 }

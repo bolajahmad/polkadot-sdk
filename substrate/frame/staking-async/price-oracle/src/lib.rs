@@ -15,50 +15,62 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Price-Oracle System
+//! Price-Oracle System, intended to be used with pUSD.
 //!
-//! Pallets:
+//! ## Overview
 //!
-//! - Oracle: the pallet through which validators submit their price bumps. This pallet implements a
-//!   `OneSessionHandler`, allowing it to receive updated about the local session pallet. This local
-//!   session pallet is controlled by the next component (`Rc-client`), and pretty much mimics the
-//!   relay chain validators.
-//! 	- Of course, relay validators need to use their stash key once in the price-oracle parachain
-//!    to:
-//! 		- Set a proxy for future use
-//! 		- Associate a session key with their stash key.
-//! - Rc-client: pallet that receives XCMs indicating new validator sets from the RC. It also acts
-//!   as two components for the local session pallet:
-//!   - `ShouldEndSession`: It immediately signals the session pallet that it should end the
-//!     previous session once it receives the validator set via XCM.
-//!   - `SessionManager`: Once session realizes it has to rotate the session, it will call into its
-//!     `SessionManager`, which is also implemented by rc-client, to which it gives the new
-//!     validator keys.
+//! We will use the same validator set as the Polkadot relay chain to oraclize the price. The
+//! pallets in this crate will run on a dedicated parachain. The collators of the parachain are
+//! automatically updated in sync-with the relay chain validators. The same validators would have to
+//! run collators for this parachainn too.
 //!
-//! In short, the flow is as follows:
+//! ## Structure
 //!
-//! 1. block N: `relay_new_validator_set` is received, validators are kept as `ToPlan(v)`.
-//! 2. Block N+1: `should_end_session` returns `true`.
-//! 3. Block N+1: Session calls its `SessionManager`, `v` is returned in `plan_new_session`
-//! 4. Block N+1: `ToPlan(v)` updated to `Planned`.
-//! 5. Block N+2: `should_end_session` still returns `true`, forcing tht local session to trigger a
-//!    new session again.
-//! 6. Block N+2: Session again calls `SessionManager`, nothing is returned in `plan_new_session`,
-//!    and session pallet will enact the `v` previously received.
+//! This crate is multiple pallets and components that are meant to work together.
 //!
-//! This design hinges on the fact that the session pallet always does 3 calls at the same time when
-//! interacting with the `SessionManager`:
+//! - [`crate::oracle`]: the pallet through which validators submit their price updates. This pallet
+//!   implements a `OneSessionHandler`, allowing it to receive updated about the local session
+//!   pallet. This local session pallet is controlled by the next component (`client`), and pretty
+//!   much mimics the relay chain validators. Of course, relay validators need to use their stash
+//!   key once in the price-oracle parachain to:
+//! 	* Associate a session key with their stash key.
+//! 	* Set a proxy for future use
+//! - [`crate::client`]: pallet that receives XCMs indicating new validator sets from the RC.
+//! - [`crate::tally`]: Example tally implementations that can be wired up with
+//!   [`crate::oracle::Config::TallyManager`].
+//! - [`crate::extension`]: Transaction extensions that should be used in the parachain runtime
+//!   containing this system.
 //!
-//! * `end_session(n)`
-//! * `start_session(n+1)`
-//! * `new_session(n+2)`
+//! ## Runtime Restriction
 //!
-//! Every time `new_session` receives some validator set as return value, it is only enacted on the
-//! next session rotation.
+//! The runtime containing this system is a special one, not containing any other pallet. Namely, it
+//! doesn't have transaction-payment and balances. This has a few implications:
 //!
-//! Notes/TODOs:
-//! we might want to still retain a periodic session as well, allowing validators to swap keys in
-//! case of emergency.
+//! * No balance can be teleported to this runtime.
+//! * Yet, the runtime should nonetheless prevent spam transactions from random signed accounts, as
+//!   they would all be considered valid in the absence of `transaction-payment` and `balances`.
+//!
+//! To combat this, this crate provides two lines of defense:
+//!
+//! * a custom transaction-extension that will invalidate all transactions, at the transaction-pool
+//!   level, if they are not originating from our known set of authorities.
+//! * all calls in [`crate::oracle`] are marked as `DispatchClass::Operational`, meaning that even
+//!   if some spam happens, a portion of the block weight remains free for vote transactions. A
+//!   portion of the block weight is also in any case reserved for tallying, which happens at the
+//!   end of each block.
+//!
+//! Other notes:
+//! * The said runtime should allocate most of the transaction weights to the operational class.
+//! * We may use the global dispatch filter, but this is a rather late defense; the spam
+//!   transactions would still occupy space in the transaction-pool, and only upon dispatch they
+//!   will be filtered out.
+//! * The said runtime should prevent any sort of remote call execution via XCM.
+//! * The said runtime should indeed allow XCM messages originating from privileged locations such
+//!   as AH, and Collectives to be received and dispatched.
+//!
+//! ## Future Work / Ideas
+//!
+//! TODO
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -76,19 +88,26 @@ macro_rules! log {
 	};
 }
 
+macro_rules! client_log {
+	($level:tt, $pattern:expr, $( $args:expr ),*) => {
+		log::$level!(
+			target: $crate::LOG_TARGET,
+			concat!("[#{:?}][client] 🤑 ", $pattern), frame_system::Pallet::<T>::block_number() $(, $args)*
+		)
+	}
+}
+
 #[macro_export]
 macro_rules! ocw_log {
 	($level:tt, $pattern:expr $(, $values:expr)* $(,)?) => {
 		log::$level!(
 			target: $crate::LOG_TARGET,
-			concat!("[oracle-ocw] 🤑 ", $pattern) $(, $values)*
+			concat!("[#{:?}] [oracle-ocw] 🤑 ", $pattern), frame_system::Pallet::<T>::block_number() $(, $values)*
 		)
 	};
 }
 
-pub mod oracle;
 pub mod client;
 pub mod extension;
+pub mod oracle;
 pub mod tally;
-
-

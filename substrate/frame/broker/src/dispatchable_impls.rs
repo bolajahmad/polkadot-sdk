@@ -185,7 +185,7 @@ impl<T: Config> Pallet<T> {
 
 	/// Must be called on a core in `PotentialRenewals` whose value is a timeslice equal to the
 	/// current sale status's `region_end`.
-	pub(crate) fn do_renew(who: T::AccountId, core: CoreIndex) -> Result<CoreIndex, DispatchError> {
+	pub(crate) fn do_renew(who: T::AccountId, core: CoreIndex) -> Result<(), DispatchError> {
 		let config = Configuration::<T>::get().ok_or(Error::<T>::Uninitialized)?;
 		let status = Status::<T>::get().ok_or(Error::<T>::Uninitialized)?;
 		let mut sale = SaleInfo::<T>::get().ok_or(Error::<T>::NoSales)?;
@@ -201,15 +201,8 @@ impl<T: Config> Pallet<T> {
 		//ensure!(now > sale.sale_start, Error::<T>::TooEarly);
 		let blocks_since_sale_begin = now.saturating_sub(sale.sale_start);
 
-		let core = match Self::place_renewal_order(
-			blocks_since_sale_begin,
-			&who,
-			renewal_id,
-			record.price,
-		)? {
-			RenewalOrderResult::BidPlaced { id, bid_price } => {
-				0 // TODO: Modify `do_renew` signature to not return `CoreIndex`.
-			},
+		match Self::place_renewal_order(blocks_since_sale_begin, &who, renewal_id, record.price)? {
+			RenewalOrderResult::BidPlaced { id, bid_price } => {},
 			RenewalOrderResult::Sold { price } => {
 				let old_core = core;
 
@@ -250,12 +243,10 @@ impl<T: Config> Pallet<T> {
 					log::debug!("Recording renewable price for next run: {:?}", price);
 					Self::deposit_event(Event::Renewable { core, price, begin, workload });
 				}
-
-				core
 			},
 		};
 
-		Ok(core)
+		Ok(())
 	}
 
 	pub(crate) fn do_transfer(
@@ -601,7 +592,8 @@ impl<T: Config> Pallet<T> {
 		if PotentialRenewals::<T>::get(PotentialRenewalId { core, when: sale.region_begin })
 			.is_some()
 		{
-			core = Self::do_renew(sovereign_account.clone(), core)?;
+			// TODO: Fix this logic.
+			//core = Self::do_renew(sovereign_account.clone(), core)?;
 		} else if let Some(workload_end) = workload_end_hint {
 			ensure!(
 				PotentialRenewals::<T>::get(PotentialRenewalId { core, when: workload_end })

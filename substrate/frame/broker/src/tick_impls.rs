@@ -371,20 +371,22 @@ impl<T: Config> Pallet<T> {
 					return None
 				};
 
-				if let Ok(new_core_index) = Self::do_renew(payer.clone(), record.core) {
-					Some(AutoRenewalRecord {
-						core: new_core_index,
-						task: record.task,
-						next_renewal: sale.region_end,
-					})
-				} else {
-					Self::deposit_event(Event::<T>::AutoRenewalFailed {
-						core: record.core,
-						payer: Some(payer),
-					});
+				// TODO: Fix this logic.
+				// if let Ok(new_core_index) = Self::do_renew(payer.clone(), record.core) {
+				// 	Some(AutoRenewalRecord {
+				// 		core: new_core_index,
+				// 		task: record.task,
+				// 		next_renewal: sale.region_end,
+				// 	})
+				// } else {
+				// 	Self::deposit_event(Event::<T>::AutoRenewalFailed {
+				// 		core: record.core,
+				// 		payer: Some(payer),
+				// 	});
 
-					None
-				}
+				// 	None
+				// }
+				None
 			})
 			.collect::<Vec<AutoRenewalRecord>>()
 			.try_into()

@@ -417,7 +417,7 @@ fn renewal_works() {
 		// Should now be renewable.
 		advance_to(6);
 		assert_noop!(Broker::do_purchase(1, u64::max_value()), Error::<Test>::TooEarly);
-		let core = Broker::do_renew(1, region.core).unwrap();
+		let core = do_renew_and_get_the_new_core(1, region.core);
 		assert_eq!(balance(1), 99_800);
 		advance_to(8);
 		assert_noop!(Broker::do_purchase(1, u64::max_value()), Error::<Test>::SoldOut);
@@ -459,7 +459,7 @@ fn renewals_affect_price() {
 		assert_ok!(Broker::do_assign(region, None, 1001, Final));
 		advance_to(40);
 		assert_noop!(Broker::do_purchase(1, u64::max_value()), Error::<Test>::TooEarly);
-		let core = Broker::do_renew(1, region.core).unwrap();
+		let core = do_renew_and_get_the_new_core(1, region.core);
 		// First renewal has same price as initial purchase.
 		let b = b - price;
 		assert_eq!(balance(1), b);
@@ -527,7 +527,7 @@ fn renewal_price_adjusts_to_lower_market_end() {
 			advance_to(region_length_blocks);
 			assert_noop!(Broker::do_purchase(1, u64::max_value()), Error::<Test>::TooEarly);
 
-			let core = Broker::do_renew(1, region.core).unwrap();
+			let core = do_renew_and_get_the_new_core(1, region.core);
 			// First renewal has same price as initial purchase.
 			let b = b - price;
 			assert_eq!(balance(1), b);
@@ -1899,14 +1899,14 @@ fn renewal_works_leases_ended_before_start_sales() {
 		advance_sale_period();
 
 		// Now we can finally renew the core 0 of task 1.
-		let new_core = Broker::do_renew(1, 0).unwrap();
+		let new_core = do_renew_and_get_the_new_core(1, 0);
 		// Renewing the active lease doesn't work.
 		assert_noop!(Broker::do_renew(1, 1), Error::<Test>::SoldOut);
 		assert_eq!(balance(1), 99000);
 
 		// This intializes the third sale and the period 2.
 		advance_sale_period();
-		let new_core = Broker::do_renew(1, new_core).unwrap();
+		let new_core = do_renew_and_get_the_new_core(1, new_core);
 
 		// Renewing the active lease doesn't work.
 		assert_noop!(Broker::do_renew(1, 0), Error::<Test>::SoldOut);
@@ -1919,9 +1919,9 @@ fn renewal_works_leases_ended_before_start_sales() {
 		advance_sale_period();
 
 		// Renew again
-		assert_eq!(0, Broker::do_renew(1, new_core).unwrap());
+		assert_eq!(0, do_renew_and_get_the_new_core(1, new_core));
 		// Renew the task 2.
-		assert_eq!(1, Broker::do_renew(1, 0).unwrap());
+		assert_eq!(1, do_renew_and_get_the_new_core(1, 0));
 		assert_eq!(balance(1), 98790);
 
 		// This intializes the fifth sale and the period 4.
@@ -2900,4 +2900,19 @@ fn remove_potential_renewal_makes_auto_renewal_die() {
 
 		assert_eq!(AutoRenewals::<Test>::get().len(), 0);
 	})
+}
+
+fn do_renew_and_get_the_new_core(
+	who: <Test as frame_system::Config>::AccountId,
+	core: CoreIndex,
+) -> CoreIndex {
+	Broker::do_renew(who, core).unwrap();
+
+	for event in System::events() {
+		if let RuntimeEvent::Broker(Event::Renewed { core: new_core, .. }) = event.event {
+			return new_core
+		}
+	}
+
+	panic!("The `Renewed` event was expected");
 }

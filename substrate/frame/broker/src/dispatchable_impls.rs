@@ -219,12 +219,12 @@ impl<T: Config> Pallet<T> {
 
 				Workplan::<T>::insert((sale.region_begin, core), &workload);
 
+				// TODO: Calculate price cap in the `Market impl`.
 				let begin = sale.region_end;
 				let end_price = sale.end_price;
 				// Renewals should never be priced lower than the current `end_price`:
 				let price_cap = cmp::max(price + config.renewal_bump * price, end_price);
-				let now = RCBlockNumberProviderOf::<T::Coretime>::current_block_number();
-				let price = Self::sale_price(&sale, now).min(price_cap);
+				let price = price.min(price_cap);
 				log::debug!(
 					"Renew with: sale price: {:?}, price cap: {:?}, old price: {:?}",
 					price,

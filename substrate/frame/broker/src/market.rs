@@ -106,6 +106,7 @@ impl From<MarketError> for DispatchError {
 
 impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for Pallet<T> {
 	type Error = MarketError;
+	/// Must be unique.
 	type BidId = ();
 
 	fn place_order(

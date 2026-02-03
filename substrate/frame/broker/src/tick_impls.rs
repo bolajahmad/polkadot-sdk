@@ -278,16 +278,17 @@ impl<T: Config> Pallet<T> {
 
 		Self::renew_cores(&new_sale);
 
-		Self::deposit_event(Event::SaleInitialized {
-			sale_start,
-			leadin_length,
-			start_price: Self::sale_price(&new_sale, now),
-			end_price: new_prices.end_price,
-			region_begin,
-			region_end,
-			ideal_cores_sold,
-			cores_offered,
-		});
+		// TODO: Determine the price.
+		// Self::deposit_event(Event::SaleInitialized {
+		// 	sale_start,
+		// 	leadin_length,
+		// 	start_price: Self::sale_price(&new_sale, now),
+		// 	end_price: new_prices.end_price,
+		// 	region_begin,
+		// 	region_end,
+		// 	ideal_cores_sold,
+		// 	cores_offered,
+		// });
 
 		Some(())
 	}

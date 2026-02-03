@@ -2692,6 +2692,7 @@ fn fatp_tx_is_revalidated_by_mempool_revalidation() {
 /// 1. A block is created and immediately finalized
 /// 2. A transaction is submitted AFTER finalization (to the finalized view)
 /// 3. The Ready event should be delivered immediately (before any new block)
+// see: https://github.com/paritytech/polkadot-sdk/issues/10332
 #[test]
 fn fatp_watcher_ready_event_after_instant_finalization() {
 	sp_tracing::try_init_simple();

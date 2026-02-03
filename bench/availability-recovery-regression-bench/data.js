@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770148079745,
+  "lastUpdate": 1770160117072,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "140459108+kilavvy@users.noreply.github.com",
-            "name": "kilavvy",
-            "username": "kilavvy"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "56234513d1d1b3cc9fb85fcc1a9735ab9df22ef2",
-          "message": "Minor Documentation and Comment Corrections (#8997)\n\n**Description:**  \nThis pull request fixes minor typos and improves clarity in code\ncomments and documentation.\n- Corrected spelling errors in `coretime_interface.rs` and `types.rs`.\n- Enhanced comment readability for better developer experience.",
-          "timestamp": "2025-06-26T12:16:15Z",
-          "tree_id": "c055da89195b5154118af4c81f0797e5e8a60f5a",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/56234513d1d1b3cc9fb85fcc1a9735ab9df22ef2"
-        },
-        "date": 1750943792171,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.2006355777333333,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.198898714766667,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-recovery",
             "value": 11.385733466600003,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "60601340+lexnv@users.noreply.github.com",
+            "name": "Alexandru Vasile",
+            "username": "lexnv"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "4535807e489a0e71e15e420729ee2d09efa32195",
+          "message": "auth-discovery: Ensure DHT published addresses have ports (#10954)\n\nWe have seen instances in production where validators will propagate\nmultiaddresses without ports.\nThese addresses are effectively unreachable from the networking layer\nperspective.\nThey might be discovered via:\n- identify protocol\n- or simply a wrongly configured CLI for public addresses\n\nTo close the gap on this issue, this PR checks that the published\naddresses will always contain a port.\n\nCloses:\n- https://github.com/paritytech/polkadot-sdk/issues/10466\n\nPart of:\n- https://github.com/paritytech/polkadot-sdk/issues/10425\n\n---------\n\nSigned-off-by: Alexandru Vasile <alexandru.vasile@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-03T21:52:12Z",
+          "tree_id": "4ea966b3227373ed5ba3c795f900f32ecaecde86",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/4535807e489a0e71e15e420729ee2d09efa32195"
+        },
+        "date": 1770160092485,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.437140654366669,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.11936476379999997,
             "unit": "seconds"
           }
         ]

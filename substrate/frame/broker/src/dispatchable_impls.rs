@@ -148,7 +148,7 @@ impl<T: Config> Pallet<T> {
 	pub(crate) fn do_purchase(
 		who: T::AccountId,
 		price_limit: BalanceOf<T>,
-	) -> Result<RegionId, DispatchError> {
+	) -> Result<(), DispatchError> {
 		let status = Status::<T>::get().ok_or(Error::<T>::Uninitialized)?;
 		let mut sale = SaleInfo::<T>::get().ok_or(Error::<T>::NoSales)?;
 		Self::ensure_cores_for_sale(&status, &sale)?; // TODO: Move it after checking if the market allows to buy?
@@ -157,10 +157,9 @@ impl<T: Config> Pallet<T> {
 		// TODO: Check if it can be the case.
 		ensure!(now > sale.sale_start, Error::<T>::TooEarly);
 		let blocks_since_sale_begin = now.saturating_sub(sale.sale_start);
-		let region_id = match Self::place_order(blocks_since_sale_begin, &who, Some(price_limit))? {
+		match Self::place_order(blocks_since_sale_begin, &who, Some(price_limit))? {
 			OrderResult::BidPlaced { id, bid_price } => {
 				// TODO: Emit event.
-				todo!() // TODO: Modify `do_purchase` signature to not return `RegionId`.
 			},
 			OrderResult::Sold { price } => {
 				let core = Self::purchase_core(&who, price, &mut sale)?;
@@ -175,12 +174,10 @@ impl<T: Config> Pallet<T> {
 				);
 				let duration = sale.region_end.saturating_sub(sale.region_begin);
 				Self::deposit_event(Event::Purchased { who, region_id: id, price, duration });
-
-				id
 			},
 		};
 
-		Ok(region_id)
+		Ok(())
 	}
 
 	/// Must be called on a core in `PotentialRenewals` whose value is a timeslice equal to the

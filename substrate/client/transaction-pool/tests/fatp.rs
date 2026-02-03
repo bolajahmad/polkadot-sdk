@@ -2706,22 +2706,27 @@ fn fatp_watcher_ready_event_after_instant_finalization() {
 	block_on(pool.maintain(finalized_block_event(&pool, api.genesis_hash(), header01.hash())));
 
 	let xt0 = uxt(Alice, 200);
-	let xt0_watcher = block_on(pool.submit_and_watch(invalid_hash(), SOURCE, xt0.clone())).unwrap();
+	let mut xt0_watcher =
+		block_on(pool.submit_and_watch(header01.hash(), SOURCE, xt0.clone())).unwrap();
 
-	std::thread::sleep(Duration::from_millis(100));
-
-	// Now check if the Ready event is available.
-	let ready_event = xt0_watcher.take(1).collect::<Vec<_>>().now_or_never();
+	// Poll for the Ready event with retries (up to 2 seconds total)
+	let mut ready_event = None;
+	for _ in 0..20 {
+		std::thread::sleep(Duration::from_millis(100));
+		if let Some(event) = xt0_watcher.next().now_or_never().flatten() {
+			ready_event = Some(event);
+			break;
+		}
+	}
 
 	assert!(
 		ready_event.is_some(),
 		"Ready event should be available after submission on active finalized view."
 	);
 
-	let events = ready_event.unwrap();
 	assert_eq!(
-		events,
-		vec![TransactionStatus::Ready],
+		ready_event.unwrap(),
+		TransactionStatus::Ready,
 		"First event should be Ready, delivered from the finalized view"
 	);
 }

@@ -1,3 +1,21 @@
+// This file is part of Substrate.
+
+// Copyright (C) Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: GPL-3.0-or-later WITH Classpath-exception-2.0
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 use super::*;
 use crate::testing::test_executor;
 use codec::Encode;
@@ -5,7 +23,7 @@ use futures::FutureExt;
 use jsonrpsee::{RpcModule, Subscription};
 use sc_statement_store::Store;
 use sp_core::traits::SpawnNamed;
-use sp_statement_store::Statement;
+use sp_statement_store::{Statement, Topic};
 use std::sync::Arc;
 
 async fn subscribe_to_topics(
@@ -24,9 +42,9 @@ async fn subscribe_to_topics(
 }
 
 fn generate_statements() -> Vec<Statement> {
-	let topic = [0u8; 32];
-	let topic1 = [1u8; 32];
-	let topic2 = [2u8; 32];
+	let topic: Topic = [0u8; 32].into();
+	let topic1: Topic = [1u8; 32].into();
+	let topic2: Topic = [2u8; 32].into();
 
 	let mut statements = Vec::new();
 	let mut statement = sp_statement_store::Statement::new();
@@ -69,15 +87,15 @@ async fn subscribe_works() {
 	let api_rpc = api.into_rpc();
 	let api_rpc_clone = api_rpc.clone();
 	let submitted = generate_statements();
-	let first_topic: Bytes = submitted[0].topic(0).expect("Should have topic").to_vec().into();
+	let first_topic = submitted[0].topic(0).expect("Should have topic");
 
 	let match_all_filter =
-		TopicFilter::MatchAll(vec![first_topic.clone()].try_into().expect("Single topic"));
+		TopicFilter::MatchAll(vec![first_topic].try_into().expect("Single topic"));
 	let submitted_clone = submitted.clone();
 	let match_any_filter = TopicFilter::MatchAny(
 		vec![
-			submitted[0].topic(1).expect("Should have topic").to_vec().into(),
-			submitted[1].topic(1).expect("Should have topic").to_vec().into(),
+			submitted[0].topic(1).expect("Should have topic"),
+			submitted[1].topic(1).expect("Should have topic"),
 		]
 		.try_into()
 		.expect("Two topics"),
@@ -120,7 +138,7 @@ async fn subscribe_works() {
 	let mut match_any_with_random = api_rpc
 		.subscribe_unbounded(
 			"statement_subscribeStatement",
-			(TopicFilter::MatchAny(vec![vec![7u8; 32].into()].try_into().expect("Single topic")),),
+			(TopicFilter::MatchAny(vec![Topic::from([7u8; 32])].try_into().expect("Single topic")),),
 		)
 		.await
 		.expect("Failed to subscribe");
@@ -133,7 +151,7 @@ async fn subscribe_works() {
 	assert!(res.is_err(), "expected no message for random topic");
 
 	let match_all_with_random = TopicFilter::MatchAll(
-		vec![first_topic, vec![7u8; 32].into()].try_into().expect("Two topics"),
+		vec![first_topic, Topic::from([7u8; 32])].try_into().expect("Two topics"),
 	);
 	let mut match_all_with_random = api_rpc
 		.subscribe("statement_subscribeStatement", (match_all_with_random,), 100000)
@@ -163,4 +181,68 @@ async fn check_submitted(
 			.expect("Statement should exist");
 		expected.remove(position);
 	}
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 10)]
+async fn subscribe_works_with_raw_json() {
+	let executor = test_executor();
+	let client = Arc::new(substrate_test_runtime_client::new());
+	let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+	let store = Store::new_shared(
+		temp_dir.path(),
+		Default::default(),
+		Arc::clone(&client) as Arc<_>,
+		Arc::new(sc_keystore::LocalKeystore::in_memory()),
+		None,
+		Box::new(executor.as_ref().clone()),
+	)
+	.expect("Failed to create statement store");
+
+	let api = super::StatementStore::new(Arc::clone(&store) as Arc<_>, executor.clone());
+	let api_rpc = api.into_rpc();
+
+	// Test subscription with raw JSON using "matchAll" filter with 4 topics
+	let request = r#"{"jsonrpc":"2.0","method":"statement_subscribeStatement","params":[{"matchAll":["0xdededededededededededededededededededededededededededededededede","0xadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadad","0xbebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe","0xcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcf"]}],"id":2}"#;
+	let (response, _) = api_rpc
+		.raw_json_request(request, 1)
+		.await
+		.expect("Raw JSON request should succeed");
+	println!("response: {}", response);
+	assert!(
+		response.contains("\"result\""),
+		"Expected successful subscription response, got: {}",
+		response
+	);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 10)]
+async fn subscribe_rejects_more_than_4_topics_in_match_all() {
+	let executor = test_executor();
+	let client = Arc::new(substrate_test_runtime_client::new());
+	let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+	let store = Store::new_shared(
+		temp_dir.path(),
+		Default::default(),
+		Arc::clone(&client) as Arc<_>,
+		Arc::new(sc_keystore::LocalKeystore::in_memory()),
+		None,
+		Box::new(executor.as_ref().clone()),
+	)
+	.expect("Failed to create statement store");
+
+	let api = super::StatementStore::new(Arc::clone(&store) as Arc<_>, executor.clone());
+	let api_rpc = api.into_rpc();
+
+	// Test subscription with raw JSON using "matchAll" filter with 5 topics (should be rejected)
+	let request = r#"{"jsonrpc":"2.0","method":"statement_subscribeStatement","params":[{"matchAll":["0xdededededededededededededededededededededededededededededededede","0xadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadad","0xbebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe","0xcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcf","0x1111111111111111111111111111111111111111111111111111111111111111"]}],"id":2}"#;
+	let (response, _) = api_rpc
+		.raw_json_request(request, 1)
+		.await
+		.expect("Raw JSON request should succeed");
+	println!("response: {}", response);
+	assert!(
+		response.contains("\"error\""),
+		"Expected error response for more than 4 topics, got: {}",
+		response
+	);
 }

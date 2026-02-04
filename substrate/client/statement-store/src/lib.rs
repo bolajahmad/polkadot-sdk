@@ -53,7 +53,7 @@ mod subscription;
 use crate::subscription::{SubscriptionStatementsStream, SubscriptionsHandle};
 use futures::FutureExt;
 use metrics::MetricsLink as PrometheusMetrics;
-use parking_lot::RwLock;
+use parking_lot::{lock_api::RwLockUpgradableReadGuard, RwLock};
 use prometheus_endpoint::Registry as PrometheusRegistry;
 use sc_keystore::LocalKeystore;
 use sp_api::ProvideRuntimeApi;
@@ -66,14 +66,14 @@ use sp_statement_store::{
 	runtime_api::{
 		InvalidStatement, StatementSource, StatementStoreExt, ValidStatement, ValidateStatement,
 	},
-	AccountId, BlockHash, Channel, CheckedTopicFilter, DecryptionKey, FilterDecision, Hash,
-	InvalidReason, Proof, RejectionReason, Result, Statement, SubmitResult, Topic,
+	AccountId, BlockHash, Channel, DecryptionKey, FilterDecision, Hash, InvalidReason,
+	OptimizedTopicFilter, Proof, RejectionReason, Result, Statement, SubmitResult, Topic,
 };
 pub use sp_statement_store::{Error, StatementStore, MAX_TOPICS};
 use std::{
 	collections::{BTreeMap, HashMap, HashSet},
 	sync::Arc,
-	time::Instant,
+	time::{Duration, Instant},
 };
 pub use subscription::StatementStoreSubscriptionApi;
 
@@ -83,7 +83,7 @@ const CURRENT_VERSION: u32 = 1;
 const LOG_TARGET: &str = "statement-store";
 
 /// The amount of time an expired statement is kept before it is removed from the store entirely.
-pub const DEFAULT_PURGE_AFTER_SEC: u64 = 2 * 24 * 60 * 60; //48h
+pub const DEFAULT_PURGE_AFTER_SEC: u64 = 2 * 24 * 60 * 60; // 48h
 /// The maximum number of statements the statement store can hold.
 pub const DEFAULT_MAX_TOTAL_STATEMENTS: usize = 4 * 1024 * 1024; // ~4 million
 /// The maximum amount of data the statement store can hold, regardless of the number of
@@ -95,11 +95,11 @@ pub const MAX_STATEMENT_SIZE: usize =
 	sc_network_statement::config::MAX_STATEMENT_NOTIFICATION_SIZE as usize - 1;
 
 /// Maximum number of statements to expire in a single iteration.
-const MAX_EXPIRY_STATEMENTS_PER_ITERATION: usize = 1_000;
+const MAX_EXPIRY_STATEMENTS_PER_ITERATION: usize = 10_000;
 /// Maximum number of accounts to check for expiry in a single iteration.
 const MAX_EXPIRY_ACCOUNTS_PER_ITERATION: usize = 10_000;
 /// Maximum time in milliseconds to spend checking for expiry in a single iteration.
-const MAX_EXPIRY_TIME_MS_PER_ITERATION: u128 = 100;
+const MAX_EXPIRY_TIME_PER_ITERATION: Duration = Duration::from_millis(100);
 
 /// Number of subscription filter worker tasks.
 const NUM_FILTER_WORKERS: usize = 1;
@@ -279,10 +279,10 @@ impl Index {
 
 	fn query(&self, hash: &Hash) -> IndexQuery {
 		if self.entries.contains_key(hash) {
-			return IndexQuery::Exists
+			return IndexQuery::Exists;
 		}
 		if self.expired.contains_key(hash) {
-			return IndexQuery::Expired
+			return IndexQuery::Expired;
 		}
 		IndexQuery::Unknown
 	}
@@ -294,14 +294,14 @@ impl Index {
 	fn iterate_with(
 		&self,
 		key: Option<DecryptionKey>,
-		topic: &CheckedTopicFilter,
+		topic: &OptimizedTopicFilter,
 		f: impl FnMut(&Hash) -> Result<()>,
 	) -> Result<()> {
 		match topic {
-			CheckedTopicFilter::Any => self.iterate_with_any(key, f),
-			CheckedTopicFilter::MatchAll(topics) =>
+			OptimizedTopicFilter::Any => self.iterate_with_any(key, f),
+			OptimizedTopicFilter::MatchAll(topics) =>
 				self.iterate_with_match_all(key, topics.iter(), f),
-			CheckedTopicFilter::MatchAny(topics) =>
+			OptimizedTopicFilter::MatchAny(topics) =>
 				self.iterate_with_match_any(key, topics.iter(), f),
 		}
 	}
@@ -312,17 +312,15 @@ impl Index {
 		match_any_topics: impl ExactSizeIterator<Item = &'a Topic>,
 		mut f: impl FnMut(&Hash) -> Result<()>,
 	) -> Result<()> {
-		let key_set = self.by_dec_key.get(&key);
-		if key_set.map_or(0, |s| s.len()) == 0 {
-			// Key does not exist in the index.
-			return Ok(())
-		}
+		let Some(key_set) = self.by_dec_key.get(&key).filter(|k| !k.is_empty()) else {
+			return Ok(());
+		};
 
 		for t in match_any_topics {
 			let set = self.by_topic.get(t);
 
 			for item in set.iter().flat_map(|set| set.iter()) {
-				if key_set.map_or(false, |s| s.contains(item)) {
+				if key_set.contains(item) {
 					log::trace!(
 						target: LOG_TARGET,
 						"Iterating by topic/key: statement {:?}",
@@ -341,9 +339,9 @@ impl Index {
 		mut f: impl FnMut(&Hash) -> Result<()>,
 	) -> Result<()> {
 		let key_set = self.by_dec_key.get(&key);
-		if key_set.map_or(0, |s| s.len()) == 0 {
+		if key_set.map_or(true, |s| s.is_empty()) {
 			// Key does not exist in the index.
-			return Ok(())
+			return Ok(());
 		}
 
 		for item in key_set.map(|hashes| hashes.iter()).into_iter().flatten() {
@@ -362,19 +360,19 @@ impl Index {
 		let mut sets: [&HashSet<Hash>; MAX_TOPICS + 1] = [&empty; MAX_TOPICS + 1];
 		let num_topics = match_all_topics.len();
 		if num_topics > MAX_TOPICS {
-			return Ok(())
+			return Ok(());
 		}
 		let key_set = self.by_dec_key.get(&key);
-		if key_set.map_or(0, |s| s.len()) == 0 {
+		if key_set.map_or(true, |s| s.is_empty()) {
 			// Key does not exist in the index.
-			return Ok(())
+			return Ok(());
 		}
 		sets[0] = key_set.expect("Function returns if key_set is None");
 		for (i, t) in match_all_topics.enumerate() {
 			let set = self.by_topic.get(t);
 			if set.map_or(0, |s| s.len()) == 0 {
 				// At least one of the match_all_topics does not exist in the index.
-				return Ok(())
+				return Ok(());
 			}
 			sets[i + 1] = set.expect("Function returns if set is None");
 		}
@@ -532,11 +530,11 @@ impl Index {
 					account_rec.by_priority.len() + 1 - evicted.len() <= max_count
 				{
 					// Satisfied
-					break
+					break;
 				}
 				if evicted.contains(&entry.hash) {
 					// Already accounted for above
-					continue
+					continue;
 				}
 				if entry.expiry >= expiry {
 					log::debug!(
@@ -652,7 +650,7 @@ impl Store {
 						.map_err(|_| Error::Db("Error reading database version".into()))?,
 				);
 				if version != CURRENT_VERSION {
-					return Err(Error::Db(format!("Unsupported database version: {version}")))
+					return Err(Error::Db(format!("Unsupported database version: {version}")));
 				}
 			},
 			None => {
@@ -741,7 +739,7 @@ impl Store {
 	fn collect_statements_locked<R>(
 		&self,
 		key: Option<DecryptionKey>,
-		topic_filter: &CheckedTopicFilter,
+		topic_filter: &OptimizedTopicFilter,
 		index: &Index,
 		result: &mut Vec<R>,
 		mut f: impl FnMut(Statement) -> Option<R>,
@@ -779,7 +777,7 @@ impl Store {
 	fn collect_statements<R>(
 		&self,
 		key: Option<DecryptionKey>,
-		topic_filter: &CheckedTopicFilter,
+		topic_filter: &OptimizedTopicFilter,
 		f: impl FnMut(Statement) -> Option<R>,
 	) -> Result<Vec<R>> {
 		let mut result = Vec::new();
@@ -808,22 +806,21 @@ impl Store {
 		let current_time = self.timestamp();
 
 		let (needs_expiry, num_accounts_checked) = {
-			let index = self.index.read();
+			let index = self.index.upgradable_read();
 			if index.accounts_to_check_for_expiry_stmts.is_empty() {
 				let existing_accounts = index.accounts.keys().cloned().collect::<Vec<_>>();
-				drop(index);
-				let mut index = self.index.write();
+				let mut index = RwLockUpgradableReadGuard::upgrade(index);
 				index.accounts_to_check_for_expiry_stmts = existing_accounts;
-				return
+				return;
 			}
 
 			let mut needs_expiry = Vec::new();
 			let mut num_accounts_checked = 0;
 			let start = Instant::now();
 
-			for accounts in index.accounts_to_check_for_expiry_stmts.iter().rev() {
+			for account in index.accounts_to_check_for_expiry_stmts.iter().rev() {
 				num_accounts_checked += 1;
-				if let Some(account_rec) = index.accounts.get(accounts) {
+				if let Some(account_rec) = index.accounts.get(account) {
 					needs_expiry.extend(
 						account_rec
 							.by_priority
@@ -840,9 +837,9 @@ impl Store {
 
 				if needs_expiry.len() >= MAX_EXPIRY_STATEMENTS_PER_ITERATION ||
 					num_accounts_checked >= MAX_EXPIRY_ACCOUNTS_PER_ITERATION ||
-					start.elapsed().as_millis() >= MAX_EXPIRY_TIME_MS_PER_ITERATION
+					start.elapsed() >= MAX_EXPIRY_TIME_PER_ITERATION
 				{
-					break
+					break;
 				}
 			}
 
@@ -928,7 +925,7 @@ impl Store {
 	) -> Result<Vec<R>> {
 		self.collect_statements(
 			Some(dest),
-			&CheckedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
+			&OptimizedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
 			|statement| {
 				if let (Some(key), Some(_)) = (statement.decryption_key(), statement.data()) {
 					let public: sp_core::ed25519::Public = UncheckedFrom::unchecked_from(key);
@@ -981,7 +978,7 @@ impl StatementStore for Store {
 			let Some(encoded) =
 				self.db.get(col::STATEMENTS, &hash).map_err(|e| Error::Db(e.to_string()))?
 			else {
-				continue
+				continue;
 			};
 			if let Ok(statement) = Statement::decode(&mut encoded.as_slice()) {
 				result.push((hash, statement));
@@ -998,7 +995,7 @@ impl StatementStore for Store {
 			let Some(encoded) =
 				self.db.get(col::STATEMENTS, &hash).map_err(|e| Error::Db(e.to_string()))?
 			else {
-				continue
+				continue;
 			};
 			if let Ok(statement) = Statement::decode(&mut encoded.as_slice()) {
 				result.push((hash, statement));
@@ -1058,7 +1055,7 @@ impl StatementStore for Store {
 			let Some(encoded) =
 				self.db.get(col::STATEMENTS, hash).map_err(|e| Error::Db(e.to_string()))?
 			else {
-				continue
+				continue;
 			};
 			let Ok(statement) = Statement::decode(&mut encoded.as_slice()) else { continue };
 			match filter(hash, &encoded, &statement) {
@@ -1069,7 +1066,7 @@ impl StatementStore for Store {
 				FilterDecision::Abort => {
 					// We did not process it :)
 					processed -= 1;
-					break
+					break;
 				},
 			}
 		}
@@ -1082,7 +1079,7 @@ impl StatementStore for Store {
 	fn broadcasts(&self, match_all_topics: &[Topic]) -> Result<Vec<Vec<u8>>> {
 		self.collect_statements(
 			None,
-			&CheckedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
+			&OptimizedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
 			|statement| statement.into_data(),
 		)
 	}
@@ -1093,7 +1090,7 @@ impl StatementStore for Store {
 	fn posted(&self, match_all_topics: &[Topic], dest: [u8; 32]) -> Result<Vec<Vec<u8>>> {
 		self.collect_statements(
 			Some(dest),
-			&CheckedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
+			&OptimizedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
 			|statement| statement.into_data(),
 		)
 	}
@@ -1109,7 +1106,7 @@ impl StatementStore for Store {
 	fn broadcasts_stmt(&self, match_all_topics: &[Topic]) -> Result<Vec<Vec<u8>>> {
 		self.collect_statements(
 			None,
-			&CheckedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
+			&OptimizedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
 			|statement| Some(statement.encode()),
 		)
 	}
@@ -1120,7 +1117,7 @@ impl StatementStore for Store {
 	fn posted_stmt(&self, match_all_topics: &[Topic], dest: [u8; 32]) -> Result<Vec<Vec<u8>>> {
 		self.collect_statements(
 			Some(dest),
-			&CheckedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
+			&OptimizedTopicFilter::MatchAll(match_all_topics.iter().cloned().collect()),
 			|statement| Some(statement.encode()),
 		)
 	}
@@ -1170,11 +1167,11 @@ impl StatementStore for Store {
 		match self.index.read().query(&hash) {
 			IndexQuery::Expired =>
 				if !source.can_be_resubmitted() {
-					return SubmitResult::KnownExpired
+					return SubmitResult::KnownExpired;
 				},
 			IndexQuery::Exists =>
 				if !source.can_be_resubmitted() {
-					return SubmitResult::Known
+					return SubmitResult::Known;
 				},
 			IndexQuery::Unknown => {},
 		}
@@ -1243,7 +1240,7 @@ impl StatementStore for Store {
 					e,
 					statement
 				);
-				return SubmitResult::InternalError(Error::Db(e.to_string()))
+				return SubmitResult::InternalError(Error::Db(e.to_string()));
 			}
 			self.subscription_manager.notify(statement);
 		} // Release index lock
@@ -1269,7 +1266,7 @@ impl StatementStore for Store {
 						e,
 						HexDisplay::from(hash),
 					);
-					return Err(Error::Db(e.to_string()))
+					return Err(Error::Db(e.to_string()));
 				}
 			}
 		}
@@ -1307,7 +1304,7 @@ impl StatementStore for Store {
 impl StatementStoreSubscriptionApi for Store {
 	fn subscribe_statement(
 		&self,
-		topic_filter: CheckedTopicFilter,
+		topic_filter: OptimizedTopicFilter,
 	) -> Result<(Vec<Vec<u8>>, async_channel::Sender<Bytes>, SubscriptionStatementsStream)> {
 		// Keep the index read lock until after we have subscribed to avoid missing statements.
 		let mut existing_statements = Vec::new();
@@ -1466,9 +1463,9 @@ mod tests {
 	}
 
 	fn topic(data: u64) -> Topic {
-		let mut topic: Topic = Default::default();
-		topic[0..8].copy_from_slice(&data.to_le_bytes());
-		topic
+		let mut bytes = [0u8; 32];
+		bytes[0..8].copy_from_slice(&data.to_le_bytes());
+		Topic::from(bytes)
 	}
 
 	fn dec_key(data: u64) -> DecryptionKey {

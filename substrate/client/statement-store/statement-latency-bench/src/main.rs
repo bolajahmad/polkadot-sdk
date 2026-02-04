@@ -26,7 +26,7 @@ use jsonrpsee::{
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use sp_core::{blake2_256, bounded_vec::BoundedVec, sr25519, Bytes, ConstU32, Pair};
-use sp_statement_store::{Statement, SubmitResult, TopicFilter};
+use sp_statement_store::{Statement, SubmitResult, Topic, TopicFilter};
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::Barrier, time::timeout};
 
@@ -175,11 +175,11 @@ async fn run_client(
 		let round_start = std::time::Instant::now();
 		let mut sent_count: u32 = 0;
 
-		let expected_topics: Vec<Bytes> = (0..expected_count)
-			.map(|idx| generate_topic(test_run_id, neighbour_id, round, idx).to_vec().into())
+		let expected_topics: Vec<Topic> = (0..expected_count)
+			.map(|idx| generate_topic(test_run_id, neighbour_id, round, idx).into())
 			.collect();
 
-		let bounded_topics: BoundedVec<Bytes, ConstU32<128>> = expected_topics
+		let bounded_topics: BoundedVec<Topic, ConstU32<128>> = expected_topics
 			.try_into()
 			.map_err(|_| anyhow!("Client {client_id}: Too many topics (max 128)"))?;
 
@@ -200,7 +200,7 @@ async fn run_client(
 				let mut statement = Statement::new();
 				statement.set_channel(channel);
 				statement.set_expiry_from_parts(u32::MAX, (sent_count + 1) * (round as u32));
-				statement.set_topic(0, topic);
+				statement.set_topic(0, topic.into());
 				statement.set_plain_data(vec![0u8; size]);
 				statement.sign_sr25519_private(&keyring);
 

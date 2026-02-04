@@ -102,8 +102,7 @@ impl std::fmt::Display for SubmitError {
 		match self {
 			Self::Usurped => write!(f, "Transaction was usurped by another with the same nonce"),
 			Self::Dropped => write!(f, "Transaction was dropped"),
-			Self::Invalid =>
-				write!(f, "Transaction is invalid (e.g. bad nonce, signature, etc)"),
+			Self::Invalid => write!(f, "Transaction is invalid (e.g. bad nonce, signature, etc)"),
 			Self::StreamEnded => write!(f, "Transaction stream ended without status"),
 			Self::Unknown => write!(f, "Unknown transaction status"),
 		}
@@ -567,7 +566,7 @@ impl Client {
 					},
 				}
 			}
-			return Err(ClientError::SubmitError(SubmitError::StreamEnded))
+			return Err(ClientError::SubmitError(SubmitError::StreamEnded));
 		})
 		.await
 		.map_err(|_| ClientError::Timeout)?

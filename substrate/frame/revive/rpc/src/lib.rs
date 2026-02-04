@@ -216,7 +216,7 @@ impl EthRpcServer for EthRpcServerImpl {
 		})?;
 
 		if matches!(tx_status, TransactionStatus::Future) {
-			return Ok(hash)
+			return Ok(hash);
 		}
 
 		// Wait for the transaction to be included in a block if automine is enabled
@@ -225,11 +225,11 @@ impl EthRpcServer for EthRpcServerImpl {
 				if let Ok(block_hash) = receiver.recv().await {
 					let Ok(Some(block)) = self.client.block_by_hash(&block_hash).await else {
 						log::debug!(target: LOG_TARGET, "Could not find the block with the received hash: {hash:?}.");
-						continue
+						continue;
 					};
 					let Some(evm_block) = self.client.evm_block(block, false).await else {
 						log::debug!(target: LOG_TARGET, "Failed to get the EVM block for substrate block with hash: {hash:?}");
-						continue
+						continue;
 					};
 					if evm_block.transactions.contains_tx(hash) {
 						log::debug!(target: LOG_TARGET, "{hash:} was included in a block");

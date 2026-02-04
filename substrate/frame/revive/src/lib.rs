@@ -2107,12 +2107,11 @@ impl<T: Config> Pallet<T> {
 		u64::MAX.into()
 	}
 
-	/// Returns the block gas limit as calculated from the weights.
-	pub fn evm_block_gas_limit_from_weights() -> U256 {
-		let max_weight = Self::evm_max_extrinsic_weight();
-		let fee = T::FeeInfo::weight_to_fee(&max_weight);
+	/// Returns the maximum value of gas that can be represented in weights.
+	pub fn evm_max_extrinsic_weight_in_gas() -> U256 {
+		let max_extrinsic_fee = T::FeeInfo::weight_to_fee(&Self::evm_max_extrinsic_weight());
 		let gas_scale: BalanceOf<T> = T::GasScale::get().into();
-		((fee.saturating_add(gas_scale.saturating_sub(1u32.into()))) / gas_scale).into()
+		(max_extrinsic_fee / gas_scale).into()
 	}
 
 	/// The maximum weight an `eth_transact` is allowed to consume.
@@ -2578,7 +2577,7 @@ sp_api::decl_runtime_apis! {
 		fn block_gas_limit() -> U256;
 
 		/// Returns the block gas limit as calculated from the weights.
-		fn block_gas_limit_from_weights() -> U256;
+		fn max_extrinsic_weight_in_gas() -> U256;
 
 		/// Returns the free balance of the given `[H160]` address, using EVM decimals.
 		fn balance(address: H160) -> U256;
@@ -2772,8 +2771,8 @@ macro_rules! impl_runtime_apis_plus_revive_traits {
 					$crate::Pallet::<Self>::evm_block_gas_limit()
 				}
 
-				fn block_gas_limit_from_weights() -> $crate::U256 {
-					$crate::Pallet::<Self>::evm_block_gas_limit_from_weights()
+				fn max_extrinsic_weight_in_gas() -> $crate::U256 {
+					$crate::Pallet::<Self>::evm_max_extrinsic_weight_in_gas()
 				}
 
 				fn gas_price() -> $crate::U256 {

@@ -158,12 +158,15 @@ impl EthRpcServer for EthRpcServerImpl {
 		block: Option<BlockNumberOrTag>,
 	) -> RpcResult<U256> {
 		log::trace!(target: LOG_TARGET, "estimate_gas transaction={transaction:?} block={block:?}");
-		let mut low = U256::zero();
-		let mut high = {
+
+		let runtime_api = {
 			let block = block.unwrap_or_default();
 			let hash = self.client.block_hash_for_tag(block.into()).await?;
-			self.client.runtime_api(hash).block_gas_limit().await?
+			self.client.runtime_api(hash)
 		};
+
+		let mut low = U256::zero();
+		let mut high = runtime_api.block_gas_limit().await?;
 		log::trace!(target: LOG_TARGET, "estimate_gas low={low} high={high}");
 
 		// Cap the high at transaction's gas limit if it's been specified by the user.
@@ -194,9 +197,33 @@ impl EthRpcServer for EthRpcServerImpl {
 
 		// Performing the dry-run with the maximum gas limit. If it fails, then there's no need to
 		// perform the binary search.
-		let mut mutated_transaction = transaction.clone();
-		mutated_transaction.gas = Some(high);
-		let first_dry_run_result = self.dry_run(mutated_transaction, block).await?;
+		let first_dry_run_result = match self
+			.dry_run_with_gas_limit(transaction.clone(), block, high)
+			.await
+		{
+			Ok(result) => result,
+			Err(error) if error.message().contains("OutOfGas") => {
+				let max_extrinsic_weight_in_gas = runtime_api.max_extrinsic_weight_in_gas().await? *
+					U256::from(95) / U256::from(100);
+				log::trace!(
+					target: LOG_TARGET,
+					"estimate_gas Going through the max_extrinsic_weight_in_gas route. max_extrinsic_weight_in_gas={}",
+					max_extrinsic_weight_in_gas
+				);
+				let dry_run_result = self
+					.dry_run_with_gas_limit(transaction.clone(), block, max_extrinsic_weight_in_gas)
+					.await
+					.inspect(
+						|_| log::trace!(target: LOG_TARGET, "estimate_gas max_extrinsic_weight_in_gas route succeeded"),
+					)
+					.inspect_err(
+						|_| log::trace!(target: LOG_TARGET, "estimate_gas max_extrinsic_weight_in_gas route failed"),
+					)?;
+				high = max_extrinsic_weight_in_gas;
+				dry_run_result
+			},
+			Err(err) => return Err(err),
+		};
 		low = first_dry_run_result.eth_gas - U256::one();
 
 		// Performing the binary search for the lowest gas limit.
@@ -236,9 +263,8 @@ impl EthRpcServer for EthRpcServerImpl {
 					)
 				})?);
 
-			let mut mutated_transaction = transaction.clone();
-			mutated_transaction.gas = Some(midpoint);
-			let dry_run_result = self.dry_run(mutated_transaction, block).await;
+			let dry_run_result =
+				self.dry_run_with_gas_limit(transaction.clone(), block, midpoint).await;
 			match dry_run_result {
 				Ok(eth_transact_info) => {
 					high = midpoint;
@@ -271,7 +297,11 @@ impl EthRpcServer for EthRpcServerImpl {
 				)
 			})?;
 
-		log::trace!(target: LOG_TARGET, "estimate_gas result={gas_estimate:?} - first_dry_run_result={}", first_dry_run_result.eth_gas);
+		log::trace!(
+			target: LOG_TARGET,
+			"estimate_gas result={gas_estimate:?} - first_dry_run_result={}",
+			first_dry_run_result.eth_gas
+		);
 		Ok(gas_estimate)
 	}
 
@@ -596,6 +626,16 @@ impl EthRpcServerImpl {
 		};
 
 		Ok(Some(TransactionInfo::new(&receipt, signed_tx)))
+	}
+
+	async fn dry_run_with_gas_limit(
+		&self,
+		mut transaction: GenericTransaction,
+		block: Option<BlockNumberOrTag>,
+		gas_limit: U256,
+	) -> RpcResult<EthTransactInfo<u128>> {
+		transaction.gas = Some(gas_limit);
+		self.dry_run(transaction, block).await
 	}
 
 	async fn dry_run(

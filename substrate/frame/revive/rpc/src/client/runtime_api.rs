@@ -144,8 +144,8 @@ impl RuntimeApi {
 	}
 
 	/// Calculates the block gas limit from the weights.
-	pub async fn block_gas_limit_from_weights(&self) -> Result<U256, ClientError> {
-		let payload = subxt_client::apis().revive_api().block_gas_limit_from_weights();
+	pub async fn max_extrinsic_weight_in_gas(&self) -> Result<U256, ClientError> {
+		let payload = subxt_client::apis().revive_api().max_extrinsic_weight_in_gas();
 		let gas_limit = self.0.call(payload).await?;
 		Ok(*gas_limit)
 	}

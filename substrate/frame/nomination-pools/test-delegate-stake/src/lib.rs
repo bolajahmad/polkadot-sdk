@@ -21,6 +21,9 @@
 #[allow(unexpected_cfgs)]
 mod mock;
 
+// Test for CurrentEra vs ActiveEra mismatch bug (PR #10311)
+mod current_era_active_era_bug;
+
 use frame_support::{
 	assert_noop, assert_ok, hypothetically,
 	traits::{

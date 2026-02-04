@@ -224,3 +224,8 @@ pub fn setup_alice_fgs(fs: impl IntoIterator<Item = impl IntoIterator<Item = u64
 	let fgs = fs.into_iter().map(fg).collect::<Vec<_>>();
 	assert_ok!(Recovery::set_friend_groups(signed(ALICE), fgs));
 }
+
+// Migration config for v0 -> v1 migration tests
+impl crate::migrations::v0::MigrationConfig for Test {
+	type Currency = Balances;
+}

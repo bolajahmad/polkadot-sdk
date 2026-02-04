@@ -19,35 +19,36 @@
 //!
 //! These represent the old storage layout before the v1 migration.
 
+use crate::InheritanceOrder;
 use codec::{Decode, Encode, MaxEncodedLen};
+use frame::traits::BlockNumberProvider;
 use frame_support::{
 	storage_alias,
 	traits::{Currency, ReservableCurrency},
 	Blake2_128Concat, BoundedVec, Twox64Concat,
 };
 use scale_info::TypeInfo;
-use frame::traits::BlockNumberProvider;
 
 /// Migration config - extends the new pallet Config with types needed for migration.
 pub trait MigrationConfig: crate::pallet::Config {
-	/// The old currency type that was used in v0.
+	/// The currency type used in v0.
 	/// Must implement ReservableCurrency for unreserving deposits.
-	type OldCurrency: ReservableCurrency<Self::AccountId>;
-
-	/// Maximum number of friends in v0 (was called MaxFriends).
-	type MaxFriends: frame_support::traits::Get<u32>;
+	/// The Balance type must match the new pallet's Balance type.
+	type Currency: ReservableCurrency<Self::AccountId, Balance = crate::BalanceOf<Self>>;
 }
 
 /// Old balance type for v0 storage.
 pub type BalanceOf<T> =
-	<<T as MigrationConfig>::OldCurrency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+	<<T as MigrationConfig>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 /// Old block number type from provider.
 pub type BlockNumberFromProviderOf<T> =
 	<<T as crate::pallet::Config>::BlockNumberProvider as BlockNumberProvider>::BlockNumber;
 
 /// Old friends bounded vec type.
-pub type FriendsOf<T> = BoundedVec<<T as frame_system::Config>::AccountId, <T as MigrationConfig>::MaxFriends>;
+/// Uses MaxFriendsPerConfig from the new pallet Config (assumes same as old MaxFriends).
+pub type FriendsOf<T> =
+	BoundedVec<<T as frame_system::Config>::AccountId, <T as crate::pallet::Config>::MaxFriendsPerConfig>;
 
 /// Old recovery configuration structure from v0.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, Default, TypeInfo, MaxEncodedLen)]
@@ -64,6 +65,29 @@ pub struct RecoveryConfig<BlockNumber, Balance, Friends> {
 	pub threshold: u16,
 }
 
+impl<BlockNumber, Balance, Friends> RecoveryConfig<BlockNumber, Balance, Friends> {
+	/// Convert v0 RecoveryConfig to v1 FriendGroup.
+	///
+	/// Since v0 didn't have `inheritor`, `inheritance_order`, or `cancel_delay`,
+	/// these must be provided as parameters.
+	pub fn into_v1_friend_group<AccountId>(
+		self,
+		inheritor: AccountId,
+		inheritance_order: InheritanceOrder,
+		cancel_delay: BlockNumber,
+	) -> crate::FriendGroup<BlockNumber, AccountId, Balance, Friends> {
+		crate::FriendGroup {
+			deposit: self.deposit,
+			friends: self.friends,
+			friends_needed: self.threshold as u32,
+			inheritor,
+			inheritance_delay: self.delay_period,
+			inheritance_order,
+			cancel_delay,
+		}
+	}
+}
+
 /// Old active recovery structure from v0.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, Default, TypeInfo, MaxEncodedLen)]
 pub struct ActiveRecovery<BlockNumber, Balance, Friends> {
@@ -75,6 +99,10 @@ pub struct ActiveRecovery<BlockNumber, Balance, Friends> {
 	/// The friends which have vouched so far. Always sorted.
 	pub friends: Friends,
 }
+
+// Note: ActiveRecovery cannot be converted to v1 Attempt because the structures
+// are fundamentally different. V0 tracks vouching friends as a list, v1 uses a
+// bitfield and requires friend_group_index which doesn't exist in v0.
 
 /// Old storage: The set of recoverable accounts and their recovery configuration.
 #[storage_alias]

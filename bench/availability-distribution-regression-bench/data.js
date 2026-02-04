@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770187367597,
+  "lastUpdate": 1770201545958,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "gui.thiolliere@gmail.com",
-            "name": "Guillaume Thiolliere",
-            "username": "gui1117"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "18cd0b4d8ff6a2eea379a3b166fe21aec180778f",
-          "message": "Enable statement store in polkadot-omni-node and polkadot-parachain (#8076)\n\nIn `polkadot-omni-node-lib`, when starting the node, when the runtime\nfor the best hash contains the runtime api: `ValidateStatement`, then we\nstart the statement store.\n\nThe statement store is an off-chain data-store for signed statements\naccessible via RPC and offchain worker.\nIt uses the runtime api to get the allowance associated to an account.\n\nThis takes effect in `polkadot-omni-node` and `polkadot-parachain` and\nany node depending on `polkadot-omni-node-lib`.\n\n</br>\n\n</br>\n\n ----\n\n### Old description:\n\nWe want to enable statement store for people chain.\n\nThis PR introduces and enables the statement store and add a new\nargument `disable_statement_store` in `polkadot-omni-node-lib`.\nThis takes effect in `polkadot-omni-node` and `polkadot-parachain` and\nany node depending on `polkadot-omni-node-lib`.\n\nThe reasoning is following other service such as `offchain_worker` the\ndefault behavior is to support it, otherwise I expect not many collator\nto explictly opt-in (but I can be wrong assuming this).\nDo system chain collator use `omni-node` or `polkadot-parachain`? we\ncould otherwise only enable it for `polkadot-parachain`. Or we could\nalso create a new binary for people chain and enable it only for this\nnew binary, and remove people chain from `polkadot-parachain`.\n\nIf the runtime doesn't support the API then it any submission will fail\nwith `Error calling into the runtime`.\n\nIt would be ideal to target the next cut-off for this issue/PR given\nthat it can take time for node operator to update their node.\n\nTo have a configurable CLI and default behavior for statement-store, I\ndid in this PR: https://github.com/paritytech/polkadot-sdk/pull/8421\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Sebastian Kunert <skunert49@gmail.com>\nCo-authored-by: Iulian Barbu <14218860+iulianbarbu@users.noreply.github.com>",
-          "timestamp": "2025-06-26T14:44:56Z",
-          "tree_id": "9d7792b62cc997aad62d005d4685d62689efae28",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/18cd0b4d8ff6a2eea379a3b166fe21aec180778f"
-        },
-        "date": 1750953291958,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022618867626666667,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008997216833333424,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.01301274142,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15766696851333337,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "bitfield-distribution",
             "value": 0.022927256126666667,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alin@parity.io",
+            "name": "Alin Dima",
+            "username": "alindima"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a40ab3cd1348c871523a2bfccb71f484cd5591af",
+          "message": "collator-protocol-revamp: CollationManager and subsystem impl (#8541)\n\nImplements the `CollationManager` and the new collator protocol\n(validator side) subsystem.\n\nIssues https://github.com/paritytech/polkadot-sdk/issues/8182 and\nhttps://github.com/paritytech/polkadot-sdk/issues/7752.\n\nThese are the big remaining parts which would enable us to test the\nentire implementation.\n\nTODO:\n- [ ] add a couple more unit tests (see the suggestions at the bottom of\nthe tests file)\n- [x] polish the ClaimQueueState and verify if it's sufficiently covered\nby unit tests\n  - https://github.com/paritytech/polkadot-sdk/pull/10334\n  - https://github.com/paritytech/polkadot-sdk/pull/10368\n- [x] add metrics and polish logs -\nhttps://github.com/paritytech/polkadot-sdk/pull/10730\n- [x] add a CLI parameter for enabling the experimental subsystem (and\nremove the compile-time feature) ->\nhttps://github.com/paritytech/polkadot-sdk/pull/10285\n- [x] implement registered paras update, using\nhttps://github.com/paritytech/polkadot-sdk/pull/9055\n- [ ] do some manual zombienet tests with v1 protocol version and with\nrestarting validators (including syncing with warp sync)\n- [x] prdoc\n- [x] Rollback \n-\nhttps://github.com/paritytech/polkadot-sdk/pull/8541/commits/03e89150bd87e63a6a74e9ce1b9d1122b9239d14\n-\nhttps://github.com/paritytech/polkadot-sdk/pull/8541/commits/05e1497a3f785f41aac81e08f13676bdc96b9035\nThese commits were added just to run the CI tests for this PR with the\nnew experimental protocol\n\nAfter merging: \n- [ ] versi testing\n\n\n\nUses a slightly modified version of the ClaimQueueState written by\n@tdimitrov in https://github.com/paritytech/polkadot-sdk/pull/7114.\n\n---------\n\nCo-authored-by: Tsvetomir Dimitrov <tsvetomir@parity.io>\nCo-authored-by: Serban Iorga <serban@parity.io>\nCo-authored-by: Serban Iorga <serban300@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T08:56:37Z",
+          "tree_id": "7ee158481ac5f452aa18dcac48dc2b98b1a1aa9b",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a40ab3cd1348c871523a2bfccb71f484cd5591af"
+        },
+        "date": 1770201522137,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14634880668666667,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.006896440966666667,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.023029282133333332,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009739121953333313,
             "unit": "seconds"
           }
         ]

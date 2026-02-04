@@ -1094,17 +1094,20 @@ pub mod pallet {
 			data: Vec<u8>,
 		) -> DispatchResultWithPostInfo {
 			Self::ensure_non_contract_if_signed(&origin)?;
-			let mut output = Self::bare_call(
-				origin,
-				dest,
-				Pallet::<T>::convert_native_to_evm(value),
-				TransactionLimits::WeightAndDeposit {
-					weight_limit,
-					deposit_limit: storage_deposit_limit,
-				},
-				data,
-				ExecConfig::new_substrate_tx(),
-			);
+			let mut output = match TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+				weight_limit,
+				deposit_limit: storage_deposit_limit,
+			}) {
+				Ok(transaction_meter) => Self::bare_call(
+					origin,
+					dest,
+					Pallet::<T>::convert_native_to_evm(value),
+					transaction_meter,
+					data,
+					ExecConfig::new_substrate_tx(),
+				),
+				Err(error) => ContractResult { result: Err(error), ..Default::default() },
+			};
 
 			if let Ok(return_value) = &output.result {
 				if return_value.did_revert() {
@@ -1624,7 +1627,6 @@ impl<T: Config> Pallet<T> {
 		};
 
 		let meter = TransactionMeter::new(limits);
-
 		let base_call_weight = base_info.call_weight;
 
 		// Process authorizations OUTSIDE the transaction context
@@ -1639,7 +1641,7 @@ impl<T: Config> Pallet<T> {
 		};
 
 		block_storage::with_ethereum_context::<T>(transaction_encoded, || {
-			let mut meter = match meter {
+			let meter = match meter {
 				Ok(mut m) => {
 					if refund_count > 0 {
 						m.refund_weight(RuntimeCosts::DelegationRefunds(refund_count));
@@ -1662,13 +1664,13 @@ impl<T: Config> Pallet<T> {
 					},
 			};
 
-			let output = Self::bare_call_internal(
+			let output = Self::bare_call(
 				origin,
 				dest,
 				value,
+				meter,
 				data,
 				ExecConfig::new_eth_tx(effective_gas_price, encoded_len, extra_weight),
-				&mut meter,
 			);
 
 			block_storage::EthereumCallResult::new::<T>(
@@ -1692,29 +1694,9 @@ impl<T: Config> Pallet<T> {
 		origin: OriginFor<T>,
 		dest: H160,
 		evm_value: U256,
-		transaction_limits: TransactionLimits<T>,
+		mut transaction_meter: TransactionMeter<T>,
 		data: Vec<u8>,
 		exec_config: ExecConfig<T>,
-	) -> ContractResult<ExecReturnValue, BalanceOf<T>> {
-		let mut transaction_meter = match TransactionMeter::new(transaction_limits) {
-			Ok(transaction_meter) => transaction_meter,
-			Err(error) => return ContractResult { result: Err(error), ..Default::default() },
-		};
-
-		Self::bare_call_internal(origin, dest, evm_value, data, exec_config, &mut transaction_meter)
-	}
-
-	/// Internal implementation of [`Self::bare_call`].
-	///
-	/// Accepts an existing transaction meter, allowing callers to manage meter creation
-	/// and authorization before execution.
-	fn bare_call_internal(
-		origin: OriginFor<T>,
-		dest: H160,
-		evm_value: U256,
-		data: Vec<u8>,
-		exec_config: ExecConfig<T>,
-		transaction_meter: &mut TransactionMeter<T>,
 	) -> ContractResult<ExecReturnValue, BalanceOf<T>> {
 		let mut storage_deposit = Default::default();
 
@@ -1723,7 +1705,7 @@ impl<T: Config> Pallet<T> {
 			let result = ExecStack::<T, ContractBlob<T>>::run_call(
 				origin.clone(),
 				dest,
-				transaction_meter,
+				&mut transaction_meter,
 				evm_value,
 				data,
 				&exec_config,
@@ -2032,14 +2014,20 @@ impl<T: Config> Pallet<T> {
 					Default::default()
 				} else {
 					// Dry run the call.
-					let result = crate::Pallet::<T>::bare_call(
-						OriginFor::<T>::signed(origin),
-						dest,
-						value,
-						transaction_limits,
-						input.clone(),
-						exec_config,
-					);
+					let result = match TransactionMeter::new(transaction_limits) {
+						Ok(transaction_meter) => crate::Pallet::<T>::bare_call(
+							OriginFor::<T>::signed(origin),
+							dest,
+							value,
+							transaction_meter,
+							input.clone(),
+							exec_config,
+						),
+						Err(error) =>
+							return Err(EthTransactError::Message(format!(
+								"Failed to create meter: {error:?}"
+							))),
+					};
 
 					let data = match result.result {
 						Ok(return_value) => {
@@ -2983,14 +2971,24 @@ macro_rules! impl_runtime_apis_plus_revive_traits {
 						<Self as $crate::frame_system::Config>::BlockWeights::get();
 
 					$crate::Pallet::<Self>::prepare_dry_run(&origin);
-					$crate::Pallet::<Self>::bare_call(
-						<Self as $crate::frame_system::Config>::RuntimeOrigin::signed(origin),
-						dest,
-						$crate::Pallet::<Self>::convert_native_to_evm(value),
+					let transaction_meter = match $crate::TransactionMeter::new(
 						$crate::TransactionLimits::WeightAndDeposit {
 							weight_limit: weight_limit.unwrap_or(blockweights.max_block),
 							deposit_limit: storage_deposit_limit.unwrap_or(u128::MAX),
 						},
+					) {
+						Ok(transaction_meter) => transaction_meter,
+						Err(error) => return $crate::ContractResult {
+							result: Err(error),
+							..Default::default()
+						},
+					};
+
+					$crate::Pallet::<Self>::bare_call(
+						<Self as $crate::frame_system::Config>::RuntimeOrigin::signed(origin),
+						dest,
+						$crate::Pallet::<Self>::convert_native_to_evm(value),
+						transaction_meter,
 						input_data,
 						$crate::ExecConfig::new_substrate_tx().with_dry_run(Default::default()),
 					)

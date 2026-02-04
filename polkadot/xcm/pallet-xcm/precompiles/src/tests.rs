@@ -29,7 +29,7 @@ use pallet_revive::{
 		},
 		H160,
 	},
-	ExecConfig, TransactionLimits, U256,
+	ExecConfig, TransactionLimits, TransactionMeter, U256,
 };
 use polkadot_parachain_primitives::primitives::Id as ParaId;
 use sp_runtime::traits::AccountIdConversion;
@@ -71,14 +71,16 @@ fn test_xcm_send_precompile_works() {
 		let call = IXcm::IXcmCalls::send(xcm_send_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -122,14 +124,16 @@ fn test_xcm_send_precompile_to_parachain() {
 		let call = IXcm::IXcmCalls::send(xcm_send_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -173,14 +177,16 @@ fn test_xcm_send_precompile_fails() {
 		let call = IXcm::IXcmCalls::send(xcm_send_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -225,14 +231,16 @@ fn send_fails_on_old_location_version() {
 		let call = IXcm::IXcmCalls::send(xcm_send_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -254,14 +262,16 @@ fn send_fails_on_old_location_version() {
 		let call = IXcm::IXcmCalls::send(xcm_send_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -306,14 +316,16 @@ fn send_fails_on_old_xcm_version() {
 		let call = IXcm::IXcmCalls::send(xcm_send_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -336,14 +348,16 @@ fn send_fails_on_old_xcm_version() {
 		let call = IXcm::IXcmCalls::send(xcm_send_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -381,14 +395,16 @@ fn test_xcm_execute_precompile_works() {
 		let weight_call = IXcm::IXcmCalls::weighMessage(weight_params);
 		let encoded_weight_call = weight_call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let xcm_weight_results = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_weight_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -405,14 +421,16 @@ fn test_xcm_execute_precompile_works() {
 		let call = IXcm::IXcmCalls::execute(xcm_execute_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -446,14 +464,16 @@ fn test_xcm_execute_precompile_different_beneficiary() {
 		let weight_call = IXcm::IXcmCalls::weighMessage(weight_params);
 		let encoded_weight_call = weight_call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let xcm_weight_results = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_weight_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -470,14 +490,16 @@ fn test_xcm_execute_precompile_different_beneficiary() {
 		let call = IXcm::IXcmCalls::execute(xcm_execute_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -519,14 +541,16 @@ fn test_xcm_execute_precompile_fails() {
 		let weight_call = IXcm::IXcmCalls::weighMessage(weight_params);
 		let encoded_weight_call = weight_call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let xcm_weight_results = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_weight_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -543,14 +567,16 @@ fn test_xcm_execute_precompile_fails() {
 		let call = IXcm::IXcmCalls::execute(xcm_execute_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -591,14 +617,16 @@ fn execute_fails_on_old_version() {
 		let weight_call = IXcm::IXcmCalls::weighMessage(weight_params);
 		let encoded_weight_call = weight_call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let xcm_weight_results = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_weight_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -622,14 +650,16 @@ fn execute_fails_on_old_version() {
 		let call = IXcm::IXcmCalls::execute(xcm_execute_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -651,14 +681,16 @@ fn execute_fails_on_old_version() {
 		let call = IXcm::IXcmCalls::execute(xcm_execute_params);
 		let encoded_call = call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let result = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -702,14 +734,16 @@ fn weight_fails_on_old_version() {
 		let weight_call = IXcm::IXcmCalls::weighMessage(weight_params);
 		let encoded_weight_call = weight_call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let xcm_weight_results = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_weight_call,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -728,14 +762,16 @@ fn weight_fails_on_old_version() {
 		let weight_call = IXcm::IXcmCalls::weighMessage(weight_params);
 		let encoded_weight_call = weight_call.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u128::MAX,
+		})
+		.unwrap();
 		let xcm_weight_results = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(ALICE),
 			xcm_precompile_addr,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u128::MAX,
-			},
+			transaction_meter,
 			encoded_weight_call,
 			ExecConfig::new_substrate_tx(),
 		);

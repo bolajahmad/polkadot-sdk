@@ -22,7 +22,7 @@ use crate::{
 };
 use alloy::primitives::U256;
 use frame_support::{assert_ok, traits::Currency};
-use pallet_revive::{precompiles::TransactionLimits, ExecConfig};
+use pallet_revive::{precompiles::TransactionLimits, ExecConfig, TransactionMeter};
 use sp_core::H160;
 use sp_runtime::Weight;
 
@@ -72,14 +72,16 @@ fn precompile_transfer_works() {
 		let data =
 			IERC20::transferCall { to: to_addr.0.into(), value: U256::from(10) }.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u64::MAX,
+		})
+		.unwrap();
 		pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(from),
 			H160::from(asset_addr),
 			0u32.into(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u64::MAX,
-			},
+			transaction_meter,
 			data,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -113,14 +115,16 @@ fn total_supply_works() {
 
 		let data = IERC20::totalSupplyCall {}.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u64::MAX,
+		})
+		.unwrap();
 		let data = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(owner),
 			H160::from(asset_addr),
 			0u32.into(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u64::MAX,
-			},
+			transaction_meter,
 			data,
 			ExecConfig::new_substrate_tx(),
 		)
@@ -148,14 +152,16 @@ fn balance_of_works() {
 		let account = <Test as pallet_revive::Config>::AddressMapper::to_address(&owner).0.into();
 		let data = IERC20::balanceOfCall { account }.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u64::MAX,
+		})
+		.unwrap();
 		let data = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(owner),
 			H160::from(asset_addr),
 			0u32.into(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u64::MAX,
-			},
+			transaction_meter,
 			data,
 			ExecConfig::new_substrate_tx(),
 		)
@@ -196,14 +202,16 @@ fn approval_works() {
 		let data = IERC20::approveCall { spender: spender_addr.0.into(), value: U256::from(25) }
 			.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u64::MAX,
+		})
+		.unwrap();
 		pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(owner),
 			H160::from(asset_addr),
 			0u32.into(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u64::MAX,
-			},
+			transaction_meter,
 			data,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -221,14 +229,16 @@ fn approval_works() {
 			IERC20::allowanceCall { owner: owner_addr.0.into(), spender: spender_addr.0.into() }
 				.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u64::MAX,
+		})
+		.unwrap();
 		let data = pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(owner),
 			H160::from(asset_addr),
 			0u32.into(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u64::MAX,
-			},
+			transaction_meter,
 			data,
 			ExecConfig::new_substrate_tx(),
 		)
@@ -246,14 +256,16 @@ fn approval_works() {
 		}
 		.abi_encode();
 
+		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: Weight::MAX,
+			deposit_limit: u64::MAX,
+		})
+		.unwrap();
 		pallet_revive::Pallet::<Test>::bare_call(
 			RuntimeOrigin::signed(spender),
 			H160::from(asset_addr),
 			0u32.into(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: Weight::MAX,
-				deposit_limit: u64::MAX,
-			},
+			transaction_meter,
 			data,
 			ExecConfig::new_substrate_tx(),
 		);

@@ -42,7 +42,10 @@ use frame_support::{
 use sp_core::{H160, U256};
 use sp_runtime::{traits::AccountIdConversion, DispatchError};
 
-use super::{address::AddressMapper, pallet, Config, ContractResult, ExecConfig, Pallet, Weight};
+use super::{
+	address::AddressMapper, metering::TransactionMeter, pallet, Config, ContractResult, ExecConfig,
+	Pallet, Weight,
+};
 use ethereum_standards::IERC20;
 
 const WEIGHT_LIMIT: Weight = Weight::from_parts(10_000_000_000, 1000_000);
@@ -65,15 +68,19 @@ impl<T: Config> fungibles::Inspect<<T as frame_system::Config>::AccountId> for P
 	// Need to call a view function here.
 	fn total_issuance(asset_id: Self::AssetId) -> Self::Balance {
 		let data = IERC20::totalSupplyCall {}.abi_encode();
+		let transaction_meter = match TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: WEIGHT_LIMIT,
+			deposit_limit:
+				<<T as pallet::Config>::Currency as fungible::Inspect<_>>::total_issuance(),
+		}) {
+			Ok(transaction_meter) => transaction_meter,
+			Err(_) => return 0,
+		};
 		let ContractResult { result, .. } = Self::bare_call(
 			OriginFor::<T>::signed(Self::checking_account()),
 			asset_id,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: WEIGHT_LIMIT,
-				deposit_limit:
-					<<T as pallet::Config>::Currency as fungible::Inspect<_>>::total_issuance(),
-			},
+			transaction_meter,
 			data,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -103,15 +110,19 @@ impl<T: Config> fungibles::Inspect<<T as frame_system::Config>::AccountId> for P
 		let eth_address = T::AddressMapper::to_address(account_id);
 		let address = Address::from(Into::<[u8; 20]>::into(eth_address));
 		let data = IERC20::balanceOfCall { account: address }.abi_encode();
+		let transaction_meter = match TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: WEIGHT_LIMIT,
+			deposit_limit:
+				<<T as pallet::Config>::Currency as fungible::Inspect<_>>::total_issuance(),
+		}) {
+			Ok(transaction_meter) => transaction_meter,
+			Err(_) => return 0,
+		};
 		let ContractResult { result, .. } = Self::bare_call(
 			OriginFor::<T>::signed(account_id.clone()),
 			asset_id,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: WEIGHT_LIMIT,
-				deposit_limit:
-					<<T as pallet::Config>::Currency as fungible::Inspect<_>>::total_issuance(),
-			},
+			transaction_meter,
 			data,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -175,15 +186,19 @@ impl<T: Config> fungibles::Mutate<<T as frame_system::Config>::AccountId> for Pa
 		let checking_address = Address::from(Into::<[u8; 20]>::into(checking_account_eth));
 		let data =
 			IERC20::transferCall { to: checking_address, value: EU256::from(amount) }.abi_encode();
+		let transaction_meter = match TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: WEIGHT_LIMIT,
+			deposit_limit:
+				<<T as pallet::Config>::Currency as fungible::Inspect<_>>::total_issuance(),
+		}) {
+			Ok(transaction_meter) => transaction_meter,
+			Err(error) => return Err(error),
+		};
 		let ContractResult { result, weight_consumed, .. } = Self::bare_call(
 			OriginFor::<T>::signed(who.clone()),
 			asset_id,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: WEIGHT_LIMIT,
-				deposit_limit:
-					<<T as pallet::Config>::Currency as fungible::Inspect<_>>::total_issuance(),
-			},
+			transaction_meter,
 			data,
 			ExecConfig::new_substrate_tx(),
 		);
@@ -214,15 +229,19 @@ impl<T: Config> fungibles::Mutate<<T as frame_system::Config>::AccountId> for Pa
 		let eth_address = T::AddressMapper::to_address(who);
 		let address = Address::from(Into::<[u8; 20]>::into(eth_address));
 		let data = IERC20::transferCall { to: address, value: EU256::from(amount) }.abi_encode();
+		let transaction_meter = match TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			weight_limit: WEIGHT_LIMIT,
+			deposit_limit:
+				<<T as pallet::Config>::Currency as fungible::Inspect<_>>::total_issuance(),
+		}) {
+			Ok(transaction_meter) => transaction_meter,
+			Err(error) => return Err(error),
+		};
 		let ContractResult { result, .. } = Self::bare_call(
 			OriginFor::<T>::signed(Self::checking_account()),
 			asset_id,
 			U256::zero(),
-			TransactionLimits::WeightAndDeposit {
-				weight_limit: WEIGHT_LIMIT,
-				deposit_limit:
-					<<T as pallet::Config>::Currency as fungible::Inspect<_>>::total_issuance(),
-			},
+			transaction_meter,
 			data,
 			ExecConfig::new_substrate_tx(),
 		);

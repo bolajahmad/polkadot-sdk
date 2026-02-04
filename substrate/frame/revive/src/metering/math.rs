@@ -257,8 +257,7 @@ pub mod ethereum_execution {
 	///
 	/// This constructs a root `TransactionMeter` where the global limit is an
 	/// ethereum-gas budget (`max_total_gas`). Weight and deposit meters are left unbounded
-	/// (None). The function does not validate remaining gas after initialization; the first
-	/// gas-consuming operation will return `OutOfGas` if the limit is exhausted.
+	/// (None).
 	pub fn new_root<T: Config>(
 		eth_gas_limit: BalanceOf<T>,
 		weight_limit: Weight,

@@ -542,10 +542,8 @@ mod test {
 				transaction_encoded,
 				effective_gas_price,
 				encoded_len,
-				authorization_list,
 				..
-			}) if authorization_list.is_empty() &&
-				dest == tx.to.unwrap() &&
+			}) if dest == tx.to.unwrap() &&
 				value == tx.value.unwrap_or_default().as_u64().into() &&
 				data == tx_input &&
 				transaction_encoded == signed_transaction.signed_payload() &&

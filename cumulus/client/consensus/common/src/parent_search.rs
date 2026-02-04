@@ -42,9 +42,6 @@ pub struct ParentSearchParams {
 	/// A limitation on the age of relay parents for parachain blocks that are being
 	/// considered. This is relative to the `relay_parent` number.
 	pub ancestry_lookback: usize,
-	/// Whether to only ignore "alternative" branches, i.e. branches of the chain
-	/// which do not contain the block pending availability.
-	pub ignore_alternative_branches: bool,
 }
 
 /// A potential parent block returned from [`find_potential_parents`]
@@ -125,20 +122,17 @@ pub async fn find_potential_parents<B: BlockT>(
 		// If the pending block is not locally known, we can't do anything.
 		if let Some(header) = pending_header {
 			let pending_hash = header.hash();
-			match backend.blockchain().header(pending_hash) {
+			let Ok(Some(header)) = backend.blockchain().header(pending_hash) else {
 				// We are supposed to ignore branches that don't contain the pending block, but we
 				// do not know the pending block locally.
-				Ok(None) | Err(_) if params.ignore_alternative_branches => {
-					tracing::warn!(
-						target: PARENT_SEARCH_LOG_TARGET,
-						%pending_hash,
-						"Failed to get header for pending block.",
-					);
-					return Ok(Default::default());
-				},
-				Ok(Some(_)) => Some((header, pending_hash)),
-				_ => None,
-			}
+				tracing::warn!(
+					target: PARENT_SEARCH_LOG_TARGET,
+					%pending_hash,
+					"Failed to get header for pending block.",
+				);
+				return Ok(Default::default());
+			};
+			Some((header, pending_hash))
 		} else {
 			None
 		}
@@ -154,12 +148,8 @@ pub async fn find_potential_parents<B: BlockT>(
 	// If we want to ignore alternative branches there is no reason to start
 	// the parent search at the included block. We can add the included block and
 	// the path to the pending block to the potential parents directly.
-	let (frontier, potential_parents) = match (
-		&maybe_pending,
-		params.ignore_alternative_branches,
-		&maybe_route_to_last_pending,
-	) {
-		(Some((pending_header, pending_hash)), true, Some(ref route_to_pending)) => {
+	let (frontier, potential_parents) = match (&maybe_pending, &maybe_route_to_last_pending) {
+		(Some((pending_header, pending_hash)), Some(ref route_to_pending)) => {
 			let mut potential_parents = only_included;
 
 			// This is a defensive check, should never happen.
@@ -209,7 +199,6 @@ pub async fn find_potential_parents<B: BlockT>(
 		included_header,
 		maybe_pending.map(|(_, hash)| hash),
 		backend,
-		params.ignore_alternative_branches,
 		rp_ancestry,
 		potential_parents,
 	))
@@ -308,7 +297,6 @@ pub fn search_child_branches_for_parents<Block: BlockT>(
 	included_header: Block::Header,
 	pending_hash: Option<Block::Hash>,
 	backend: &impl Backend<Block>,
-	ignore_alternative_branches: bool,
 	rp_ancestry: Vec<(RelayHash, RelayHash)>,
 	mut potential_parents: Vec<PotentialParent<Block>>,
 ) -> Vec<PotentialParent<Block>> {
@@ -381,7 +369,7 @@ pub fn search_child_branches_for_parents<Block: BlockT>(
 				(pending_distance.map_or(true, |dist| child_depth > dist) ||
 					is_child_pending(child));
 
-			if ignore_alternative_branches && !aligned_with_pending {
+			if !aligned_with_pending {
 				tracing::trace!(target: PARENT_SEARCH_LOG_TARGET, ?child, "Child is not aligned with pending block.");
 				continue;
 			}

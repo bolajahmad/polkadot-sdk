@@ -231,11 +231,11 @@ fn set_friend_groups_lost_account_in_group_fails() {
 	});
 }
 
-/// Maximum number of friend groups (16) can be set.
+/// Maximum number of friend groups (10) can be set.
 #[test]
 fn set_friend_groups_max_groups_works() {
 	new_test_ext().execute_with(|| {
-		let friend_groups: Vec<_> = (0..16u8)
+		let friend_groups: Vec<_> = (0..10u8)
 			.map(|i| FriendGroupOf::<T> {
 				deposit: 10,
 				friends: friends([BOB, CHARLIE]),
@@ -248,7 +248,7 @@ fn set_friend_groups_max_groups_works() {
 			.collect();
 
 		assert_ok!(Recovery::set_friend_groups(signed(ALICE), friend_groups));
-		assert_eq!(Recovery::friend_groups(ALICE).len(), 16);
+		assert_eq!(Recovery::friend_groups(ALICE).len(), 10);
 	});
 }
 

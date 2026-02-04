@@ -18,7 +18,7 @@
 //! Test utilities for pallet-price-oracle
 
 use crate::{
-	extension::SetPriorityFromProducedIn,
+	extension::{OnlyOracleAuthorities, SetPriorityFromProducedIn},
 	oracle::{
 		self as pallet_price_oracle,
 		offchain::{Endpoint, Method, ParsingMethod},
@@ -47,7 +47,7 @@ use sp_runtime::{
 };
 use std::sync::Arc;
 
-pub type Extensions = SetPriorityFromProducedIn<Runtime>;
+pub type Extensions = (OnlyOracleAuthorities<Runtime>, SetPriorityFromProducedIn<Runtime>);
 pub type Block = frame_system::mocking::MockBlock<Runtime>;
 pub type T = Runtime;
 pub type Extrinsic = sp_runtime::testing::TestXt<RuntimeCall, Extensions>;
@@ -153,11 +153,15 @@ where
 	>(
 		call: RuntimeCall,
 		_public: Self::Public,
-		_account: AccountId,
-		nonce: u32,
+		account: AccountId,
+		// TODO: maybe use and add check-nonce to our e2e test
+		_nonce: u32,
 	) -> Option<Extrinsic> {
-		let extensions = SetPriorityFromProducedIn::<Runtime>::default();
-		Some(Extrinsic::new_signed(call, nonce.into(), (), extensions))
+		let extensions = (
+			OnlyOracleAuthorities::<Runtime>::default(),
+			SetPriorityFromProducedIn::<Runtime>::default(),
+		);
+		Some(Extrinsic::new_signed(call, account.into(), (), extensions))
 	}
 }
 
@@ -297,6 +301,11 @@ impl ExtBuilder {
 		self
 	}
 
+	pub fn price_update_interval(self, interval: u64) -> Self {
+		PriceUpdateInterval::set(interval);
+		self
+	}
+
 	pub fn empty(mut self) -> Self {
 		self.assets = vec![];
 		self
@@ -339,6 +348,8 @@ impl ExtBuilder {
 	pub(crate) fn build_offchainify(
 		self,
 	) -> (sp_io::TestExternalities, Arc<RwLock<PoolState>>, Arc<RwLock<OffchainState>>) {
+		// set keys for 1 account that is actually an authority.
+		UintAuthorityId::set_all_keys(vec![1]);
 		let mut ext = self.build();
 		let (offchain, offchain_state) = TestOffchainExt::new();
 		let (pool, pool_state) = TestTransactionPoolExt::new();
@@ -371,3 +382,19 @@ pub fn bump_block_number(next: BlockNumber) {
 	frame_system::Pallet::<T>::set_block_number(frame_system::Pallet::<T>::block_number() + 1);
 	assert_eq!(next, System::block_number(), "next expected block number is not guessed correctly");
 }
+
+parameter_types! {
+	pub static OracleEventIndex: usize = 0;
+}
+
+pub fn oracle_events_since_last_call() -> Vec<pallet_price_oracle::Event<Runtime>> {
+	let all: Vec<_> = System::events()
+		.into_iter()
+		.filter_map(|r| if let RuntimeEvent::PriceOracle(inner) = r.event { Some(inner) } else { None })
+		.collect();
+	let seen = OracleEventIndex::get();
+	OracleEventIndex::set(all.len());
+	all.into_iter().skip(seen).collect()
+}
+
+

@@ -125,7 +125,7 @@ where
 
 		// Check if our call `IsSubType` of the `RuntimeCall`
 		if let Some(OracleCall::vote { produced_in, .. }) = call.is_sub_type() {
-			log::debug!(target: "runtime::price-oracle::priority-extension", "Setting priority for vote call");
+			log::trace!(target: "runtime::price-oracle::priority-extension", "Setting priority for vote call");
 			priority = (*produced_in).saturated_into();
 		}
 
@@ -212,17 +212,17 @@ where
 		let caller = origin.caller();
 		match (caller.is_root(), caller.as_signed()) {
 			(true, _) => {
-				log::debug!(target: "runtime::price-oracle::only-oracle-authorities", "Allowing root origin");
+				log::trace!(target: "runtime::price-oracle::only-oracle-authorities", "Allowing root origin");
 				return Ok((ValidTransaction::default(), (), origin));
 			},
 			(false, Some(signer))
 				if crate::oracle::Authorities::<T>::get().contains_key(signer) =>
 			{
-				log::debug!(target: "runtime::price-oracle::only-oracle-authorities", "Allowing oracle authority");
+				log::trace!(target: "runtime::price-oracle::only-oracle-authorities", "Allowing oracle authority");
 				return Ok((ValidTransaction::default(), (), origin));
 			},
 			(false, Some(signer)) if ExtraSigners::get().contains(signer) => {
-				log::debug!(target: "runtime::price-oracle::only-oracle-authorities", "Allowing extra signer");
+				log::trace!(target: "runtime::price-oracle::only-oracle-authorities", "Allowing extra signer");
 				return Ok((ValidTransaction::default(), (), origin));
 			},
 			_ => return Err(TransactionValidityError::Invalid(InvalidTransaction::BadSigner)),

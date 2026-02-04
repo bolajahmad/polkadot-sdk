@@ -69,6 +69,7 @@ use frame_system::{
 	offchain::{SendSignedTransaction, Signer},
 	pallet_prelude::BlockNumberFor,
 };
+use oracle::Event;
 use scale_info::TypeInfo;
 use sp_core::{ConstU32, Get};
 use sp_runtime::{
@@ -405,10 +406,12 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 
 		ocw_log!(
 			debug,
-			"fetch_endpoint: url={:?}, method={:?}, timeout={}ms",
+			"fetch_endpoint: url={:?}, method={:?}, timeout={}ms, body={:?}, headers={:?}",
 			url,
 			endpoint.method,
-			timeout_ms
+			timeout_ms,
+			endpoint.body,
+			endpoint.headers.iter().map(|h| (&h.name, &h.value)).collect::<Vec<_>>()
 		);
 
 		// Resolve body data.
@@ -429,10 +432,8 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 
 		// Send the request.
 		let pending = if !body_bytes.is_empty() {
-			ocw_log!(debug, "fetch_endpoint: sending with body ({} bytes)", body_bytes.len());
 			request.body(vec![body_bytes]).send().map_err(OffchainError::CoreHttpError)?
 		} else {
-			ocw_log!(debug, "fetch_endpoint: sending without body");
 			request.send().map_err(OffchainError::CoreHttpError)?
 		};
 
@@ -453,7 +454,7 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 	///
 	/// Returns the price as a [`FixedU128`] value.
 	fn parse_response(method: &ParsingMethod, body: Vec<u8>) -> Result<FixedU128, OffchainError> {
-		ocw_log!(debug, "parsing body: {:?}", body);
+		ocw_log!(trace, "parsing body: {:?}", body);
 
 		let v: serde_json::Value =
 			serde_json::from_slice(&body).map_err(|e| OffchainError::ParseError(e))?;
@@ -468,7 +469,7 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 							.as_number()
 							.map(|n| n.to_string())
 							.ok_or("failed to parse USD field")?;
-						ocw_log!(debug, "CryptoCompareFree price_str: {:?}", price_str);
+						ocw_log!(trace, "CryptoCompareFree price_str: {:?}", price_str);
 						let price =
 							FixedU128::from_float_str(&price_str).map_err(OffchainError::Other)?;
 						Ok(price)
@@ -482,7 +483,7 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 					serde_json::Value::Object(obj) if obj.contains_key("price") => {
 						let price_str =
 							obj["price"].as_str().ok_or("failed to parse price field as string")?;
-						ocw_log!(debug, "BinanceFree price_str: {:?}", price_str);
+						ocw_log!(trace, "BinanceFree price_str: {:?}", price_str);
 						let price =
 							FixedU128::from_float_str(price_str).map_err(OffchainError::Other)?;
 						Ok(price)
@@ -499,7 +500,7 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 								let price_str = obj["price_usd"]
 									.as_str()
 									.ok_or("failed to parse price_usd field as string")?;
-								ocw_log!(debug, "CoinLoreFree price_str: {:?}", price_str);
+								ocw_log!(trace, "CoinLoreFree price_str: {:?}", price_str);
 								let price = FixedU128::from_float_str(price_str)
 									.map_err(OffchainError::Other)?;
 								return Ok(price);
@@ -521,20 +522,26 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 			return Ok(0);
 		}
 
-		ocw_log!(debug, "Offchain worker starting at #{:?}", local_block_number);
+		ocw_log!(trace, "Offchain worker starting at #{:?}", local_block_number);
 
 		// Setup signer.
 		let signer = Signer::<T, T::AuthorityId>::all_accounts();
 		if !signer.can_sign() {
 			ocw_log!(error, "cannot sign!");
 			return Err(OffchainError::CannotSign);
+		} else {
+			ocw_log!(
+				trace,
+				"signer is: {:?}",
+				signer.accounts_from_keys().map(|a| a.id).collect::<Vec<_>>()
+			);
 		}
 
 		let mut assets_updated = 0;
 
 		// Iterate over all tracked assets and their endpoints.
 		for (asset_id, endpoints) in oracle::StorageManager::<T>::tracked_assets_with_endpoints() {
-			ocw_log!(debug, "Processing asset {:?} with {} endpoints", asset_id, endpoints.len());
+			ocw_log!(trace, "Processing asset {:?} with {} endpoints", asset_id, endpoints.len());
 
 			// Filter endpoints to only those that meet requirements.
 			let eligible_endpoints: Vec<&Endpoint> =
@@ -555,7 +562,7 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 				eligible_endpoints[random_u8 as usize % eligible_endpoints.len()];
 
 			ocw_log!(
-				debug,
+				trace,
 				"Selected endpoint for asset {:?}: {:?}",
 				asset_id,
 				core::str::from_utf8(&selected_endpoint.url).unwrap_or("<invalid utf8>")
@@ -579,7 +586,7 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 				},
 			};
 
-			ocw_log!(debug, "Fetched price: {:?} for asset {:?}", price, asset_id);
+			ocw_log!(info, "Fetched price: {:?} for asset {:?}", price, asset_id);
 
 			// Submit a vote transaction.
 			let call =
@@ -587,7 +594,7 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 
 			// TODO: handle
 			let _res = signer.send_signed_transaction(|_account| call.clone());
-			ocw_log!(info, "Submitted vote for asset {:?}", asset_id);
+			ocw_log!(debug, "Submitted vote for asset {:?}", asset_id);
 
 			assets_updated += 1;
 		}
@@ -712,15 +719,29 @@ mod ocw_tests {
 	use crate::oracle::{
 		mock::*,
 		offchain::{Endpoint, Method, ParsingMethod, RequestData},
+		StorageManager, TallyOuterError,
 	};
-	use sp_core::offchain::testing::PendingRequest;
-	use sp_runtime::testing::UintAuthorityId;
+	use frame_support::{
+		dispatch::{DispatchClass, DispatchErrorWithPostInfo, GetDispatchInfo},
+		pallet_prelude::TransactionValidityError,
+		traits::Hooks,
+	};
+	use parking_lot::RwLock;
+	use sp_core::offchain::testing::{OffchainState, PendingRequest, PoolState};
+	use sp_runtime::{
+		generic::Preamble,
+		offchain::storage::StorageValueRef,
+		testing::UintAuthorityId,
+		traits::{Dispatchable, TransactionExtension, TxBaseImplication},
+		transaction_validity::TransactionSource,
+	};
+	use std::sync::Arc;
+	use substrate_test_utils::assert_eq_uvec;
 
 	#[test]
 	fn ocw_makes_http_get_request() {
 		ExtBuilder::default().build_offchain_and_execute(|pool_state, offchain_state| {
-			// given: keys are available, mock HTTP response is registered
-			UintAuthorityId::set_all_keys(vec![0]);
+			// given: mock HTTP response is registered
 			offchain_state.write().expect_request(PendingRequest {
 				method: "GET".into(),
 				uri: "ocw.local.io/price".into(),
@@ -770,8 +791,7 @@ mod ocw_tests {
 				}],
 			)
 			.build_offchain_and_execute(|pool_state, offchain_state| {
-				// given: keys are available, mock HTTP response is registered
-				UintAuthorityId::set_all_keys(vec![0]);
+				// given mock HTTP response is registered
 				offchain_state.write().expect_request(PendingRequest {
 					method: "POST".into(),
 					uri: "ocw.local.io/api/price".into(),
@@ -805,7 +825,7 @@ mod ocw_tests {
 
 	#[test]
 	fn ocw_uses_api_key_from_offchain_database() {
-		let (mut ext, pool_state, offchain_state) = ExtBuilder::default()
+		ExtBuilder::default()
 			.only_asset(
 				1,
 				vec![Endpoint {
@@ -824,47 +844,43 @@ mod ocw_tests {
 					..Default::default()
 				}],
 			)
-			.build_offchainify();
+			.build_offchain_and_execute(|pool_state, offchain_state| {
+				// given: API key in offchain db, mock response registered
+				StorageValueRef::persistent(b"api_key").set(&b"secret-key-12345".to_vec());
 
-		ext.execute_with(|| {
-			// given: keys are available, API key in offchain db, mock response registered
-			UintAuthorityId::set_all_keys(vec![0]);
-			use sp_runtime::offchain::storage::StorageValueRef;
-			StorageValueRef::persistent(b"api_key").set(&b"secret-key-12345".to_vec());
+				offchain_state.write().expect_request(PendingRequest {
+					method: "GET".into(),
+					uri: "ocw.local.io/premium".into(),
+					headers: vec![("X-API-Key".into(), "secret-key-12345".into())],
+					response: Some(br#"{"USD": 4.2}"#.to_vec()),
+					sent: true,
+					..Default::default()
+				});
 
-			offchain_state.write().expect_request(PendingRequest {
-				method: "GET".into(),
-				uri: "ocw.local.io/premium".into(),
-				headers: vec![("X-API-Key".into(), "secret-key-12345".into())],
-				response: Some(br#"{"USD": 4.2}"#.to_vec()),
-				sent: true,
-				..Default::default()
+				// when: OCW worker runs
+				let block_number = PriceUpdateInterval::get();
+				let _result = OracleOffchainWorker::<Runtime>::offchain_worker(block_number);
+
+				// then: request was fulfilled with API key header (no panic)
+				// then: there is one transaction in the pool
+				assert_eq!(pool_state.read().transactions.len(), 1);
+				// then the transaction can be decoded
+				let tx = pool_state.write().transactions.pop().unwrap();
+				let tx = Extrinsic::decode(&mut &*tx).unwrap();
+				assert_eq!(
+					tx.function,
+					RuntimeCall::PriceOracle(crate::oracle::Call::vote {
+						asset_id: 1,
+						price: FixedU128::from_rational(42, 10),
+						produced_in: block_number
+					})
+				);
 			});
-
-			// when: OCW worker runs
-			let block_number = PriceUpdateInterval::get();
-			let _result = OracleOffchainWorker::<Runtime>::offchain_worker(block_number);
-
-			// then: request was fulfilled with API key header (no panic)
-			// then: there is one transaction in the pool
-			assert_eq!(pool_state.read().transactions.len(), 1);
-			// then the transaction can be decoded
-			let tx = pool_state.write().transactions.pop().unwrap();
-			let tx = Extrinsic::decode(&mut &*tx).unwrap();
-			assert_eq!(
-				tx.function,
-				RuntimeCall::PriceOracle(crate::oracle::Call::vote {
-					asset_id: 1,
-					price: FixedU128::from_rational(42, 10),
-					produced_in: block_number
-				})
-			);
-		});
 	}
 
 	#[test]
 	fn ocw_skips_endpoints_missing_api_keys() {
-		let (mut ext, pool_state, offchain_state) = ExtBuilder::default()
+		ExtBuilder::default()
 			.only_asset(
 				1,
 				vec![
@@ -894,36 +910,282 @@ mod ocw_tests {
 					},
 				],
 			)
-			.build_offchainify();
+			.build_offchain_and_execute(|pool_state, offchain_state| {
+				// given: one signing key is available, but API key is NOT in offchain database
 
-		ext.execute_with(|| {
-			// given: one signing key is available, but API key is NOT in offchain database
-			UintAuthorityId::set_all_keys(vec![0]);
+				// when: run 10 rounds of OCW
+				for round in 0u64..10 {
+					let block_number = PriceUpdateInterval::get() * (round + 1);
+					frame_system::Pallet::<Runtime>::set_block_number(block_number);
 
-			// when: run 10 rounds of OCW
-			for round in 0u64..10 {
-				let block_number = PriceUpdateInterval::get() * (round + 1);
-				frame_system::Pallet::<Runtime>::set_block_number(block_number);
+					// Register mock response for the free endpoint only
+					offchain_state.write().expect_request(PendingRequest {
+						method: "GET".into(),
+						uri: "ocw.local.io/free".into(),
+						response: Some(br#"{"USD": 4.2}"#.to_vec()),
+						sent: true,
+						..Default::default()
+					});
 
-				// Register mock response for the free endpoint only
-				offchain_state.write().expect_request(PendingRequest {
-					method: "GET".into(),
-					uri: "ocw.local.io/free".into(),
-					response: Some(br#"{"USD": 4.2}"#.to_vec()),
-					sent: true,
-					..Default::default()
-				});
+					let _result = OracleOffchainWorker::<Runtime>::offchain_worker(block_number);
+				}
 
-				let _result = OracleOffchainWorker::<Runtime>::offchain_worker(block_number);
-			}
+				// then: 10 transactions submitted (one per round, using only the free endpoint)
+				assert_eq!(pool_state.read().transactions.len(), 10);
+			});
+	}
 
-			// then: 10 transactions submitted (one per round, using only the free endpoint)
-			assert_eq!(pool_state.read().transactions.len(), 10);
-		});
+	#[derive(Debug, PartialEq, Eq)]
+	#[allow(unused)]
+	enum UberDispatchError {
+		Validity(TransactionValidityError),
+		Dispatch(DispatchErrorWithPostInfo),
+	}
+
+	impl From<TransactionValidityError> for UberDispatchError {
+		fn from(e: TransactionValidityError) -> Self {
+			UberDispatchError::Validity(e)
+		}
+	}
+
+	impl From<DispatchErrorWithPostInfo> for UberDispatchError {
+		fn from(e: DispatchErrorWithPostInfo) -> Self {
+			UberDispatchError::Dispatch(e)
+		}
+	}
+
+	fn roll_next_and_set_response(
+		pool_state: Arc<RwLock<PoolState>>,
+		offchain_state: Arc<RwLock<OffchainState>>,
+		response: PendingRequest,
+	) -> (Result<u32, OffchainError>, Vec<Result<(), UberDispatchError>>) {
+		// first, block initialization
+		let now = System::block_number();
+		let weight = PriceOracle::on_initialize(now);
+		System::register_extra_weight_unchecked(weight, DispatchClass::Mandatory);
+
+		// then anything in the txpool is validated and applied
+		let tx_results = pool_state
+			.read()
+			.transactions
+			.clone()
+			.into_iter()
+			.map(|tx| {
+				// all transactions must be decode-able.
+				let tx = Extrinsic::decode(&mut &*tx).unwrap();
+
+				// Extract signer and extensions from the preamble (TestXt uses Signed preamble)
+				let (signer, extensions) = match &tx.preamble {
+					Preamble::Signed(signer, _signature, ext) => (*signer, ext.clone()),
+					_ => panic!("Expected signed extrinsic"),
+				};
+
+				// Manually validate the transaction extensions
+				let call = &tx.function;
+				let info = call.get_dispatch_info();
+				let len = tx.encoded_size();
+
+				// The implicit type for our Extensions tuple is ((), ())
+				let (_validity, _val, origin) = extensions.validate(
+					RuntimeOrigin::signed(signer),
+					call,
+					&info,
+					len,
+					((), ()),
+					&TxBaseImplication(()),
+					TransactionSource::External,
+				)?;
+
+				// Dispatch the call
+				tx.function.dispatch(origin)?;
+
+				Ok(())
+			})
+			.collect::<Vec<Result<(), UberDispatchError>>>();
+
+		// Clear the pool after processing
+		pool_state.write().transactions.clear();
+
+		// then the offchain worker runs
+		offchain_state.write().expect_request(response);
+		let ocw_result = OracleOffchainWorker::<Runtime>::offchain_worker(now);
+
+		// then finalize
+		PriceOracle::on_finalize(now);
+
+		(ocw_result, tx_results)
+	}
+
+	fn good_response() -> PendingRequest {
+		PendingRequest {
+			method: "GET".into(),
+			uri: "ocw.local.io/price".into(),
+			response: Some(br#"{"USD": 4.2}"#.to_vec()),
+			sent: true,
+			..Default::default()
+		}
+	}
+
+	fn bad_response() -> PendingRequest {
+		PendingRequest {
+			method: "GET".into(),
+			uri: "ocw.local.io/price".into(),
+			response: Some(Default::default()),
+			sent: true,
+			..Default::default()
+		}
 	}
 
 	#[test]
 	fn ocw_e2e() {
-		todo!();
+		ExtBuilder::default().price_update_interval(1).build_offchain_and_execute(
+			|pool_state, offchain_state| {
+				// given
+				assert_eq!(System::block_number(), 7);
+				assert!(pool_state.read().transactions.is_empty());
+				assert_eq!(HistoryDepth::get(), 4);
+
+				// when block 7 going forward, the ocw should submit one transaction, and no
+				// tally should happen.
+				let (ocw_result, tx_results) = roll_next_and_set_response(
+					Arc::clone(&pool_state),
+					Arc::clone(&offchain_state),
+					good_response(),
+				);
+
+				// then: we have submitted one transaction for 1 asset.
+				assert_eq!(ocw_result.unwrap(), 1);
+				assert_eq!(pool_state.read().transactions.len(), 1);
+
+				// then: no txs were applied yet
+				assert!(tx_results.is_empty());
+				// then: no votes are submitted yet.
+				assert_eq!(StorageManager::<Runtime>::block_with_votes(1), vec![]);
+
+				// then: tally failed since no prior votes
+				assert_eq!(
+					oracle_events_since_last_call(),
+					vec![Event::TallyFailed { error: TallyOuterError::YankVotes(()) }]
+				);
+
+				// when block 8 finalizes
+				bump_block_number(8);
+				let (ocw_result, tx_results) = roll_next_and_set_response(
+					Arc::clone(&pool_state),
+					Arc::clone(&offchain_state),
+					good_response(),
+				);
+
+				// then we have submitted one transaction for 1 asset again
+				assert_eq!(ocw_result.unwrap(), 1);
+				assert_eq!(pool_state.read().transactions.len(), 1);
+				// then: previous transactions was applied
+				assert_eq!(tx_results, vec![Ok(())]);
+
+				// then: we have 1 block with vote, also knowing our history depth is 4.
+				assert_eq!(StorageManager::<Runtime>::block_with_votes(1), vec![(8, 1)]);
+
+				// then: new vote vote submitted and tally happened.
+				assert_eq!(
+					oracle_events_since_last_call(),
+					vec![
+						Event::VoteSubmitted {
+							who: 1,
+							asset_id: 1,
+							price: FixedU128::from_rational(42, 10)
+						},
+						Event::PriceUpdated {
+							asset_id: 1,
+							old_price: None,
+							new_price: FixedU128::from_rational(42, 10),
+							vote_count: 1
+						}
+					]
+				);
+
+				// rest of the blocks follow a similar pattern. But to spice up a bit, let's do one
+				// more block and fail our tally for no reason but keep the votes.
+
+				// Note: in this block, we want to keep the votes submitted for the next block, and
+				// for it not to overlap with the existing vote in the txpool, we switch our
+				// keystore account to a different authority.
+				UintAuthorityId::set_all_keys(vec![2]);
+
+				// when block 9 finalizes
+				bump_block_number(9);
+				NextTallyFails::set(Some(TallyOuterError::KeepVotes(())));
+				let (ocw_result, tx_results) = roll_next_and_set_response(
+					Arc::clone(&pool_state),
+					Arc::clone(&offchain_state),
+					good_response(),
+				);
+
+				// then we have submitted one transaction for 1 asset again
+				assert_eq!(ocw_result.unwrap(), 1);
+				assert_eq!(pool_state.read().transactions.len(), 1);
+				// then: previous transactions was applied
+				assert_eq!(tx_results, vec![Ok(())]);
+
+				// then: the vote from block 8, which was processed in block 9, is moved to block 10
+				// due to `KeepVotes`
+				assert_eq_uvec!(
+					StorageManager::<Runtime>::block_with_votes(1),
+					vec![(8, 1), (10, 1)]
+				);
+
+				// then: new vote vote submitted and tally happened.
+				assert_eq!(
+					oracle_events_since_last_call(),
+					vec![
+						Event::VoteSubmitted {
+							who: 1,
+							asset_id: 1,
+							price: FixedU128::from_rational(42, 10)
+						},
+						Event::TallyFailed { error: TallyOuterError::KeepVotes(()) }
+					]
+				);
+
+				// when block 10 finalizes, we will get a tally with 2 votes this time. In this
+				// round, we don't return a good response to OCW to not track an new txs.
+				bump_block_number(10);
+				let (ocw_result, tx_results) = roll_next_and_set_response(
+					Arc::clone(&pool_state),
+					Arc::clone(&offchain_state),
+					bad_response(),
+				);
+
+				// then we have not submitted any transaction for 1 asset again
+				assert_eq!(ocw_result.unwrap(), 0);
+				assert_eq!(pool_state.read().transactions.len(), 0);
+				// then: previous transactions was applied
+				assert_eq!(tx_results, vec![Ok(())]);
+
+				// then: the vote from block 8, which was processed in block 9, is moved to block 10
+				// due to `KeepVotes`
+				assert_eq_uvec!(
+					StorageManager::<Runtime>::block_with_votes(1),
+					vec![(8, 1), (10, 2)]
+				);
+
+				// then: new vote vote submitted and tally happened.
+				assert_eq!(
+					oracle_events_since_last_call(),
+					vec![
+						Event::VoteSubmitted {
+							who: 2,
+							asset_id: 1,
+							price: FixedU128::from_rational(42, 10)
+						},
+						Event::PriceUpdated {
+							asset_id: 1,
+							old_price: Some(FixedU128::from_rational(42, 10)),
+							new_price: FixedU128::from_rational(42, 10),
+							vote_count: 2 // kaboom, 1 and 2.
+						}
+					]
+				);
+			},
+		);
 	}
 }

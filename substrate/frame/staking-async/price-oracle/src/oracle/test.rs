@@ -17,7 +17,9 @@
 
 //! Tests for pallet-price-oracle
 
-use crate::oracle::{self, mock::*, PriceData, StorageManager, TallyOuterError, TimePoint, Vote};
+use crate::oracle::{
+	self, mock::*, offchain::Endpoint, PriceData, StorageManager, TallyOuterError, TimePoint, Vote,
+};
 use frame_support::{pallet_prelude::*, testing_prelude::*, traits::Get};
 use sp_runtime::{DispatchError, FixedU128, Percent};
 use substrate_test_utils::assert_eq_uvec;
@@ -47,7 +49,6 @@ mod setup {
 	#[test]
 	#[should_panic(expected = "genesis endpoints should fit")]
 	fn too_many_endpoints() {
-		use crate::oracle::offchain::{Endpoint, Method, ParsingMethod};
 		// given max endpoints per asset is 8
 		let endpoints = (0..9).map(|_| Endpoint::default()).collect::<Vec<_>>();
 		// then build will panic.
@@ -57,7 +58,6 @@ mod setup {
 	#[test]
 	#[should_panic(expected = "genesis endpoints should be valid")]
 	fn invalid_endpoint() {
-		use crate::oracle::offchain::{Endpoint, Method, ParsingMethod};
 		// given an endpoint with invalid UTF-8 URL
 		// then build will panic.
 		let invalid_endpoint =

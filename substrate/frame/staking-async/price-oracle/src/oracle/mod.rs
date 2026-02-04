@@ -29,8 +29,8 @@
 //! The overall flow of operations is as follows:
 //!
 //! * The offchain workers will run every [`PriceUpdateInterval`] blocks. The inner details of how
-//!   the offchain workers operate, how they build the HTTP request is documented in the [`offchain`]
-//!   module and is based on the endpoint information in [`Endpoint`].
+//!   the offchain workers operate, how they build the HTTP request is documented in the
+//!   [`offchain`] module and is based on the endpoint information in [`Endpoint`].
 //! * At the end of each block, we attempt to tally via [`TallyManager`].
 //! * If tally succeeds, we update our price, stored in `Price`, and possibly update our history.
 //! 	* And we report the price update to [`OnPriceUpdate`], which should send it to the destination
@@ -178,11 +178,16 @@ pub mod pallet {
 	/// Alias for the price data type.
 	pub type PriceDataOf<T> = PriceData<BlockNumberFor<T>, MomentOf<T>>;
 
+	/// Alias for the inner error type of the tally manager.
+	pub type TallyInnerErrorOf<T> = <<T as Config>::TallyManager as Tally>::Error;
+
 	/// The error type that an implementation of [`Tally`] can return.
 	///
 	/// The actual error is generic; this enum is just distinguishing whether because of this error
 	/// we should keep the old votes, or yank them.
-	#[derive(Clone, PartialEq, Eq, Debug)]
+	#[derive(
+		Clone, PartialEq, Eq, Debug, Encode, Decode, TypeInfo, MaxEncodedLen, DecodeWithMemTracking,
+	)]
 	pub enum TallyOuterError<Error> {
 		/// An error happened, and we should yank existing votes as they are not useful anymore.
 		YankVotes(Error),
@@ -309,6 +314,8 @@ pub mod pallet {
 			new_price: FixedU128,
 			vote_count: u32,
 		},
+		/// The tallying failed with the given error.
+		TallyFailed { error: TallyOuterError<TallyInnerErrorOf<T>> },
 	}
 
 	#[pallet::error]
@@ -949,6 +956,9 @@ pub mod pallet {
 					);
 
 					BlockVotes::<T>::insert(asset_id, next_block, unprocessed);
+					Self::deposit_event(Event::<T>::TallyFailed {
+						error: TallyOuterError::KeepVotes(e),
+					});
 				},
 				Err(TallyOuterError::YankVotes(e)) => {
 					BlockVotes::<T>::remove(asset_id, local_block_number);
@@ -958,6 +968,9 @@ pub mod pallet {
 						asset_id,
 						e
 					);
+					Self::deposit_event(Event::<T>::TallyFailed {
+						error: TallyOuterError::YankVotes(e),
+					});
 				},
 			}
 		}

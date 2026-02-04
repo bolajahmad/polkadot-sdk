@@ -17,8 +17,8 @@
 
 //! The offchain worker machinery of the price-oracle pallet.
 //!
-//! The main pallet stores a [`crate::oracle::Endpoints`] storage item, which is a mapping of
-//! asset-id to [`Endpoint`] defined below.
+//! The main pallet stores an `Endpoints` storage item, which is a mapping of asset-id to
+//! [`Endpoint`] defined below.
 //!
 //! The fields in the endpoint are all set upon registering the asset. They define how this endpoint
 //! should be queried by the offchain worker:
@@ -119,7 +119,7 @@ pub type MaxBodyLength = ConstU32<256>;
 pub type MaxRawRequestDataLength = ConstU32<256>;
 pub type MaxOffchainDatabaseKeyLength = ConstU32<8>;
 
-/// The endpoint information that is stored onchain in [`crate::oracle::Endpoints`], key-ed by an
+/// The endpoint information that is stored onchain in the `Endpoints` storage, keyed by an
 /// asset-id.
 ///
 /// It stores fine-grained information about how this endpoint should be queried, allowing the
@@ -245,20 +245,20 @@ impl Into<http::Method> for Method {
 pub enum ParsingMethod {
 	/// CryptoCompare API (free tier).
 	///
-	/// Example: https://min-api.cryptocompare.com/data/price?fsym=DOT&tsyms=USD
+	/// Example: <https://min-api.cryptocompare.com/data/price?fsym=DOT&tsyms=USD>
 	///
 	/// Response format: `{"USD": 1.702}`
 	#[default]
 	CryptoCompareFree,
 	/// Binance API (free tier).
 	///
-	/// Example: https://data-api.binance.vision/api/v3/ticker/price?symbol=DOTUSDT
+	/// Example: <https://data-api.binance.vision/api/v3/ticker/price?symbol=DOTUSDT>
 	///
 	/// Response format: `{"symbol": "DOTUSDT", "price": "1.70600000"}`
 	BinanceFree,
 	/// CoinLore API (free tier).
 	///
-	/// Example: https://api.coinlore.net/api/ticker/?id=45219
+	/// Example: <https://api.coinlore.net/api/ticker/?id=45219>
 	///
 	/// Response format: `[{"id": "45219", ..., "price_usd": "1.70", ...}]`
 	CoinLoreFree,

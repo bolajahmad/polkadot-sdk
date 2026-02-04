@@ -28,61 +28,58 @@
 //!
 //! The overall flow of operations is as follows:
 //!
-//! * The offchain workers will run every [`crate::oracle::Config::PriceUpdateInterval`] blocks. The
-//!   inner details of how the offchain workers operate, how they build the HTTP request is
-//!   documented in the [`crate::oracle::offchain`] module and is based on the endpoint information
-//!   in [`crate::offchain::Endpoint`].
-//! * At the end of each block, we attempt to do a [`crate::oracle::Config::TallyManager`]
-//! * If tally succeeds, we update our price, stored in [`crate::oracle::Price`], and possibly
-//!   update our history.
-//! 	* And we report the price update to [`crate::oracle::Config::OnPriceUpdate`], which should send
-//!    it to the destination chian(s).
+//! * The offchain workers will run every [`PriceUpdateInterval`] blocks. The inner details of how
+//!   the offchain workers operate, how they build the HTTP request is documented in the [`offchain`]
+//!   module and is based on the endpoint information in [`Endpoint`].
+//! * At the end of each block, we attempt to tally via [`TallyManager`].
+//! * If tally succeeds, we update our price, stored in `Price`, and possibly update our history.
+//! 	* And we report the price update to [`OnPriceUpdate`], which should send it to the destination
+//!    chain(s).
 //!
 //! ## Design Choices
 //!
 //! ### Asset Tracking
 //!
-//! This pallet only allows price updates for assets that are being tracked in
-//! [`crate::oracle::TrackedAssets`].
+//! This pallet only allows price updates for assets that are being tracked (i.e., have endpoints
+//! registered in `Endpoints`).
 //!
 //! ### Authorities and Voting
 //!
-//! The current set of authorities that are eligible to vote is stored in
-//! [`crate::oracle::Authorities`]. This storage item is updated upon a new session change, which is
-//! managed by [`crate::client`]. The authorities are stored as a `BTreeMap` of `(authority,
-//! confidence)` tuples for fast inclusion checks.
+//! The current set of authorities that are eligible to vote is stored in [`Authorities`]. This
+//! storage item is updated upon a new session change, which is managed by [`crate::client`]. The
+//! authorities are stored as a `BTreeMap` of `(authority, confidence)` tuples for fast inclusion
+//! checks.
 //!
-//! The [`crate::oracle::Call::vote`] is guarded by a signed origin that is one of the said
-//! authorities.
+//! The [`Call::vote`] is guarded by a signed origin that is one of the said authorities.
 //!
 //! ### Time Tracking
 //!
 //! This pallet has 3 notions of time:
 //!
 //! * The local block number
-//! * The relay block number, provided via [`crate::oracle::Config::RelayBlockNumberProvider`]
-//! * The canonical timestamp, provided via [`crate::oracle::Config::TimeProvider`]
+//! * The relay block number, provided via [`RelayBlockNumberProvider`]
+//! * The canonical timestamp, provided via [`TimeProvider`]
 //!
-//! Any price update will record all 3 data-points as a `crate::Oracle::TimePoint`.
+//! Any price update will record all 3 data-points as a [`TimePoint`].
 //!
 //! ### Vote Age
 //!
 //! This pallet ensures that all votes that are accepted, upon dispatch, are no more than
-//! [`crate::oracle::Config::MaxVoteAge`] blocks old. Moreover, upon tallying, it will double check
-//! this. In other words, a guarantee that the [`crate::Config::TallyManager`] has access to is that
-//! all votes are no more than [`crate::oracle::Config::MaxVoteAge`] blocks old.
+//! [`MaxVoteAge`] blocks old. Moreover, upon tallying, it will double check this. In other words, a
+//! guarantee that the [`TallyManager`] has access to is that all votes are no more than
+//! [`MaxVoteAge`] blocks old.
 //!
 //! The vote-age is always measured only on the basis of the local block number.
 //!
 //! NOTE: The runtime level code will decide how the final transaction is built. It is highly
 //! recommended that this code will set the longevity of the transaction (`Era` mortality) to the
-//! same value as [`crate::oracle::Config::MaxVoteAge`].
+//! same value as [`MaxVoteAge`].
 //!
 //! ### Tallying
 //!
 //! This pallet makes no assumptions about what tally algorithm is being used. It collects sensible
-//! information about the votes (represented in [`crate::oracle::Tally::tally`]), and passes it to
-//! the [`crate::Config::TallyManager`].
+//! information about the votes (represented in [`Tally::tally`]), and passes it to the
+//! [`TallyManager`].
 //!
 //! This pallet makes an assumption that tallying happens at the end of each block.
 //!
@@ -94,36 +91,31 @@
 //!
 //! #### Keeping or Yanking Votes
 //!
-//! The [`crate::oracle::Config::TallyManager`], in the case that a tally is not successful, is
-//! responsible to report back to this pallet what it should do with the existing votes:
+//! The [`TallyManager`], in the case that a tally is not successful, is responsible to report back
+//! to this pallet what it should do with the existing votes:
 //!
-//! * [`crate::oracle::TallyOuterError::KeepVotes`]: The votes IFF they still respect
-//!   [`crate::oracle::Config::MaxVoteAge`].
-//! * [`crate::oracle::TallyOuterError::YankVotes`]: Yank all votes.
+//! * [`TallyOuterError::KeepVotes`]: The votes IFF they still respect [`MaxVoteAge`].
+//! * [`TallyOuterError::YankVotes`]: Yank all votes.
 //!
 //! ### History Tracking
 //!
-//! This pallet tracks up to [`crate::oracle::Config::HistoryDepth`] price/vote data-points for each
-//! asset.
+//! This pallet tracks up to [`HistoryDepth`] price/vote data-points for each asset.
 //!
 //! Assuming `HistoryDepth = N`:
-//! * The price history is kept as the most recent record in [`crate::oracle::PriceHistory`], and
-//!   the remaining `N-1` in [`crate::oracle::PriceHistory`].
-//! * All N voting records are kept in [`crate::oracle::BlockVotes`].
+//! * The price history is kept as the most recent record in `Price`, and the remaining `N-1` in
+//!   `PriceHistory`.
+//! * All N voting records are kept in `BlockVotes`.
 //!
-//! Both are automatically pruned if [`crate::oracle::Config::TallyManager`] returns a successful
-//! new price.
+//! Both are automatically pruned if [`TallyManager`] returns a successful new price.
 //!
 //! ### Confidence
 //!
 //! This pallet employs a notion of confidence in multiple places, yet they have not all been
 //! implemented yet.
 //!
-//! * Price confidence: a notion of how strong a price is. Received from
-//!   [`crate::oracle::Config::TallyManager`] and reported to
-//!   [`crate::oracle::Config::OnPriceUpdate`].
-//! * Endpoint confidence: a notion of how reliable one of the endpoints in
-//!   [`crate::oracle::TrackedAssets`] is.
+//! * Price confidence: a notion of how strong a price is. Received from [`TallyManager`] and
+//!   reported to [`OnPriceUpdate`].
+//! * Endpoint confidence: a notion of how reliable one of the endpoints in `Endpoints` is.
 //! 	* The long term plan for this would be for authorities to signal that an endpoint is not
 //!    reliable, allowing for automatic shutdown of one.
 //! 	* Privileged calls (fellowship etc.) can always do this too.
@@ -135,7 +127,16 @@
 //! ### Implementation Notes
 //!
 //! While some items are made public to be accessible in tests/benchmarks, all price-related storage
-//! items must happen via the [`StorageManager`] struct.
+//! items must happen via the `StorageManager` struct.
+//!
+//! [`PriceUpdateInterval`]: Config::PriceUpdateInterval
+//! [`Endpoint`]: offchain::Endpoint
+//! [`TallyManager`]: Config::TallyManager
+//! [`OnPriceUpdate`]: Config::OnPriceUpdate
+//! [`RelayBlockNumberProvider`]: Config::RelayBlockNumberProvider
+//! [`TimeProvider`]: Config::TimeProvider
+//! [`MaxVoteAge`]: Config::MaxVoteAge
+//! [`HistoryDepth`]: Config::HistoryDepth
 
 pub mod offchain;
 pub mod weights;
@@ -253,7 +254,7 @@ pub mod pallet {
 		/// The maximum age of the [`Pallet::vote`] call.
 		///
 		/// Note that this value is treated at face-value and is based on the validators running the
-		/// exact code provided by the [`crate::offchain`] machinery.
+		/// exact code provided by the [`offchain`](super::offchain) machinery.
 		type MaxVoteAge: Get<BlockNumberFor<Self>>;
 
 		/// The tally manager to use.
@@ -271,7 +272,7 @@ pub mod pallet {
 
 		/// Hook to inform other systems that the price has been updated.
 		///
-		/// Is essentially a listener for [`Price`] storage item.
+		/// Is essentially a listener for the `Price` storage item.
 		type OnPriceUpdate: OnPriceUpdate<Self::AssetId, BlockNumberFor<Self>, MomentOf<Self>>;
 
 		// Configs related to the OCW. Could someday be moved ot a new `trait OffchainWorkerConfig`

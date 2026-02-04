@@ -15,6 +15,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! # Transaction Extensions for the Price Oracle Parachain
+//!
+//! This module provides specialized [`TransactionExtension`]s for the price-oracle runtime. These
+//! extensions are essential for spam prevention and transaction prioritization in a runtime that
+//! intentionally lacks standard pallets like `balances` and `transaction-payment`.
+//!
+//! ## Extensions
+//!
+//! ### [`OnlyOracleAuthorities`]
+//!
+//! This extension blocks ALL incoming signed transactions unless:
+//! 1. The origin is root
+//! 2. The signer is a registered oracle authority (in [`crate::oracle::Authorities`])
+//! 3. The signer is in the `ExtraSigners` list (e.g., sudo key holders)
+//!
+//! This is the **primary spam prevention mechanism** for the price-oracle parachain. Without
+//! balance requirements or transaction fees, this extension ensures only authorized parties can
+//! submit transactions.
+//!
+//! ### [`SetPriorityFromProducedIn`]
+//!
+//! This extension extracts the `produced_in` field from [`crate::oracle::Call::vote`] calls and
+//! sets it as the transaction priority. This ensures that more recent votes are prioritized over
+//! older ones in the transaction pool.
+//!
+//! ## Usage
+//!
+//! Both extensions should be included in the runtime's `TxExtension` tuple:
+//!
+//! ```ignore
+//! pub type TxExtension = (
+//!     // ... other extensions ...
+//!     OnlyOracleAuthorities<Runtime, ExtraSignersProvider>,
+//!     SetPriorityFromProducedIn<Runtime>,
+//! );
+//! ```
+//!
+//! [`TransactionExtension`]: sp_runtime::traits::TransactionExtension
+
 extern crate alloc;
 
 use super::oracle::Call as OracleCall;

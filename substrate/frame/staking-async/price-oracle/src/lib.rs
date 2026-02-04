@@ -22,7 +22,14 @@
 //! We will use the same validator set as the Polkadot relay chain to oraclize the price. The
 //! pallets in this crate will run on a dedicated parachain. The collators of the parachain are
 //! automatically updated in sync-with the relay chain validators. The same validators would have to
-//! run collators for this parachainn too.
+//! run collators for this parachain too.
+//!
+//! ## Naming
+//!
+//! This pallet is located under `frame/staking-async`, mainly because it needs to leverage teh
+//! staking-async's runtimes for testing. Then, to keep the naming consistent, it has to have the
+//! prefix `staking-async-` in its name, ergo `pallet-staking-async-price-oracle`. While not
+//! optimal, we opt for a consistent naming here.
 //!
 //! ## Structure
 //!

@@ -350,7 +350,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	.unwrap();
 
 	let _ = pallet_balances::GenesisConfig::<Runtime> {
-		balances: vec![(10, 100), (20, 100), (30, 100), (21, 100), (22, 100)]
+		balances: vec![(10, 100), (20, 100), (21, 100), (22, 100)]
 			.into_iter()
 			.chain(TEST_VALIDATORS.iter().map(|&v| (v, 1000)))
 			.collect::<Vec<_>>(),

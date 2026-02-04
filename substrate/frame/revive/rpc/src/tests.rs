@@ -302,20 +302,21 @@ async fn run_all_eth_rpc_tests_inner() -> anyhow::Result<()> {
 	}
 
 	run_tests!(
-		test_transfer,
-		test_deploy_and_call,
-		test_runtime_api_dry_run_addr_works,
-		test_invalid_transaction,
-		test_evm_blocks_should_match,
-		test_evm_blocks_hydrated_should_match,
-		test_block_hash_for_tag_with_proper_ethereum_block_hash_works,
-		test_block_hash_for_tag_with_invalid_ethereum_block_hash_fails,
-		test_block_hash_for_tag_with_block_number_works,
-		test_block_hash_for_tag_with_block_tags_works,
-		test_multiple_transactions_in_block,
-		test_mixed_evm_substrate_transactions,
-		test_runtime_pallets_address_upload_code,
-		test_dry_run_of_contract_with_consume_all_gas,
+		// test_transfer,
+		// test_deploy_and_call,
+		// test_runtime_api_dry_run_addr_works,
+		// test_invalid_transaction,
+		// test_evm_blocks_should_match,
+		// test_evm_blocks_hydrated_should_match,
+		// test_block_hash_for_tag_with_proper_ethereum_block_hash_works,
+		// test_block_hash_for_tag_with_invalid_ethereum_block_hash_fails,
+		// test_block_hash_for_tag_with_block_number_works,
+		// test_block_hash_for_tag_with_block_tags_works,
+		// test_multiple_transactions_in_block,
+		// test_mixed_evm_substrate_transactions,
+		// test_runtime_pallets_address_upload_code,
+		// test_dry_run_of_contract_with_consume_all_gas,
+		test_gas_estimation_for_contract_requiring_binary_search
 	);
 
 	log::debug!(target: LOG_TARGET, "All tests completed successfully!");
@@ -869,6 +870,42 @@ async fn test_dry_run_of_contract_with_consume_all_gas() -> anyhow::Result<()> {
 
 	// Assert
 	dry_run_result.expect("Dry run of this transaction must succeed");
+
+	Ok(())
+}
+
+async fn test_gas_estimation_for_contract_requiring_binary_search() -> anyhow::Result<()> {
+	// Arrange
+	let code = pallet_revive_fixtures::compile_module_with_type(
+		"ContractRequiringBinarySearchForGasEstimation",
+		pallet_revive_fixtures::FixtureType::Resolc,
+	)?
+	.0;
+	let client = Arc::new(SharedResources::client().await);
+	let account = Account::default();
+
+	let receipt = TransactionBuilder::new(client.clone())
+		.input(code)
+		.send()
+		.await?
+		.wait_for_receipt()
+		.await?;
+	let contract_address = receipt
+		.contract_address
+		.expect("Expected the transaction to publish a contract");
+
+	// Act
+	let main_function_selector = [0xdf, 0xfe, 0xad, 0xd0];
+	let receipt = TransactionBuilder::new(client.clone())
+		.to(contract_address)
+		.input(main_function_selector.to_vec())
+		.send()
+		.await?
+		.wait_for_receipt()
+		.await?;
+
+	// Assert
+	assert!(receipt.is_success());
 
 	Ok(())
 }

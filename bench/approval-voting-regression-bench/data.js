@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770221622458,
+  "lastUpdate": 1770241811119,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "donal.murray@parity.io",
-            "name": "Dónal Murray",
-            "username": "seadanda"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "4e122d496f68a820e0e13f63435b6d74fb53be0d",
-          "message": "[AHM] The Asset Hub Migration on Westend (#7997)\n\nPost AHM changes for Westend Relay and Asset Hub.\n\nChanges:\n- Add Async staking pallets to Westend Relay and Asset Hub\n- XCM stuff?\n- Deploy pallet-ah-ops\n- Deprecate pallet function\n`pallet_utility::Pallet::<T>::derivative_account_id` in favour of\nfreestanding function `pallet_utility::derivative_account_id`.\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>\nSigned-off-by: Alexandru Gheorghe <alexandru.gheorghe@parity.io>\nSigned-off-by: Iulian Barbu <iulian.barbu@parity.io>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>\nCo-authored-by: muharem <ismailov.m.h@gmail.com>\nCo-authored-by: polka.dom <polkadotdom@gmail.com>\nCo-authored-by: Ankan <ankan.anurag@gmail.com>\nCo-authored-by: Kian Paimani <5588131+kianenigma@users.noreply.github.com>\nCo-authored-by: Adrian Catangiu <adrian@parity.io>\nCo-authored-by: kianenigma <kian@parity.io>\nCo-authored-by: Ankan <10196091+Ank4n@users.noreply.github.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Karol Kokoszka <karol.k91@gmail.com>\nCo-authored-by: Branislav Kontur <bkontur@gmail.com>\nCo-authored-by: Paolo La Camera <paolo@parity.io>\nCo-authored-by: ordian <noreply@reusable.software>\nCo-authored-by: Javier Viola <363911+pepoviola@users.noreply.github.com>\nCo-authored-by: Dmitry Markin <dmitry@markin.tech>\nCo-authored-by: Andrei Eres <eresav@me.com>\nCo-authored-by: Tsvetomir Dimitrov <tsvetomir@parity.io>\nCo-authored-by: Javier Viola <javier@parity.io>\nCo-authored-by: Alexandru Gheorghe <49718502+alexggh@users.noreply.github.com>\nCo-authored-by: cuteolaf <OliverLim818@gmail.com>\nCo-authored-by: Michal Kucharczyk <1728078+michalkucharczyk@users.noreply.github.com>\nCo-authored-by: Serban Iorga <serban@parity.io>\nCo-authored-by: PG Herveou <pgherveou@gmail.com>\nCo-authored-by: Anthony Kveder <32168055+antkve@users.noreply.github.com>\nCo-authored-by: Alexandru Vasile <60601340+lexnv@users.noreply.github.com>\nCo-authored-by: Bastian Köcher <git@kchr.de>\nCo-authored-by: Alin Dima <alin@parity.io>\nCo-authored-by: Iulian Barbu <14218860+iulianbarbu@users.noreply.github.com>\nCo-authored-by: Steven <stevenlawrence13e@gmail.com>\nCo-authored-by: girazoki <gorka.irazoki@gmail.com>\nCo-authored-by: Evgeny Svirsky <e.svirsky@tut.by>\nCo-authored-by: Alexander Cyon <Sajjon@users.noreply.github.com>\nCo-authored-by: Koute <koute@users.noreply.github.com>\nCo-authored-by: Afounso Souza <drewsmpk@gmail.com>\nCo-authored-by: Alexandre R. Baldé <alexandre.balde@parity.io>\nCo-authored-by: Doordashcon <jesse.chejieh@gmail.com>\nCo-authored-by: Alexander Theißen <alex.theissen@me.com>\nCo-authored-by: Victor Oliva <olivarra1@gmail.com>\nCo-authored-by: Karol Kokoszka <karol@parity.io>",
-          "timestamp": "2025-06-27T15:21:49Z",
-          "tree_id": "e07b89123d6ec10848381da7ac02a652e1b8edf9",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/4e122d496f68a820e0e13f63435b6d74fb53be0d"
-        },
-        "date": 1751041543416,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 63625.6,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 52939,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.00001694367,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.4604208662800159,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.367041108239999,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.000019853759999999993,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.3334022069426226,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.3935588619999995,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.00001694367,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.890117481650014,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005601535769999996,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.000019853759999999993,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.4262872267700026,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.376337960169999,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.8608699224199978,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting-parallel/approval-voting-parallel-3",
             "value": 2.7017936011900003,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eresav@me.com",
+            "name": "Andrei Eres",
+            "username": "AndreiEres"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a09c18f60eb31198d1422c7d4903b82a0c507e9c",
+          "message": "statement-store: validation without runtime (#10787)\n\n# Description\n\nFixes https://github.com/paritytech/polkadot-sdk/issues/10799\n\nThis removes slow runtime validation from statement-submission hot path.\nValidation now happens on the node side via direct signature\nverification and storage reads for account quotas.\n\n## Integration\n\nNode validates signatures directly, reads quotas from storage. Setting\nallowances is implementing in another PR.\n\n---------\n\nSigned-off-by: Alexandru Gheorghe <alexandru.gheorghe@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Alexandru Gheorghe <49718502+alexggh@users.noreply.github.com>\nCo-authored-by: Alexandru Gheorghe <alexandru.gheorghe@parity.io>",
+          "timestamp": "2026-02-04T20:37:11Z",
+          "tree_id": "c68144a42eb5a7b82421e852f69b10c1f1bcb1c1",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a09c18f60eb31198d1422c7d4903b82a0c507e9c"
+        },
+        "date": 1770241786453,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 52938.2,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 63617.16000000001,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.644661272819999,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.000021683110000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.000021683110000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.719033477260023,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.00510364125,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.6722325534300007,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8219072439700194,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.491515672662981,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.6150766967100005,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.307283785740002,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.6527682833400013,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.000021743769999999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.000021743769999999998,
             "unit": "seconds"
           }
         ]

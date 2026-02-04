@@ -780,17 +780,14 @@ pub fn benchmarks(
 
 						// Access all whitelisted keys to get them into the proof recorder since the
 						// recorder does not have a whitelist.
-						// NOTE: We read from the global whitelist here (not the local captured copy)
-						// because the benchmark setup code may have added additional keys via
-						// add_to_whitelist() or add_to_whitelist_child().
+						// NOTE: We read from the global whitelist because the benchmark setup code
+						// may have added additional keys via add_to_whitelist() or add_to_whitelist_child().
 						let current_whitelist = #krate::benchmarking::get_whitelist();
 						for key in &current_whitelist {
 							if let Some(child_trie_key) = &key.child_trie_key {
-								// Child trie key - use child storage API
 								let child_info = #krate::__private::storage::ChildInfo::new_default(child_trie_key);
 								#krate::__private::storage::child::get_raw(&child_info, &key.key);
 							} else {
-								// Main storage key
 								#krate::__private::storage::unhashed::get_raw(&key.key);
 							}
 						}

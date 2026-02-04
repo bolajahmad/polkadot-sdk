@@ -21,6 +21,8 @@
 
 use crate::InheritanceOrder;
 use codec::{Decode, Encode, MaxEncodedLen};
+use frame::deps::sp_io::hashing::blake2_256;
+use frame::deps::sp_runtime::traits::TrailingZeroInput;
 use frame::traits::BlockNumberProvider;
 use frame_support::{
 	storage_alias,
@@ -35,6 +37,18 @@ pub trait MigrationConfig: crate::pallet::Config {
 	/// Must implement ReservableCurrency for unreserving deposits.
 	/// The Balance type must match the new pallet's Balance type.
 	type Currency: ReservableCurrency<Self::AccountId, Balance = crate::BalanceOf<Self>>;
+}
+
+/// Derive a multi-account ID from the sorted list of accounts and the threshold.
+///
+/// This is used to compute the inheritor for migrated recovery configs - the inheritor
+/// will be the multisig account that the friends can control together.
+///
+/// NOTE: `who` must be sorted. If it is not, then you'll get the wrong answer.
+pub fn multi_account_id<AccountId: Encode + Decode>(who: &[AccountId], threshold: u16) -> AccountId {
+	let entropy = (b"modlpy/utilisuba", who, threshold).using_encoded(blake2_256);
+	Decode::decode(&mut TrailingZeroInput::new(entropy.as_ref()))
+		.expect("infinite length input; no invalid inputs for type; qed")
 }
 
 /// Old balance type for v0 storage.
@@ -99,10 +113,6 @@ pub struct ActiveRecovery<BlockNumber, Balance, Friends> {
 	/// The friends which have vouched so far. Always sorted.
 	pub friends: Friends,
 }
-
-// Note: ActiveRecovery cannot be converted to v1 Attempt because the structures
-// are fundamentally different. V0 tracks vouching friends as a list, v1 uses a
-// bitfield and requires friend_group_index which doesn't exist in v0.
 
 /// Old storage: The set of recoverable accounts and their recovery configuration.
 #[storage_alias]

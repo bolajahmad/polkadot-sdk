@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770201644804,
+  "lastUpdate": 1770208948435,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23176,6 +23176,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "dispute-distribution",
             "value": 0.009286944479999988,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "5588131+kianenigma@users.noreply.github.com",
+            "name": "Kian Paimani",
+            "username": "kianenigma"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "89669b38344e4378581c34b7833d109e3ad477a5",
+          "message": "Remove unused code in staking-async (#10842)\n\n- remove the `reward-fn` from `pallet-staking-async`. This crate is no\nlonger needed.\n- rename `ahm-test` to `integration-tests`\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T11:34:00Z",
+          "tree_id": "a8b5a9abec24dd000c1670c0722bf883b0ecf7a6",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/89669b38344e4378581c34b7833d109e3ad477a5"
+        },
+        "date": 1770208924749,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009488550179999987,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006764339799999995,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0027173619299999995,
             "unit": "seconds"
           }
         ]

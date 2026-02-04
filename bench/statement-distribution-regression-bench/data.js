@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770181080440,
+  "lastUpdate": 1770187436101,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "1728078+michalkucharczyk@users.noreply.github.com",
-            "name": "Michal Kucharczyk",
-            "username": "michalkucharczyk"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "caf999310df66b790c7f26b0227a51068ba441fc",
-          "message": "`fatxpool`: `ChainApi` is now async (#8875)\n\n[`ChainApi`](https://github.com/paritytech/polkadot-sdk/blob/488072d245763fb059743bf32eea2f48d84054b3/substrate/client/transaction-pool/src/graph/pool.rs#L65-L66)\nis now `async_trait`,\n[`validate_transaction`](https://github.com/paritytech/polkadot-sdk/blob/488072d245763fb059743bf32eea2f48d84054b3/substrate/client/transaction-pool/src/graph/pool.rs#L78)\nand\n[`block_body`](https://github.com/paritytech/polkadot-sdk/blob/488072d245763fb059743bf32eea2f48d84054b3/substrate/client/transaction-pool/src/graph/pool.rs#L112)\nare now `async` methods. This is just cleanup - migrating from returning\n`Future` to `async` method\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-25T21:43:36Z",
-          "tree_id": "9d3d2131eb7ed4b84ce7223da3c9fc2191f8ba29",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/caf999310df66b790c7f26b0227a51068ba441fc"
-        },
-        "date": 1750892869728,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.96799999999998,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.03419689567,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04534625380399996,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.038367806314,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "6c01d65fb821be787b894d513604d1c532220746",
+          "message": "ci: improve try-runtime snapshot caching strategy (#10972)\n\nSplit check-runtime-migration into two jobs, similarly to what runtimes\nrepo already does:\n- `prepare-snapshots`: creates snapshots only when cache miss\n- `check-runtime-migration`: restores cached snapshots, runs checks\n\nCache strategy changes:\n- Restore uses prefix key (matches any date, enables fallback to older\nsnapshots)\n- Save uses dated key (fresh snapshots don't overwrite until successful)\n- Scheduled runs skip cache check, always create fresh snapshots\n- PRs reuse existing snapshots, only create if cache is empty\n\nThis prevents multiple concurrent jobs from hammering RPC endpoints when\ncache misses occur, and provides automatic fallback to older snapshots\nwhen daily refresh fails.\n\nNote that this is a behavioral change: PRs now match any date and not\ntoday-only, falling back to the most recent snapshot.",
+          "timestamp": "2026-02-04T05:32:25Z",
+          "tree_id": "ebbc361570d0c8da8ef43b5f1c3c797f92859c28",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/6c01d65fb821be787b894d513604d1c532220746"
+        },
+        "date": 1770187411155,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.02799999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.038566873099999996,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06792206219199994,
             "unit": "seconds"
           }
         ]

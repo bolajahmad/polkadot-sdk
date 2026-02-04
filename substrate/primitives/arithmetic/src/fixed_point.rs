@@ -809,23 +809,34 @@ macro_rules! implement_fixed {
 			/// 5. Calls `checked_from_rational` to create the fixed-point number
 			///
 			/// This is more accurate than `from_str` which only parses the raw inner
-			/// representation. `float_str` handles decimal notation that humans expect.
+			/// representation. `from_float_str` handles decimal notation that humans expect.
 			///
 			/// # Examples
 			///
-			/// ```ignore
+			/// ```
+			/// use sp_arithmetic::FixedU64;
+			///
 			/// // Parse "3.14" as 314/100
-			/// let pi = FixedU64::float_str("3.14").unwrap();
+			/// let pi = FixedU64::from_float_str("3.14").unwrap();
+			/// assert_eq!(pi, FixedU64::from_rational(314, 100));
 			///
 			/// // Parse "0.5" as 5/10
-			/// let half = FixedU64::float_str("0.5").unwrap();
+			/// let half = FixedU64::from_float_str("0.5").unwrap();
+			/// assert_eq!(half, FixedU64::from_rational(1, 2));
 			///
 			/// // Parse "5" as integer 5
-			/// let five = FixedU64::float_str("5").unwrap();
+			/// let five = FixedU64::from_float_str("5").unwrap();
+			/// assert_eq!(five, FixedU64::from_u32(5));
 			///
 			/// // All these are equal to 5.0
-			/// assert_eq!(FixedU64::float_str("5").unwrap(), FixedU64::float_str("5.").unwrap());
-			/// assert_eq!(FixedU64::float_str("5").unwrap(), FixedU64::float_str("5.0").unwrap());
+			/// assert_eq!(
+			///     FixedU64::from_float_str("5").unwrap(),
+			///     FixedU64::from_float_str("5.").unwrap()
+			/// );
+			/// assert_eq!(
+			///     FixedU64::from_float_str("5").unwrap(),
+			///     FixedU64::from_float_str("5.0").unwrap()
+			/// );
 			/// ```
 			///
 			/// # Errors
@@ -835,6 +846,11 @@ macro_rules! implement_fixed {
 			/// - The resulting rational overflows the fixed-point range
 			pub fn from_float_str(s: &str) -> Result<Self, &'static str> {
 				// Find the decimal point (if present)
+				let s = s.trim();
+				if s.is_empty() {
+					return Err("invalid string input");
+				}
+
 				let dot_pos_opt = s.find('.');
 
 				let (integer_part, fractional_part) = if let Some(dot_pos) = dot_pos_opt {
@@ -850,17 +866,17 @@ macro_rules! implement_fixed {
 
 				// Parse both parts as integers, handling negative signs
 				let is_negative = integer_part.starts_with('-');
-				let integer_part_abs = if is_negative { &integer_part[1..] } else { integer_part };
+				let integer_part = if is_negative { &integer_part[1..] } else { integer_part };
 
-				if integer_part_abs.is_empty() && fractional_part.is_empty() {
-					return Err("invalid string input")
+				if integer_part.is_empty() && fractional_part.is_empty() {
+					return Err("invalid string input");
 				}
 
 				// Parse the absolute integer part
-				let int_value: u128 = if integer_part_abs.is_empty() || integer_part_abs == "0" {
+				let int_value: u128 = if integer_part.is_empty() || integer_part == "0" {
 					0
 				} else {
-					integer_part_abs.parse::<u128>().map_err(|_| "invalid integer part")?
+					integer_part.parse::<u128>().map_err(|_| "invalid integer part")?
 				};
 
 				// Handle fractional part
@@ -893,13 +909,14 @@ macro_rules! implement_fixed {
 				if is_negative {
 					// For negative numbers, we need to handle signed types
 					if !Self::SIGNED {
-						return Err("cannot parse negative number for unsigned type")
+						return Err("cannot parse negative number for unsigned type");
 					}
-					// Convert to signed by negating the denominator.
-					// This is safer than negating the numerator because the denominator is a power of 10
-					// which fits in u128 (checked above) and is guaranteed to fit in i128 (10^38 < 2^127).
-					// The numerator can be up to u128::MAX which doesn't fit in i128.
-					let signed_denominator = -(denominator as i128);
+					// Convert to signed by negating the denominator (safer than negating the
+					// numerator which can be up to u128::MAX).
+					let signed_denominator = i128::try_from(denominator)
+						.ok()
+						.and_then(|d| d.checked_neg())
+						.ok_or("denominator overflow")?;
 					Self::checked_from_rational(numerator, signed_denominator)
 						.ok_or("rational conversion failed or overflow")
 				} else {
@@ -2353,46 +2370,75 @@ macro_rules! implement_fixed {
 			#[test]
 			fn float_str_works_basic() {
 				// Test basic parsing
-				let a = $name::from_float_str("3.14").unwrap();
-				assert_eq!(a, $name::saturating_from_rational(314, 100));
+				assert_eq!(
+					$name::from_float_str("3.14").unwrap(),
+					$name::saturating_from_rational(314, 100)
+				);
 
-				let b = $name::from_float_str("0.5").unwrap();
-				assert_eq!(b, $name::saturating_from_rational(5, 10));
+				assert_eq!(
+					$name::from_float_str("42").unwrap(),
+					$name::saturating_from_rational(42, 1)
+				);
 
-				let c = $name::from_float_str("1.0").unwrap();
-				assert_eq!(c, $name::one());
+				assert_eq!(
+					$name::from_float_str("0.5").unwrap(),
+					$name::saturating_from_rational(5, 10)
+				);
 
-				let d = $name::from_float_str("10.25").unwrap();
-				assert_eq!(d, $name::saturating_from_rational(1025, 100));
+				assert_eq!($name::from_float_str("1.0").unwrap(), $name::one());
+
+				assert_eq!(
+					$name::from_float_str("10.25").unwrap(),
+					$name::saturating_from_rational(1025, 100)
+				);
 
 				// Test with leading zeros
-				let e = $name::from_float_str("0.05").unwrap();
-				assert_eq!(e, $name::saturating_from_rational(5, 100));
+				assert_eq!(
+					$name::from_float_str("0.05").unwrap(),
+					$name::saturating_from_rational(5, 100)
+				);
 
 				// Test with trailing zeros (they matter for denominator)
-				let f = $name::from_float_str("1.50").unwrap();
-				assert_eq!(f, $name::saturating_from_rational(150, 100));
+				assert_eq!(
+					$name::from_float_str("1.50").unwrap(),
+					$name::saturating_from_rational(150, 100)
+				);
 
 				// Test with many decimal places
-				let g = $name::from_float_str("2.718281828").unwrap();
-				assert_eq!(g, $name::saturating_from_rational(2718281828u64, 1_000_000_000u64));
+				assert_eq!(
+					$name::from_float_str("2.718281828").unwrap(),
+					$name::saturating_from_rational(2718281828u64, 1_000_000_000u64)
+				);
 			}
 
 			#[test]
 			fn float_str_works_signed() {
 				if $name::SIGNED {
 					// Test negative numbers
-					let a = $name::from_float_str("-3.14").unwrap();
-					assert_eq!(a, $name::saturating_from_rational(-314, 100));
+					assert_eq!(
+						$name::from_float_str("-3.14").unwrap(),
+						$name::saturating_from_rational(-314, 100)
+					);
 
-					let b = $name::from_float_str("-0.5").unwrap();
-					assert_eq!(b, $name::saturating_from_rational(-5, 10));
+					assert_eq!(
+						$name::from_float_str("-0.5").unwrap(),
+						$name::saturating_from_rational(-5, 10)
+					);
 
-					let c = $name::from_float_str("-1.0").unwrap();
-					assert_eq!(c, -$name::one());
+					assert_eq!(
+						$name::from_float_str("-1.0").unwrap(),
+						$name::saturating_from_rational(-1, 1)
+					);
 
-					let d = $name::from_float_str("-10.25").unwrap();
-					assert_eq!(d, $name::saturating_from_rational(-1025, 100));
+					assert_eq!(
+						$name::from_float_str("-1").unwrap(),
+						$name::saturating_from_rational(-1, 1)
+					);
+
+					assert_eq!(
+						$name::from_float_str("-10.25").unwrap(),
+						$name::saturating_from_rational(-1025, 100)
+					);
 				}
 			}
 
@@ -2414,16 +2460,35 @@ macro_rules! implement_fixed {
 				// missing integer part
 				assert_eq!($name::from_float_str("1.").unwrap(), $name::saturating_from_integer(1));
 				// missing decimal part
-				assert_eq!($name::from_float_str(".1").unwrap(), $name::saturating_from_rational(1, 10));
+				assert_eq!(
+					$name::from_float_str(".1").unwrap(),
+					$name::saturating_from_rational(1, 10)
+				);
 				// missing both parts
 				assert!($name::from_float_str(".").is_err());
+			}
+
+			#[test]
+			fn zero() {
+				assert_eq!($name::from_float_str(".0").unwrap(), $name::zero());
+				assert_eq!($name::from_float_str("0").unwrap(), $name::zero());
+				assert_eq!($name::from_float_str("0.").unwrap(), $name::zero());
+				assert_eq!($name::from_float_str("0.0").unwrap(), $name::zero());
+
+				if $name::SIGNED {
+					assert_eq!($name::from_float_str("-.0").unwrap(), $name::zero());
+					assert_eq!($name::from_float_str("-0").unwrap(), $name::zero());
+					assert_eq!($name::from_float_str("-0.").unwrap(), $name::zero());
+					assert_eq!($name::from_float_str("-0.0").unwrap(), $name::zero());
+				}
 			}
 
 			#[test]
 			fn float_str_errors() {
 				// Invalid characters
 				assert!($name::from_float_str("3.1a4").is_err());
-				assert!($name::from_float_str("abc.def").is_err());
+				assert!($name::from_float_str("foo").is_err());
+				assert!($name::from_float_str("foo.bar").is_err());
 				assert!($name::from_float_str("").is_err());
 				assert!($name::from_float_str("-").is_err());
 				assert!($name::from_float_str(".").is_err());
@@ -2453,53 +2518,6 @@ macro_rules! implement_fixed {
 					let res = $name::from_float_str(s);
 					assert!(res.is_err());
 				}
-			}
-
-			#[test]
-			fn float_str_edge_cases() {
-				// Zero with decimal
-				let a = $name::from_float_str("0.0").unwrap();
-				assert_eq!(a, $name::zero());
-
-				// Very small number
-				let b = $name::from_float_str("0.000000001").unwrap();
-				assert_eq!(b, $name::saturating_from_rational(1, 1_000_000_000));
-
-				// Integer part is zero
-				let c = $name::from_float_str("0.123").unwrap();
-				assert_eq!(c, $name::saturating_from_rational(123, 1000));
-
-				if $name::SIGNED {
-					// Negative zero (should be zero)
-					let d = $name::from_float_str("-0.0").unwrap();
-					assert_eq!(d, $name::zero());
-
-					// Negative with zero integer part
-					let e = $name::from_float_str("-0.5").unwrap();
-					assert_eq!(e, $name::saturating_from_rational(-5, 10));
-				}
-			}
-
-			#[test]
-			fn float_str_precision() {
-				// Test that precision is preserved
-				let a = $name::from_float_str("1.25").unwrap();
-				let b = $name::saturating_from_rational(125, 100);
-				assert_eq!(a, b);
-
-				// Test equivalence with saturating_from_rational
-				let c = $name::from_float_str("7.5").unwrap();
-				let d = $name::saturating_from_rational(75, 10);
-				assert_eq!(c, d);
-
-				// Multiple equivalent representations
-				let e = $name::from_float_str("0.5").unwrap();
-				let f = $name::from_float_str("0.50").unwrap();
-				// Note: These might differ slightly due to denominator being 10 vs 100
-				// but should represent the same value when normalized
-				let expected = $name::saturating_from_rational(1, 2);
-				assert_eq!(e, expected);
-				assert_eq!(f, expected);
 			}
 
 			#[test]

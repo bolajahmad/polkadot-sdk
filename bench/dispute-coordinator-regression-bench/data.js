@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770241877868,
+  "lastUpdate": 1770245818439,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23421,6 +23421,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "dispute-coordinator",
             "value": 0.0026697767200000006,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@kchr.de",
+            "name": "Bastian Köcher",
+            "username": "bkchr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0be9d3a1924bc3278e816495c925bddb07965844",
+          "message": "FixedPoint: Support parsing `x.y` format (#9184)\n\nThis makes it easier to declare a fixed point value. The old format is\nalso still supported.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
+          "timestamp": "2026-02-04T21:21:05Z",
+          "tree_id": "607bd7ed665e626059dc8fe90b415e3264704b78",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/0be9d3a1924bc3278e816495c925bddb07965844"
+        },
+        "date": 1770245794109,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0026651349000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009212545159999974,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006640721569999999,
             "unit": "seconds"
           }
         ]

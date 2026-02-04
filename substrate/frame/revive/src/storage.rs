@@ -43,7 +43,7 @@ use sp_core::{Get, H160};
 use sp_io::KillStorageResult;
 use sp_runtime::{
 	traits::{Hash, Saturating, Zero},
-	DispatchError, RuntimeDebug,
+	Debug, DispatchError,
 };
 
 use crate::metering::Diff;
@@ -57,15 +57,7 @@ pub enum AccountIdOrAddress<T: Config> {
 
 /// Represents the account information for a contract or an externally owned account (EOA).
 #[derive(
-	DefaultNoBound,
-	Encode,
-	Decode,
-	CloneNoBound,
-	PartialEq,
-	Eq,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	DefaultNoBound, Encode, Decode, CloneNoBound, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
 )]
 #[scale_info(skip_type_params(T))]
 pub struct AccountInfo<T: Config> {
@@ -79,15 +71,7 @@ pub struct AccountInfo<T: Config> {
 
 /// The account type is used to distinguish between contracts and externally owned accounts.
 #[derive(
-	DefaultNoBound,
-	Encode,
-	Decode,
-	CloneNoBound,
-	PartialEq,
-	Eq,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	DefaultNoBound, Encode, Decode, CloneNoBound, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
 )]
 #[scale_info(skip_type_params(T))]
 pub enum AccountType<T: Config> {
@@ -271,7 +255,7 @@ impl<T: Config> ContractInfo<T> {
 		if_tracing(|t| {
 			t.storage_read(key, result.data.as_deref());
 		});
-		result
+result
 	}
 
 	/// Returns `Some(len)` (in bytes) if a storage item exists at `key`.
@@ -424,7 +408,7 @@ impl<T: Config> ContractInfo<T> {
 	/// Delete as many items from the deletion queue possible within the supplied weight limit.
 	pub fn process_deletion_queue_batch(meter: &mut WeightMeter) {
 		if meter.try_consume(T::WeightInfo::on_process_deletion_queue_batch()).is_err() {
-			return
+			return;
 		};
 
 		let mut queue = <DeletionQueueManager<T>>::load();
@@ -447,7 +431,7 @@ impl<T: Config> ContractInfo<T> {
 				// This happens when our budget wasn't large enough to remove all keys.
 				KillStorageResult::SomeRemaining(keys_removed) => {
 					remaining_key_budget.saturating_reduce(keys_removed);
-					break
+					break;
 				},
 				KillStorageResult::AllRemoved(keys_removed) => {
 					entry.remove();
@@ -477,7 +461,7 @@ impl<T: Config> ContractInfo<T> {
 }
 
 /// Information about what happened to the pre-existing value when calling [`ContractInfo::write`].
-#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, Eq, PartialEq, Encode, Decode, Debug, TypeInfo)]
 pub enum WriteOutcome {
 	/// No value existed at the specified key.
 	New,
@@ -581,7 +565,7 @@ impl<T: Config> DeletionQueueManager<T> {
 	/// the cost of an extra call to `sp_io::storage::next_key` to lookup the next entry in the map
 	fn next(&mut self) -> Option<DeletionQueueEntry<'_, T>> {
 		if self.is_empty() {
-			return None
+			return None;
 		}
 
 		let entry = <DeletionQueue<T>>::get(self.delete_counter);

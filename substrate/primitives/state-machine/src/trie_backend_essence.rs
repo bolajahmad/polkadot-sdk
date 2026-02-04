@@ -117,7 +117,7 @@ where
 		) -> Option<core::result::Result<RE, Box<TrieError<<H as Hasher>::Out>>>>,
 	) -> Option<Result<RE>> {
 		if !matches!(self.state, IterState::Pending) {
-			return None
+			return None;
 		}
 
 		let result = backend.with_trie_db(self.root, self.child_info.as_ref(), |db| {
@@ -409,7 +409,7 @@ where
 		#[cfg(feature = "std")]
 		{
 			if let Some(result) = self.cache.read().child_root.get(child_info.storage_key()) {
-				return Ok(*result)
+				return Ok(*result);
 			}
 		}
 
@@ -640,7 +640,7 @@ where
 
 		if self.root == Default::default() {
 			// A special-case for an empty storage root.
-			return Ok(Default::default())
+			return Ok(Default::default());
 		}
 
 		let trie_iter = self
@@ -874,7 +874,7 @@ impl<
 {
 	fn get(&self, key: &H::Out, prefix: Prefix) -> Option<DBValue> {
 		if *key == self.empty {
-			return Some([0u8].to_vec())
+			return Some([0u8].to_vec());
 		}
 		match self.storage.get(key, prefix) {
 			Ok(x) => x,

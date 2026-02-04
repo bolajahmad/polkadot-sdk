@@ -55,7 +55,7 @@ use sp_runtime::{
 		AccountIdConversion, BadOrigin, BlakeTwo256, BlockNumberProvider, Dispatchable, Hash,
 		Saturating, Zero,
 	},
-	Either, RuntimeDebug, SaturatedConversion,
+	Debug, Either, SaturatedConversion,
 };
 use storage::{with_transaction, TransactionOutcome};
 use xcm::{latest::QueryResponseInfo, prelude::*};
@@ -636,15 +636,7 @@ pub mod pallet {
 
 	#[pallet::origin]
 	#[derive(
-		PartialEq,
-		Eq,
-		Clone,
-		Encode,
-		Decode,
-		DecodeWithMemTracking,
-		RuntimeDebug,
-		TypeInfo,
-		MaxEncodedLen,
+		PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 	)]
 	pub enum Origin {
 		/// It comes from somewhere in the XCM space wanting to transact.
@@ -757,7 +749,7 @@ pub mod pallet {
 	}
 
 	/// The status of a query.
-	#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	#[derive(Clone, Eq, PartialEq, Encode, Decode, Debug, TypeInfo, MaxEncodedLen)]
 	pub enum QueryStatus<BlockNumber> {
 		/// The query was sent but no response has yet been received.
 		Pending {
@@ -1026,7 +1018,7 @@ pub mod pallet {
 					if Self::request_version_notify(dest).is_ok() {
 						// TODO: correct weights.
 						weight_used.saturating_accrue(T::DbWeight::get().reads_writes(1, 1));
-						break
+						break;
 					}
 				}
 			}
@@ -1048,7 +1040,7 @@ pub mod pallet {
 		use super::*;
 		use frame_support::traits::{PalletInfoAccess, StorageVersion};
 
-		#[derive(Clone, Eq, PartialEq, Encode, Decode, RuntimeDebug, TypeInfo)]
+		#[derive(Clone, Eq, PartialEq, Encode, Decode, Debug, TypeInfo)]
 		enum QueryStatusV0<BlockNumber> {
 			Pending {
 				responder: VersionedLocation,
@@ -2840,7 +2832,7 @@ impl<T: Config> Pallet<T> {
 					}
 					weight_used.saturating_accrue(sv_migrate_weight);
 					if weight_used.any_gte(weight_cutoff) {
-						return (weight_used, Some(stage))
+						return (weight_used, Some(stage));
 					}
 				}
 			}
@@ -2854,7 +2846,7 @@ impl<T: Config> Pallet<T> {
 					}
 					weight_used.saturating_accrue(vn_migrate_weight);
 					if weight_used.any_gte(weight_cutoff) {
-						return (weight_used, Some(stage))
+						return (weight_used, Some(stage));
 					}
 				}
 			}
@@ -2876,7 +2868,7 @@ impl<T: Config> Pallet<T> {
 						// We don't early return here since we need to be certain that we
 						// make some progress.
 						weight_used.saturating_accrue(vnt_already_notified_weight);
-						continue
+						continue;
 					},
 				};
 				let response = Response::Version(xcm_version);
@@ -2902,7 +2894,7 @@ impl<T: Config> Pallet<T> {
 				weight_used.saturating_accrue(vnt_notify_weight);
 				if weight_used.any_gte(weight_cutoff) {
 					let last = Some(iter.last_raw_key().into());
-					return (weight_used, Some(NotifyCurrentTargets(last)))
+					return (weight_used, Some(NotifyCurrentTargets(last)));
 				}
 			}
 			stage = MigrateAndNotifyOldTargets;
@@ -2920,9 +2912,9 @@ impl<T: Config> Pallet<T> {
 							});
 							weight_used.saturating_accrue(vnt_migrate_fail_weight);
 							if weight_used.any_gte(weight_cutoff) {
-								return (weight_used, Some(stage))
+								return (weight_used, Some(stage));
 							}
-							continue
+							continue;
 						},
 					};
 
@@ -2963,7 +2955,7 @@ impl<T: Config> Pallet<T> {
 						weight_used.saturating_accrue(vnt_notify_migrate_weight);
 					}
 					if weight_used.any_gte(weight_cutoff) {
-						return (weight_used, Some(stage))
+						return (weight_used, Some(stage));
 					}
 				}
 			}
@@ -3619,7 +3611,7 @@ impl<T: Config> Pallet<T> {
 		// if migration has been already scheduled, everything is ok and data will be eventually
 		// migrated
 		if CurrentMigration::<T>::exists() {
-			return Ok(())
+			return Ok(());
 		}
 
 		// if migration has NOT been scheduled yet, we need to check all operational data
@@ -3920,7 +3912,7 @@ impl<T: Config> VersionChangeNotifier for Pallet<T> {
 impl<T: Config> DropAssets for Pallet<T> {
 	fn drop_assets(origin: &Location, assets: AssetsInHolding, _context: &XcmContext) -> Weight {
 		if assets.is_empty() {
-			return Weight::zero()
+			return Weight::zero();
 		}
 		let versioned = VersionedAssets::from(Assets::from(assets));
 		let hash = BlakeTwo256::hash_of(&(&origin, &versioned));
@@ -3963,7 +3955,7 @@ impl<T: Config> ClaimAssets for Pallet<T> {
 			origin: origin.clone(),
 			assets: versioned,
 		});
-		return true
+		return true;
 	}
 }
 
@@ -4009,7 +4001,7 @@ impl<T: Config> OnResponse for Pallet<T> {
 							query_id,
 							expected_location: Some(o),
 						});
-						return Weight::zero()
+						return Weight::zero();
 					},
 					_ => {
 						Self::deposit_event(Event::InvalidResponder {
@@ -4018,7 +4010,7 @@ impl<T: Config> OnResponse for Pallet<T> {
 							expected_location: None,
 						});
 						// TODO #3735: Correct weight for this.
-						return Weight::zero()
+						return Weight::zero();
 					},
 				};
 				// TODO #3735: Check max_weight is correct.
@@ -4051,7 +4043,7 @@ impl<T: Config> OnResponse for Pallet<T> {
 								origin: origin.clone(),
 								query_id,
 							});
-							return Weight::zero()
+							return Weight::zero();
 						},
 					};
 					if querier.map_or(true, |q| q != &match_querier) {
@@ -4061,7 +4053,7 @@ impl<T: Config> OnResponse for Pallet<T> {
 							expected_querier: match_querier,
 							maybe_actual_querier: querier.cloned(),
 						});
-						return Weight::zero()
+						return Weight::zero();
 					}
 				}
 				let responder = match Location::try_from(responder) {
@@ -4071,7 +4063,7 @@ impl<T: Config> OnResponse for Pallet<T> {
 							origin: origin.clone(),
 							query_id,
 						});
-						return Weight::zero()
+						return Weight::zero();
 					},
 				};
 				if origin != responder {
@@ -4080,7 +4072,7 @@ impl<T: Config> OnResponse for Pallet<T> {
 						query_id,
 						expected_location: Some(responder),
 					});
-					return Weight::zero()
+					return Weight::zero();
 				}
 				match maybe_notify {
 					Some((pallet_index, call_index)) => {
@@ -4102,7 +4094,7 @@ impl<T: Config> OnResponse for Pallet<T> {
 									max_budgeted_weight: max_weight,
 								};
 								Self::deposit_event(e);
-								return Weight::zero()
+								return Weight::zero();
 							}
 							let dispatch_origin = Origin::Response(origin.clone()).into();
 							match call.dispatch(dispatch_origin) {

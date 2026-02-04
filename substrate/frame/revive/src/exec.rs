@@ -22,7 +22,7 @@ use crate::{
 	metering::{ChargedAmount, Diff, FrameMeter, ResourceMeter, State, Token, TransactionMeter},
 	precompiles::{All as AllPrecompiles, Instance as PrecompileInstance, Precompiles},
 	primitives::{ExecConfig, ExecReturnValue, StorageDeposit},
-	runtime_decl_for_revive_api::{Decode, Encode, RuntimeDebugNoBound, TypeInfo},
+	runtime_decl_for_revive_api::{Decode, Encode, TypeInfo},
 	storage::{AccountIdOrAddress, WriteOutcome},
 	tracing::if_tracing,
 	transient_storage::TransientStorage,
@@ -171,7 +171,7 @@ impl<T: Into<DispatchError>> From<T> for ExecError {
 }
 
 /// The type of origins supported by the revive pallet.
-#[derive(Clone, Encode, Decode, PartialEq, TypeInfo, RuntimeDebugNoBound)]
+#[derive(Clone, Encode, Decode, PartialEq, TypeInfo, DebugNoBound)]
 pub enum Origin<T: Config> {
 	Root,
 	Signed(T::AccountId),
@@ -281,10 +281,6 @@ pub trait Ext: PrecompileWithInfoExt {
 	/// Returns the code hash of the contract being executed.
 	#[allow(dead_code)]
 	fn own_code_hash(&mut self) -> &H256;
-
-	/// Sets new code hash and immutable data for an existing contract.
-	/// Returns whether the old code was removed as a result of this operation.
-	fn set_code_hash(&mut self, hash: H256) -> Result<CodeRemoved, DispatchError>;
 
 	/// Get the length of the immutable data.
 	///
@@ -476,7 +472,7 @@ pub trait PrecompileExt: sealing::Sealed {
 	fn sr25519_verify(&self, signature: &[u8; 64], message: &[u8], pub_key: &[u8; 32]) -> bool;
 
 	/// Returns Ethereum address from the ECDSA compressed public key.
-	fn ecdsa_to_eth_address(&self, pk: &[u8; 33]) -> Result<[u8; 20], ()>;
+	fn ecdsa_to_eth_address(&self, pk: &[u8; 33]) -> Result<[u8; 20], DispatchError>;
 
 	/// Tests sometimes need to modify and inspect the contract info directly.
 	#[cfg(any(test, feature = "runtime-benchmarks"))]
@@ -556,7 +552,7 @@ pub trait PrecompileExt: sealing::Sealed {
 	Clone,
 	PartialEq,
 	Eq,
-	sp_core::RuntimeDebug,
+	Debug,
 	codec::Decode,
 	codec::Encode,
 	codec::MaxEncodedLen,
@@ -678,7 +674,7 @@ struct Frame<T: Config> {
 
 /// This structure is used to represent the arguments in a delegate call frame in order to
 /// distinguish who delegated the call and where it was delegated to.
-#[derive(Clone, RuntimeDebugNoBound)]
+#[derive(Clone, DebugNoBound)]
 pub struct DelegateInfo<T: Config> {
 	/// The caller of the contract.
 	pub caller: Origin<T>,
@@ -1243,7 +1239,12 @@ where
 				frame.read_only,
 				frame.value_transferred,
 				&input_data,
-				frame.frame_meter.eth_gas_left().unwrap_or_default().into(),
+				frame
+					.frame_meter
+					.eth_gas_left()
+					.unwrap_or_default()
+					.try_into()
+					.unwrap_or_default(),
 			);
 		});
 		let mock_answer = self.exec_config.mock_handler.as_ref().and_then(|handler| {
@@ -1462,10 +1463,12 @@ where
 					// we treat the initial frame meter differently to address
 					// https://github.com/paritytech/polkadot-sdk/issues/8362
 					let gas_consumed = if is_first_frame {
-						frame_meter.total_consumed_gas().into()
+						frame_meter.total_consumed_gas()
 					} else {
-						frame_meter.eth_gas_consumed().into()
+						frame_meter.eth_gas_consumed()
 					};
+
+					let gas_consumed: u64 = gas_consumed.try_into().unwrap_or(u64::MAX);
 
 					match &output {
 						Ok(output) => tracer.exit_child_span(&output, gas_consumed),
@@ -1484,11 +1487,12 @@ where
 					// we treat the initial frame meter differently to address
 					// https://github.com/paritytech/polkadot-sdk/issues/8362
 					let gas_consumed = if is_first_frame {
-						frame_meter.total_consumed_gas().into()
+						frame_meter.total_consumed_gas()
 					} else {
-						frame_meter.eth_gas_consumed().into()
+						frame_meter.eth_gas_consumed()
 					};
 
+					let gas_consumed: u64 = gas_consumed.try_into().unwrap_or(u64::MAX);
 					tracer.exit_child_span_with_error(error.into(), gas_consumed);
 				});
 
@@ -1634,7 +1638,7 @@ where
 		}
 
 		if <System<T>>::account_exists(to) {
-			return transfer_with_dust::<T>(from, to, value, preservation)
+			return transfer_with_dust::<T>(from, to, value, preservation);
 		}
 
 		let origin = origin.account_id()?;
@@ -1888,7 +1892,12 @@ where
 			tracer.terminate(
 				addr,
 				*beneficiary,
-				self.top_frame().frame_meter.eth_gas_left().unwrap_or_default().into(),
+				self.top_frame()
+					.frame_meter
+					.eth_gas_left()
+					.unwrap_or_default()
+					.try_into()
+					.unwrap_or_default(),
 				crate::Pallet::<T>::evm_balance(&addr),
 			);
 		});
@@ -1921,45 +1930,6 @@ where
 
 	fn own_code_hash(&mut self) -> &H256 {
 		&self.top_frame_mut().contract_info().code_hash
-	}
-
-	/// TODO: This should be changed to run the constructor of the supplied `hash`.
-	///
-	/// Because the immutable data is attached to a contract and not a code,
-	/// we need to update the immutable data too.
-	///
-	/// Otherwise we open a massive footgun:
-	/// If the immutables changed in the new code, the contract will brick.
-	///
-	/// A possible implementation strategy is to add a flag to `FrameArgs::Instantiate`,
-	/// so that `fn run()` will roll back any changes if this flag is set.
-	///
-	/// After running the constructor, the new immutable data is already stored in
-	/// `self.immutable_data` at the address of the (reverted) contract instantiation.
-	///
-	/// The `set_code_hash` contract API stays disabled until this change is implemented.
-	fn set_code_hash(&mut self, hash: H256) -> Result<CodeRemoved, DispatchError> {
-		let frame = top_frame_mut!(self);
-
-		let info = frame.contract_info();
-
-		let prev_hash = info.code_hash;
-		info.code_hash = hash;
-
-		let code_info = CodeInfoOf::<T>::get(hash).ok_or(Error::<T>::CodeNotFound)?;
-
-		let old_base_deposit = info.storage_base_deposit();
-		let new_base_deposit = info.update_base_deposit(code_info.deposit());
-		let deposit = StorageDeposit::Charge(new_base_deposit)
-			.saturating_sub(&StorageDeposit::Charge(old_base_deposit));
-
-		frame
-			.frame_meter
-			.charge_contract_deposit_and_transfer(frame.account_id.clone(), deposit)?;
-
-		<CodeInfo<T>>::increment_refcount(hash)?;
-		let removed = <CodeInfo<T>>::decrement_refcount(prev_hash)?;
-		Ok(removed)
 	}
 
 	fn immutable_data_len(&mut self) -> u32 {
@@ -2248,7 +2218,7 @@ where
 
 	fn code_hash(&self, address: &H160) -> H256 {
 		if let Some(code) = <AllPrecompiles<T>>::code(address.as_fixed_bytes()) {
-			return sp_io::hashing::keccak_256(code).into()
+			return sp_io::hashing::keccak_256(code).into();
 		}
 
 		<AccountInfo<T>>::load_contract(&address)
@@ -2263,7 +2233,7 @@ where
 
 	fn code_size(&self, address: &H160) -> u64 {
 		if let Some(code) = <AllPrecompiles<T>>::code(address.as_fixed_bytes()) {
-			return code.len() as u64
+			return code.len() as u64;
 		}
 
 		<AccountInfo<T>>::load_contract(&address)
@@ -2370,8 +2340,10 @@ where
 		)
 	}
 
-	fn ecdsa_to_eth_address(&self, pk: &[u8; 33]) -> Result<[u8; 20], ()> {
-		ECDSAPublic::from(*pk).to_eth_address()
+	fn ecdsa_to_eth_address(&self, pk: &[u8; 33]) -> Result<[u8; 20], DispatchError> {
+		Ok(ECDSAPublic::from(*pk)
+			.to_eth_address()
+			.or_else(|()| Err(Error::<T>::EcdsaRecoveryFailed))?)
 	}
 
 	#[cfg(any(test, feature = "runtime-benchmarks"))]

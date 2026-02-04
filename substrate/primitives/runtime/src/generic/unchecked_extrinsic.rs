@@ -34,7 +34,9 @@ use codec::{
 	Compact, CountedInput, Decode, DecodeWithMemLimit, DecodeWithMemTracking, Encode, EncodeLike,
 	Input,
 };
-use core::fmt::{self, Debug};
+use core::fmt::{
+	Debug, {self},
+};
 use scale_info::{build::Fields, meta_type, Path, StaticTypeInfo, Type, TypeInfo, TypeParameter};
 use sp_io::hashing::blake2_256;
 use sp_weights::Weight;
@@ -415,7 +417,7 @@ impl<Address, Call, Signature, Extension, const MAX_CALL_SIZE: usize>
 		let encoded_call = Some(clone_bytes.1);
 
 		if input.count() != len as u64 {
-			return Err("Invalid length prefix".into())
+			return Err("Invalid length prefix".into());
 		}
 
 		Ok(Self { preamble, function, encoded_call })
@@ -494,7 +496,7 @@ where
 					tx_ext,
 				)?;
 				if !raw_payload.using_encoded(|payload| signature.verify(payload, &signed)) {
-					return Err(InvalidTransaction::BadProof.into())
+					return Err(InvalidTransaction::BadProof.into());
 				}
 				let (function, tx_ext, _) = raw_payload.deconstruct();
 				CheckedExtrinsic { format: ExtrinsicFormat::Signed(signed, tx_ext), function }
@@ -824,7 +826,7 @@ mod legacy {
 			let is_signed = version & 0b1000_0000 != 0;
 			let version = version & 0b0111_1111;
 			if version != 4u8 {
-				return Err("Invalid transaction version".into())
+				return Err("Invalid transaction version".into());
 			}
 
 			let signature = is_signed.then(|| Decode::decode(input)).transpose()?;
@@ -836,7 +838,7 @@ mod legacy {
 				let length = before_length.saturating_sub(after_length);
 
 				if length != expected_length.0 as usize {
-					return Err("Invalid length prefix".into())
+					return Err("Invalid length prefix".into());
 				}
 			}
 

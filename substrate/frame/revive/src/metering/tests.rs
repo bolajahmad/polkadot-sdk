@@ -43,6 +43,24 @@ enum Charge {
 	D(i64),
 }
 
+#[test]
+fn test_deposit_calculation() {
+	use super::SignedGas;
+
+	ExtBuilder::default()
+		.with_next_fee_multiplier(FixedU128::from_rational(2, 1))
+		.build()
+		.execute_with(|| {
+			let deposit1 = StorageDeposit::Refund(10);
+			let gas_result1 = SignedGas::<Test>::from_adjusted_deposit_charge(&deposit1);
+			assert_eq!(gas_result1, SignedGas::Negative(BalanceOf::<Test>::from(5u32)));
+
+			let deposit2 = StorageDeposit::Refund(1);
+			let gas_result2 = SignedGas::<Test>::from_adjusted_deposit_charge(&deposit2);
+			assert_eq!(gas_result2, SignedGas::Positive(BalanceOf::<Test>::from(0u32)));
+		});
+}
+
 #[test_case(FixtureType::Solc   , "DepositPrecompile" ; "solc precompiles")]
 #[test_case(FixtureType::Resolc , "DepositPrecompile" ; "resolc precompiles")]
 #[test_case(FixtureType::Solc   , "DepositDirect" ; "solc direct")]
@@ -133,7 +151,7 @@ fn substrate_metering_initialization_works() {
 				let transaction_meter =
 					TransactionMeter::<Test>::new(TransactionLimits::EthereumGas {
 						eth_gas_limit: eth_gas_limit.div_ceil(gas_scale),
-						maybe_weight_limit: None,
+						weight_limit: Weight::MAX,
 						eth_tx_info,
 					});
 
@@ -171,10 +189,7 @@ fn substrate_metering_initialization_works() {
 				let transaction_meter =
 					TransactionMeter::<Test>::new(TransactionLimits::EthereumGas {
 						eth_gas_limit: 5_000_000_000 / gas_scale,
-						maybe_weight_limit: Some(Weight::from_parts(
-							ref_time_limit,
-							proof_size_limit,
-						)),
+						weight_limit: Weight::from_parts(ref_time_limit, proof_size_limit),
 						eth_tx_info,
 					})
 					.unwrap();
@@ -266,7 +281,7 @@ fn substrate_metering_charges_works() {
 				let mut transaction_meter =
 					TransactionMeter::<Test>::new(TransactionLimits::EthereumGas {
 						eth_gas_limit: eth_gas_limit.div_ceil(gas_scale),
-						maybe_weight_limit: None,
+						weight_limit: Weight::MAX,
 						eth_tx_info,
 					})
 					.unwrap();
@@ -493,7 +508,7 @@ fn substrate_nesting_works() {
 				let mut transaction_meter =
 					TransactionMeter::<Test>::new(TransactionLimits::EthereumGas {
 						eth_gas_limit: eth_gas_limit.div_ceil(gas_scale),
-						maybe_weight_limit: None,
+						weight_limit: Weight::MAX,
 						eth_tx_info: eth_tx_info.clone(),
 					})
 					.unwrap();
@@ -596,7 +611,7 @@ fn substrate_nesting_charges_works() {
 				let mut transaction_meter =
 					TransactionMeter::<Test>::new(TransactionLimits::EthereumGas {
 						eth_gas_limit: eth_gas_limit.div_ceil(gas_scale),
-						maybe_weight_limit: None,
+						weight_limit: Weight::MAX,
 						eth_tx_info,
 					})
 					.unwrap();
@@ -712,7 +727,7 @@ fn catch_constructor_test() {
 				)
 				.transaction_limits(crate::TransactionLimits::EthereumGas {
 					eth_gas_limit: eth_gas_limit.into(),
-					maybe_weight_limit: None,
+					weight_limit: Weight::MAX,
 					eth_tx_info: crate::EthTxInfo::new(0, Default::default()),
 				})
 				.build()
@@ -733,5 +748,36 @@ fn catch_constructor_test() {
 		});
 		let gas_trace = tracer.collect_trace().unwrap();
 		assert_eq!("revert: invalid address", gas_trace.calls[0].revert_reason.as_ref().unwrap());
+	});
+}
+
+#[test]
+fn dry_run_bounded_execution_runs_out_of_gas() {
+	use crate::evm::*;
+	use pallet_revive_fixtures::Fibonacci;
+
+	let (code, _) = compile_module_with_type("Fibonacci", FixtureType::Solc).unwrap();
+
+	ExtBuilder::default().build().execute_with(|| {
+		let _ = <Test as Config>::Currency::set_balance(&ALICE, 10_000_000_000_000);
+
+		let Contract { addr, .. } =
+			builder::bare_instantiate(Code::Upload(code)).build_and_unwrap_contract();
+
+		let result = crate::Pallet::<Test>::dry_run_eth_transact(
+			GenericTransaction {
+				from: Some(ALICE_ADDR),
+				to: Some(addr),
+				input: Fibonacci::fibCall { n: 100u64 }.abi_encode().into(),
+				..Default::default()
+			},
+			Default::default(),
+		);
+
+		let err = result.expect_err("fib(100) should run out of gas");
+		assert!(
+			matches!(&err, crate::EthTransactError::Message(msg) if msg.contains("OutOfGas")),
+			"expected OutOfGas error, got: {err:?}"
+		);
 	});
 }

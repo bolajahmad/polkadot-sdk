@@ -75,20 +75,20 @@ fn current_era_active_era_mismatch_causes_fund_loss() {
 		let agent = pallet_delegated_staking::Agents::<Runtime>::get(&pool_account).unwrap();
 		assert_eq!(agent.unclaimed_withdrawals, 100);
 
-		// Charlie joins and unbonds (unlocks at era 6)
-		// Charlie unbonds less than Dave's unclaimed 100, so withdrawal will succeed
-		assert_ok!(Pools::join(RuntimeOrigin::signed(charlie), 80, 1));
-		assert_ok!(Pools::unbond(RuntimeOrigin::signed(charlie), charlie, 80));
+		// Charlie joins with 200 and unbonds 150 (unlocks at era 6)
+		// Charlie should get 150, but will be capped to Dave's unclaimed 100
+		assert_ok!(Pools::join(RuntimeOrigin::signed(charlie), 200, 1));
+		assert_ok!(Pools::unbond(RuntimeOrigin::signed(charlie), charlie, 150));
 
 		let charlie_unlock_era = early_unlock_era + bonding_duration; // Era 6
 
-		// Verify charlie's chunk in staking ledger
+		// Verify charlie's 150 chunk exists in staking ledger
 		let ledger_before = Ledger::<Runtime>::get(&pool_account).unwrap();
-		let charlie_chunk_before = ledger_before
+		let charlie_chunk = ledger_before
 			.unlocking
 			.iter()
 			.find(|chunk| chunk.era == charlie_unlock_era);
-		assert!(charlie_chunk_before.is_some());
+		assert_eq!(charlie_chunk.unwrap().value, 150);
 
 		// Create era mismatch: CurrentEra advances to 6, ActiveEra stays at 5
 		CurrentEra::<Runtime>::put(charlie_unlock_era);
@@ -102,27 +102,29 @@ fn current_era_active_era_mismatch_causes_fund_loss() {
 		let result = Pools::withdraw_unbonded(RuntimeOrigin::signed(charlie), charlie, 0);
 		let charlie_balance_after = Balances::free_balance(charlie);
 
-		// Withdrawal succeeds (paid from Dave's unclaimed funds)
+		// Withdrawal succeeds but capped to Dave's unclaimed 100
 		assert!(result.is_ok());
+		let charlie_received = charlie_balance_after - charlie_balance_before;
+		assert_eq!(charlie_received, 100, "Charlie gets capped to unclaimed funds");
 
-		// Charlie's points are dissolved
+		// BUG: All 150 points dissolved despite only receiving 100
 		let charlie_after = PoolMembers::<Runtime>::get(charlie);
 		let points_dissolved = charlie_after
 			.as_ref()
 			.map(|m| !m.unbonding_eras.contains_key(&charlie_unlock_era))
 			.unwrap_or(true);
-		assert!(points_dissolved);
+		assert!(points_dissolved, "BUG: All 150 points dissolved");
 
-		// But charlie's chunk is STILL in staking ledger (staking uses ActiveEra)
+		// Charlie's 150 chunk still in staking ledger (staking uses ActiveEra)
 		let ledger_after = Ledger::<Runtime>::get(&pool_account).unwrap();
-		let chunk_exists_after = ledger_after
+		let chunk_after = ledger_after
 			.unlocking
 			.iter()
-			.any(|chunk| chunk.era == charlie_unlock_era);
-		assert!(chunk_exists_after, "BUG: Charlie's chunk still exists");
+			.find(|chunk| chunk.era == charlie_unlock_era);
+		assert_eq!(chunk_after.unwrap().value, 150, "BUG: Charlie's 150 still locked in staking");
 
-		// Charlie was paid from Dave's unclaimed funds, not their own chunk
-		let charlie_received = charlie_balance_after - charlie_balance_before;
-		assert!(charlie_received > 0);
+		// 50 balance trapped: Charlie got 100, lost 150 points, but 150 still in staking
+		let trapped = 150 - charlie_received;
+		assert_eq!(trapped, 50, "50 balance trapped with no points to claim it");
 	});
 }

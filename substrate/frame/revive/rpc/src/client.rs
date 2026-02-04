@@ -83,24 +83,40 @@ pub enum SubscriptionType {
 }
 
 /// Submit Error reason.
-#[derive(Debug)]
-pub struct SubmitError(pub &'static str);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubmitError {
+	/// Transaction was usurped by another with the same nonce.
+	Usurped,
+	/// Transaction was dropped from the pool.
+	Dropped,
+	/// Transaction is invalid (e.g. bad nonce, signature, etc).
+	Invalid,
+	/// Transaction stream ended without a terminal status.
+	StreamEnded,
+	/// Unknown transaction status.
+	Unknown,
+}
 
 impl std::fmt::Display for SubmitError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0)
+		match self {
+			Self::Usurped => write!(f, "Transaction was usurped by another with the same nonce"),
+			Self::Dropped => write!(f, "Transaction was dropped"),
+			Self::Invalid =>
+				write!(f, "Transaction is invalid (e.g. bad nonce, signature, etc)"),
+			Self::StreamEnded => write!(f, "Transaction stream ended without status"),
+			Self::Unknown => write!(f, "Unknown transaction status"),
+		}
 	}
 }
 
 impl From<TransactionStatus<SubstrateBlockHash>> for SubmitError {
 	fn from(status: TransactionStatus<SubstrateBlockHash>) -> Self {
 		match status {
-			TransactionStatus::Usurped(_) =>
-				SubmitError("Transaction was usurped by another with the same nonce"),
-			TransactionStatus::Dropped => SubmitError("Transaction was dropped"),
-			TransactionStatus::Invalid =>
-				SubmitError("Transaction is invalid (eg because of a bad nonce, signature etc)"),
-			_ => SubmitError("Unknown transaction status"),
+			TransactionStatus::Usurped(_) => SubmitError::Usurped,
+			TransactionStatus::Dropped => SubmitError::Dropped,
+			TransactionStatus::Invalid => SubmitError::Invalid,
+			_ => SubmitError::Unknown,
 		}
 	}
 }
@@ -551,9 +567,7 @@ impl Client {
 					},
 				}
 			}
-			return Err(ClientError::SubmitError(SubmitError(
-				"Transaction stream ended without status",
-			)))
+			return Err(ClientError::SubmitError(SubmitError::StreamEnded))
 		})
 		.await
 		.map_err(|_| ClientError::Timeout)?

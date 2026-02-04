@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770221656884,
+  "lastUpdate": 1770241844559,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "e1026d7ee22a593cf566a99484eee02a03ecc236",
-          "message": "RuntimeAllocator: Align returned pointers (#8891)\n\nRust recently switched the default alignment of u128 to 16bytes:\nhttps://blog.rust-lang.org/2024/03/30/i128-layout-update/ This broke the\nassumption of our host allocator that the biggest alignment is 8 bytes.\n\nTo fix the alignment issue, the runtime allocator now takes care of\naligned the returned pointer. We are abusing the fact that we know how\nthe host allocator is working and storing some extra data in its header.\nThis is not a perfect solution as we don't align the host side pointers,\nbut the host side is mainly allocating `u8` arrays that should be fine\nwith the `8byte` alignment. Any node side change would be a consensus\nbreaking change.\n\n\nCloses: https://github.com/paritytech/polkadot-sdk/issues/8818\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-27T10:53:44Z",
-          "tree_id": "e70aa26bbd2c4f3a9858fc4b04fb7eca8c10362b",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/e1026d7ee22a593cf566a99484eee02a03ecc236"
-        },
-        "date": 1751026707563,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 127.96399999999998,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.045801663285999925,
-            "unit": "seconds"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.034384304094,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.038163931265999984,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eresav@me.com",
+            "name": "Andrei Eres",
+            "username": "AndreiEres"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a09c18f60eb31198d1422c7d4903b82a0c507e9c",
+          "message": "statement-store: validation without runtime (#10787)\n\n# Description\n\nFixes https://github.com/paritytech/polkadot-sdk/issues/10799\n\nThis removes slow runtime validation from statement-submission hot path.\nValidation now happens on the node side via direct signature\nverification and storage reads for account quotas.\n\n## Integration\n\nNode validates signatures directly, reads quotas from storage. Setting\nallowances is implementing in another PR.\n\n---------\n\nSigned-off-by: Alexandru Gheorghe <alexandru.gheorghe@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Alexandru Gheorghe <49718502+alexggh@users.noreply.github.com>\nCo-authored-by: Alexandru Gheorghe <alexandru.gheorghe@parity.io>",
+          "timestamp": "2026-02-04T20:37:11Z",
+          "tree_id": "c68144a42eb5a7b82421e852f69b10c1f1bcb1c1",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a09c18f60eb31198d1422c7d4903b82a0c507e9c"
+        },
+        "date": 1770241820307,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 128.078,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06813568904199992,
+            "unit": "seconds"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03875900832999999,
             "unit": "seconds"
           }
         ]

@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770219594663,
+  "lastUpdate": 1770221588992,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "ab81eee9c67e1be6a6bab4cad484786dc653c4db",
-          "message": "contracts-fixtures: Rebuild `core` and `alloc` for MVP (#9014)\n\nWe are using the MVP target of Wasm, which means that newer language\nfeatures are disabled by default. However the build script was failing\nwith the following error:\n```\n  Caused by:\n      Unknown opcode 252\n```\n\nThis is caused by the `core` and `alloc` crate being precompiled, but\nnot for the MVP target. The pull request is fixing this by explicetly\ncompiling these crates for MVP. We are doing the same with the\n`wasm-builder`.",
-          "timestamp": "2025-06-28T09:18:29Z",
-          "tree_id": "e8102af9f5ebc4b5c0d0c34e62bd3950c64b802f",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/ab81eee9c67e1be6a6bab4cad484786dc653c4db"
-        },
-        "date": 1751105817961,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15823042208000002,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.009041445280000074,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012930564353333339,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022786463213333344,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "bitfield-distribution",
             "value": 0.023117819693333343,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "10196091+Ank4n@users.noreply.github.com",
+            "name": "Ankan",
+            "username": "Ank4n"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "aaf8ab15b68a826e79fded0f4d7aca6da631eed0",
+          "message": "[Pool] Use active era for withdrawals (#10986)\n\nStandardising using active era in pools and staking. Current Era should\nonly be used for election logic\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Kian Paimani <5588131+kianenigma@users.noreply.github.com>",
+          "timestamp": "2026-02-04T15:01:29Z",
+          "tree_id": "daec796376b0adfb04642cc8ff0bf86b60d2f4e5",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/aaf8ab15b68a826e79fded0f4d7aca6da631eed0"
+        },
+        "date": 1770221565289,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009773499979999975,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14403872290666672,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.02292408526666666,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.0071222799466666665,
             "unit": "seconds"
           }
         ]

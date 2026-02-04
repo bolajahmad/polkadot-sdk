@@ -1904,6 +1904,7 @@ impl<T: Config> Pallet<T> {
 		}
 
 		// Store values before moving the tx
+		let authorization_list = tx.authorization_list.clone();
 		let value = tx.value.unwrap_or_default();
 		let input = tx.input.clone().to_vec();
 		let from = tx.from;
@@ -1919,10 +1920,7 @@ impl<T: Config> Pallet<T> {
 		// in those cases we skip the check that the caller has enough balance
 		// to pay for the fees
 		let base_info = T::FeeInfo::base_dispatch_info(&mut call_info.call);
-		let auth_weight = T::WeightInfo::process_new_account_authorization(
-			call_info.authorization_list.len() as u32,
-		);
-		let base_weight = base_info.total_weight().saturating_sub(auth_weight);
+		let base_weight = base_info.total_weight();
 		let exec_config =
 			ExecConfig::new_eth_tx(effective_gas_price, call_info.encoded_len, base_weight)
 				.with_dry_run(dry_run_config);
@@ -1951,42 +1949,8 @@ impl<T: Config> Pallet<T> {
 			}
 		};
 
-		let mut eth_gas_limit = call_info.eth_gas_limit.saturated_into();
-		if !call_info.authorization_list.is_empty() {
-			let auth_gas =
-				metering::SignedGas::<T>::from_weight_fee(T::FeeInfo::weight_to_fee(&auth_weight))
-					.to_ethereum_gas()
-					.unwrap_or_default();
-			if auth_gas > call_info.eth_gas_limit.saturated_into() {
-				return Err(EthTransactError::Message(alloc::string::String::from(
-					"Out of gas after authorization processing",
-				)));
-			}
-
-			let new_account_count = evm::eip7702::process_authorizations::<T>(
-				&call_info.authorization_list,
-				U256::from(T::ChainId::get()),
-			);
-
-			let refund_weight = <RuntimeCosts as WeightToken<T>>::weight(
-				&RuntimeCosts::DelegationRefunds(new_account_count),
-			);
-			let actual_auth_weight = auth_weight.saturating_sub(refund_weight);
-			let actual_auth_gas = metering::SignedGas::<T>::from_weight_fee(
-				T::FeeInfo::weight_to_fee(&actual_auth_weight),
-			)
-			.to_ethereum_gas()
-			.unwrap_or_default();
-			if actual_auth_gas > eth_gas_limit {
-				return Err(EthTransactError::Message(alloc::string::String::from(
-					"Out of gas after authorization processing",
-				)));
-			}
-			eth_gas_limit = eth_gas_limit.saturating_sub(actual_auth_gas);
-		}
-
 		let transaction_limits = TransactionLimits::EthereumGas {
-			eth_gas_limit,
+			eth_gas_limit: call_info.eth_gas_limit.saturated_into(),
 			weight_limit: Self::evm_max_extrinsic_weight(),
 			eth_tx_info: EthTxInfo::new(call_info.encoded_len, base_weight),
 		};
@@ -2014,20 +1978,34 @@ impl<T: Config> Pallet<T> {
 					Default::default()
 				} else {
 					// Dry run the call.
-					let result = match TransactionMeter::new(transaction_limits) {
-						Ok(transaction_meter) => crate::Pallet::<T>::bare_call(
-							OriginFor::<T>::signed(origin),
-							dest,
-							value,
-							transaction_meter,
-							input.clone(),
-							exec_config,
-						),
-						Err(error) =>
-							return Err(EthTransactError::Message(format!(
-								"Failed to create meter: {error:?}"
-							))),
+					let Ok(mut transaction_meter) = TransactionMeter::new(transaction_limits)
+					else {
+						return Err(EthTransactError::Message(format!("Failed to create meter")));
 					};
+
+					if !authorization_list.is_empty() {
+						if let Err(err) = transaction_meter.charge_weight_token(
+							RuntimeCosts::DelegationRefunds(authorization_list.len() as _),
+						) {
+							return extract_error(err);
+						}
+
+						let refund_count = evm::eip7702::process_authorizations::<T>(
+							&authorization_list,
+							U256::from(T::ChainId::get()),
+						);
+						transaction_meter
+							.refund_weight(RuntimeCosts::DelegationRefunds(refund_count));
+					}
+
+					let result = crate::Pallet::<T>::bare_call(
+						OriginFor::<T>::signed(origin),
+						dest,
+						value,
+						transaction_meter,
+						input.clone(),
+						exec_config,
+					);
 
 					let data = match result.result {
 						Ok(return_value) => {

@@ -178,6 +178,8 @@ pub enum RuntimeCosts {
 	Blake2F(u32),
 	/// Weight of calling `Modexp` precompile
 	Modexp(u64),
+	/// Weight of processing `n` account authorization.
+	Delegations(u32),
 	/// Refund delta between new and existing account delegation.
 	DelegationRefunds(u32),
 }
@@ -340,6 +342,7 @@ impl<T: Config> Token<T> for RuntimeCosts {
 			Identity(len) => T::WeightInfo::identity(len),
 			Blake2F(rounds) => T::WeightInfo::blake2f(rounds),
 			Modexp(gas) => Weight::from_parts(gas.saturating_mul(WEIGHT_PER_GAS), 0),
+			Delegations(count) => T::WeightInfo::process_new_account_authorization(count),
 			DelegationRefunds(count) => T::WeightInfo::process_new_account_authorization(count)
 				.saturating_sub(T::WeightInfo::process_new_account_authorization(count)),
 		}

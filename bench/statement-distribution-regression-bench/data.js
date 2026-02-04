@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770201611649,
+  "lastUpdate": 1770208916440,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "140459108+kilavvy@users.noreply.github.com",
-            "name": "kilavvy",
-            "username": "kilavvy"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "56234513d1d1b3cc9fb85fcc1a9735ab9df22ef2",
-          "message": "Minor Documentation and Comment Corrections (#8997)\n\n**Description:**  \nThis pull request fixes minor typos and improves clarity in code\ncomments and documentation.\n- Corrected spelling errors in `coretime_interface.rs` and `types.rs`.\n- Enhanced comment readability for better developer experience.",
-          "timestamp": "2025-06-26T12:16:15Z",
-          "tree_id": "c055da89195b5154118af4c81f0797e5e8a60f5a",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/56234513d1d1b3cc9fb85fcc1a9735ab9df22ef2"
-        },
-        "date": 1750943872755,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 127.96199999999997,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.034122519104,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04517335026799994,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.03835715703000001,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "5588131+kianenigma@users.noreply.github.com",
+            "name": "Kian Paimani",
+            "username": "kianenigma"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "89669b38344e4378581c34b7833d109e3ad477a5",
+          "message": "Remove unused code in staking-async (#10842)\n\n- remove the `reward-fn` from `pallet-staking-async`. This crate is no\nlonger needed.\n- rename `ahm-test` to `integration-tests`\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T11:34:00Z",
+          "tree_id": "a8b5a9abec24dd000c1670c0722bf883b0ecf7a6",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/89669b38344e4378581c34b7833d109e3ad477a5"
+        },
+        "date": 1770208892095,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 128.02199999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03848383767199999,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06632111181999994,
             "unit": "seconds"
           }
         ]

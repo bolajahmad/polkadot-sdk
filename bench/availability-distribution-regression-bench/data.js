@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770201545958,
+  "lastUpdate": 1770208850079,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "225d1742d4b9d578588daf7fd508d00b002a0de3",
-          "message": "pallet-balances: Do not create account in benchmarking (#8932)\n\nThis particular benchmark is about benchmarking the account creation, so\nwe should not create it before :)\n\n\nCloses: https://github.com/paritytech/polkadot-sdk/issues/8927\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-27T08:26:29Z",
-          "tree_id": "78dc175eb3b966f16377c0ad0396f2e61dd917d1",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/225d1742d4b9d578588daf7fd508d00b002a0de3"
-        },
-        "date": 1751017186597,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012776867506666664,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022405672753333335,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008784483100000084,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1566559409333333,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.009739121953333313,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "5588131+kianenigma@users.noreply.github.com",
+            "name": "Kian Paimani",
+            "username": "kianenigma"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "89669b38344e4378581c34b7833d109e3ad477a5",
+          "message": "Remove unused code in staking-async (#10842)\n\n- remove the `reward-fn` from `pallet-staking-async`. This crate is no\nlonger needed.\n- rename `ahm-test` to `integration-tests`\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T11:34:00Z",
+          "tree_id": "a8b5a9abec24dd000c1670c0722bf883b0ecf7a6",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/89669b38344e4378581c34b7833d109e3ad477a5"
+        },
+        "date": 1770208826068,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14560050247333342,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009885016399999997,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007007276459999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.023033555939999992,
             "unit": "seconds"
           }
         ]

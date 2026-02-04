@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770181047519,
+  "lastUpdate": 1770187401602,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "140459108+kilavvy@users.noreply.github.com",
-            "name": "kilavvy",
-            "username": "kilavvy"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "56234513d1d1b3cc9fb85fcc1a9735ab9df22ef2",
-          "message": "Minor Documentation and Comment Corrections (#8997)\n\n**Description:**  \nThis pull request fixes minor typos and improves clarity in code\ncomments and documentation.\n- Corrected spelling errors in `coretime_interface.rs` and `types.rs`.\n- Enhanced comment readability for better developer experience.",
-          "timestamp": "2025-06-26T12:16:15Z",
-          "tree_id": "c055da89195b5154118af4c81f0797e5e8a60f5a",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/56234513d1d1b3cc9fb85fcc1a9735ab9df22ef2"
-        },
-        "date": 1750943845693,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 52940.59999999999,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 63637.5,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.45652830393000976,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.3805449963299976,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.4033980237099994,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.000019554409999999998,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.342606020202294,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.8940295731600028,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005652730670000006,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.00001900861,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.877860568480013,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.000019554409999999998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.36134543059,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.3763615100900006,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.00001900861,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting-parallel/approval-voting-parallel-db",
             "value": 2.368233967210003,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "6c01d65fb821be787b894d513604d1c532220746",
+          "message": "ci: improve try-runtime snapshot caching strategy (#10972)\n\nSplit check-runtime-migration into two jobs, similarly to what runtimes\nrepo already does:\n- `prepare-snapshots`: creates snapshots only when cache miss\n- `check-runtime-migration`: restores cached snapshots, runs checks\n\nCache strategy changes:\n- Restore uses prefix key (matches any date, enables fallback to older\nsnapshots)\n- Save uses dated key (fresh snapshots don't overwrite until successful)\n- Scheduled runs skip cache check, always create fresh snapshots\n- PRs reuse existing snapshots, only create if cache is empty\n\nThis prevents multiple concurrent jobs from hammering RPC endpoints when\ncache misses occur, and provides automatic fallback to older snapshots\nwhen daily refresh fails.\n\nNote that this is a behavioral change: PRs now match any date and not\ntoday-only, falling back to the most recent snapshot.",
+          "timestamp": "2026-02-04T05:32:25Z",
+          "tree_id": "ebbc361570d0c8da8ef43b5f1c3c797f92859c28",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/6c01d65fb821be787b894d513604d1c532220746"
+        },
+        "date": 1770187377192,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 52939.5,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 63632.55,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.00001841968,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.00001841968,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.000018689950000000002,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.6728872270799995,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.6525544576000004,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.508509121543049,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.688805862469998,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.766951576899967,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.000018689950000000002,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.6241909085199997,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3183246490400062,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8040975891499634,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.00609088304,
             "unit": "seconds"
           }
         ]

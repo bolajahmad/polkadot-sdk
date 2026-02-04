@@ -1,0 +1,10 @@
+title: Meta Transactions - Benchmarking update
+doc:
+- audience: Runtime Dev
+  description: |-
+    Update of benchmarking logic to remove possibility of `quadratic complexity` not being weighted when executed. Instead of one nested call, nest calls to `MAX_EXTRINSIC_DEPTH` and reserve those funds until meta-tx is executed.
+
+    Update of weight annotation to `saturating add` instead of `add`.
+crates:
+- name: pallet-meta-tx
+  bump: patch

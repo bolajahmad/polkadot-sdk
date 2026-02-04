@@ -165,3 +165,14 @@ pub fn sign_authorization(
 		s: U256::from_big_endian(&signature.s().to_bytes()),
 	}
 }
+
+/// Derive the Ethereum address from a signing key.
+///
+/// This is a helper function for benchmarks and tests.
+#[cfg(feature = "runtime-benchmarks")]
+pub fn eth_address(signing_key: &k256::ecdsa::SigningKey) -> H160 {
+	let verifying_key = signing_key.verifying_key();
+	let public_key_bytes = verifying_key.to_encoded_point(false);
+	let public_key = &public_key_bytes.as_bytes()[1..];
+	H160::from_slice(&sp_core::keccak_256(public_key)[12..])
+}

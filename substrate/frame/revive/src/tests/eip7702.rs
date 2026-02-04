@@ -367,10 +367,7 @@ fn process_multiple_authorizations_from_different_signers() {
 		let auth2 = signer2.sign_authorization(chain_id, target, nonce2);
 		let auth3 = signer3.sign_authorization(chain_id, target, nonce3);
 
-		crate::evm::eip7702::process_authorizations::<Test>(
-			&[auth1, auth2, auth3],
-			chain_id,
-		);
+		crate::evm::eip7702::process_authorizations::<Test>(&[auth1, auth2, auth3], chain_id);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority1));
 		assert!(AccountInfo::<Test>::is_delegated(&authority2));

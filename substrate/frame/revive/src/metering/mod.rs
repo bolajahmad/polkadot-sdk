@@ -479,7 +479,7 @@ impl<T: Config> TransactionMeter<T> {
 	/// Initializes either:
 	/// - An ethereum-style gas-based meter or
 	/// - A substrate-style meter with explicit weight and deposit limits
-	pub fn new(transaction_limits: TransactionLimits<T>) -> Self {
+	pub fn new(transaction_limits: TransactionLimits<T>) -> Result<Self, DispatchError> {
 		log::debug!(
 			target: LOG_TARGET,
 			"Start new meter: transaction_limits={transaction_limits:?}",
@@ -490,12 +490,9 @@ impl<T: Config> TransactionMeter<T> {
 				math::ethereum_execution::new_root(eth_gas_limit, weight_limit, eth_tx_info),
 			TransactionLimits::WeightAndDeposit { weight_limit, deposit_limit } =>
 				math::substrate_execution::new_root(weight_limit, deposit_limit),
-		};
+		}?;
 
-		if let Err(error) = transaction_meter.adjust_effective_weight_limit() {
-			log::debug!(target: LOG_TARGET, "New meter out of gas: {error:?}");
-			transaction_meter.consume_all_weight();
-		}
+		transaction_meter.adjust_effective_weight_limit()?;
 
 		log::trace!(
 			target: LOG_TARGET,
@@ -510,7 +507,7 @@ impl<T: Config> TransactionMeter<T> {
 			transaction_meter.deposit_consumed(),
 		);
 
-		transaction_meter
+		Ok(transaction_meter)
 	}
 
 	/// Convenience constructor for substrate-style weight+deposit limits.
@@ -518,7 +515,7 @@ impl<T: Config> TransactionMeter<T> {
 		weight_limit: Weight,
 		deposit_limit: BalanceOf<T>,
 	) -> Result<Self, DispatchError> {
-		Ok(Self::new(TransactionLimits::WeightAndDeposit { weight_limit, deposit_limit }))
+		Self::new(TransactionLimits::WeightAndDeposit { weight_limit, deposit_limit })
 	}
 
 	/// Execute all postponed storage deposit operations.

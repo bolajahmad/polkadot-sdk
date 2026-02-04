@@ -1366,7 +1366,7 @@ pub mod pallet {
 			T::WeightInfo::eth_call(Pallet::<T>::has_dust(*value).into())
 			.saturating_add(*weight_limit)
 			.saturating_add(T::WeightInfo::on_finalize_block_per_tx(transaction_encoded.len() as u32))
-			.saturating_add(T::WeightInfo::process_authorization(authorization_list.len() as u32))
+			.saturating_add(T::WeightInfo::process_new_account_authorization(authorization_list.len() as u32))
 		)]
 		pub fn eth_call_with_authorization_list(
 			origin: OriginFor<T>,
@@ -1617,7 +1617,6 @@ impl<T: Config> Pallet<T> {
 		let base_info = T::FeeInfo::base_dispatch_info(&mut call);
 		drop(call);
 
-		let auth_count = authorization_list.len() as u32;
 		let extra_weight = base_info.total_weight();
 		let limits = TransactionLimits::EthereumGas {
 			eth_gas_limit: eth_gas_limit.saturated_into(),
@@ -1625,19 +1624,45 @@ impl<T: Config> Pallet<T> {
 			eth_tx_info: EthTxInfo::new(encoded_len, extra_weight),
 		};
 
-		let mut meter = TransactionMeter::new(limits);
+		let meter = TransactionMeter::new(limits);
 
 		let base_call_weight = base_info.call_weight;
-		if !authorization_list.is_empty() {
-			let new_account_count = evm::eip7702::process_authorizations::<T>(
+
+		// Process authorizations OUTSIDE the transaction context
+		// so delegation changes persist even if the call fails
+		let refund_count = if !authorization_list.is_empty() {
+			evm::eip7702::process_authorizations::<T>(
 				&authorization_list,
 				U256::from(T::ChainId::get()),
-			);
-			let refund_count = auth_count.saturating_sub(new_account_count);
-			meter.refund_weight(RuntimeCosts::ApplyDelegationNewAccountDelta(refund_count));
-		}
+			)
+		} else {
+			0
+		};
 
 		block_storage::with_ethereum_context::<T>(transaction_encoded, || {
+			let mut meter = match meter {
+				Ok(mut m) => {
+					if refund_count > 0 {
+						m.refund_weight(RuntimeCosts::DelegationRefunds(refund_count));
+					}
+					m
+				},
+				Err(error) =>
+					return block_storage::EthereumCallResult {
+						receipt_gas_info: ReceiptGasInfo {
+							gas_used: U256::zero(),
+							effective_gas_price,
+						},
+						result: Err(DispatchErrorWithPostInfo {
+							post_info: PostDispatchInfo {
+								actual_weight: Some(base_call_weight),
+								pays_fee: Pays::Yes,
+							},
+							error,
+						}),
+					},
+			};
+
 			let output = Self::bare_call_internal(
 				origin,
 				dest,
@@ -1672,7 +1697,10 @@ impl<T: Config> Pallet<T> {
 		data: Vec<u8>,
 		exec_config: ExecConfig<T>,
 	) -> ContractResult<ExecReturnValue, BalanceOf<T>> {
-		let mut transaction_meter = TransactionMeter::new(transaction_limits);
+		let mut transaction_meter = match TransactionMeter::new(transaction_limits) {
+			Ok(transaction_meter) => transaction_meter,
+			Err(error) => return ContractResult { result: Err(error), ..Default::default() },
+		};
 
 		Self::bare_call_internal(origin, dest, evm_value, data, exec_config, &mut transaction_meter)
 	}
@@ -1761,7 +1789,10 @@ impl<T: Config> Pallet<T> {
 		salt: Option<[u8; 32]>,
 		exec_config: ExecConfig<T>,
 	) -> ContractResult<InstantiateReturnValue, BalanceOf<T>> {
-		let mut transaction_meter = TransactionMeter::new(transaction_limits);
+		let mut transaction_meter = match TransactionMeter::new(transaction_limits) {
+			Ok(transaction_meter) => transaction_meter,
+			Err(error) => return ContractResult { result: Err(error), ..Default::default() },
+		};
 
 		let mut storage_deposit = Default::default();
 
@@ -1907,8 +1938,9 @@ impl<T: Config> Pallet<T> {
 		// in those cases we skip the check that the caller has enough balance
 		// to pay for the fees
 		let base_info = T::FeeInfo::base_dispatch_info(&mut call_info.call);
-		let auth_weight =
-			T::WeightInfo::process_authorization(call_info.authorization_list.len() as u32);
+		let auth_weight = T::WeightInfo::process_new_account_authorization(
+			call_info.authorization_list.len() as u32,
+		);
 		let base_weight = base_info.total_weight().saturating_sub(auth_weight);
 		let exec_config =
 			ExecConfig::new_eth_tx(effective_gas_price, call_info.encoded_len, base_weight)
@@ -1938,7 +1970,6 @@ impl<T: Config> Pallet<T> {
 			}
 		};
 
-		let auth_count = call_info.authorization_list.len() as u32;
 		let mut eth_gas_limit = call_info.eth_gas_limit.saturated_into();
 		if !call_info.authorization_list.is_empty() {
 			let auth_gas =
@@ -1956,9 +1987,8 @@ impl<T: Config> Pallet<T> {
 				U256::from(T::ChainId::get()),
 			);
 
-			let refund_count = auth_count.saturating_sub(new_account_count);
 			let refund_weight = <RuntimeCosts as WeightToken<T>>::weight(
-				&RuntimeCosts::ApplyDelegationNewAccountDelta(refund_count),
+				&RuntimeCosts::DelegationRefunds(new_account_count),
 			);
 			let actual_auth_weight = auth_weight.saturating_sub(refund_weight);
 			let actual_auth_gas = metering::SignedGas::<T>::from_weight_fee(
@@ -2295,7 +2325,7 @@ impl<T: Config> Pallet<T> {
 		let mut meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
 			weight_limit: Default::default(),
 			deposit_limit: storage_deposit_limit,
-		});
+		})?;
 
 		let module = Self::try_upload_code(
 			origin,

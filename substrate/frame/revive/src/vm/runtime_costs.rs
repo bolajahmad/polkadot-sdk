@@ -179,7 +179,7 @@ pub enum RuntimeCosts {
 	/// Weight of calling `Modexp` precompile
 	Modexp(u64),
 	/// Refund delta between new and existing account delegation.
-	ApplyDelegationNewAccountDelta(u32),
+	DelegationRefunds(u32),
 }
 
 /// For functions that modify storage, benchmarks are performed with one item in the
@@ -340,9 +340,8 @@ impl<T: Config> Token<T> for RuntimeCosts {
 			Identity(len) => T::WeightInfo::identity(len),
 			Blake2F(rounds) => T::WeightInfo::blake2f(rounds),
 			Modexp(gas) => Weight::from_parts(gas.saturating_mul(WEIGHT_PER_GAS), 0),
-			ApplyDelegationNewAccountDelta(count) => T::WeightInfo::apply_delegation(1)
-				.saturating_sub(T::WeightInfo::apply_delegation(0))
-				.saturating_mul(count.into()),
+			DelegationRefunds(count) => T::WeightInfo::process_new_account_authorization(count)
+				.saturating_sub(T::WeightInfo::process_new_account_authorization(count)),
 		}
 	}
 }

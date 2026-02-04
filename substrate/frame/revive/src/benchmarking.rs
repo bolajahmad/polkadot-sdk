@@ -131,7 +131,7 @@ mod benchmarks {
 	// This measures the overhead of processing the authorization list
 	// Parameter `n`: number of authorizations to process (0 to 255 as per EIP-7702)
 	#[benchmark(pov_mode = Measured)]
-	fn process_authorization(n: Linear<0, 255>) -> Result<(), BenchmarkError> {
+	fn process_new_account_authorization(n: Linear<0, 255>) -> Result<(), BenchmarkError> {
 		use crate::evm::eip7702;
 		use k256::ecdsa::SigningKey;
 		use sp_core::keccak_256;
@@ -156,6 +156,43 @@ mod benchmarks {
 		}
 
 		assert_eq!(new_account_count, n as u32, "All authorizations should be new");
+		Ok(())
+	}
+
+	// Benchmark for processing N EIP-7702 authorizations with empty accounts
+	// This measures the overhead of processing the authorization list
+	// Parameter `n`: number of authorizations to process (0 to 255 as per EIP-7702)
+	#[benchmark(pov_mode = Measured)]
+	fn process_existing_account_authorization(n: Linear<0, 255>) -> Result<(), BenchmarkError> {
+		use crate::evm::eip7702;
+		use k256::ecdsa::SigningKey;
+		use sp_core::keccak_256;
+
+		let chain_id = U256::from(T::ChainId::get());
+		let target = H160::from_low_u64_be(100);
+
+		let mut authorization_list = vec![];
+		for i in 0..n {
+			let key_material = [i as u8; 32];
+			let signing_key =
+				SigningKey::from_slice(&keccak_256(&key_material)).expect("valid key");
+
+			let eth_address = eip7702::eth_address(&signing_key);
+			let account_id = T::AddressMapper::to_account_id(&eth_address);
+			T::Currency::set_balance(&account_id, Pallet::<T>::min_balance());
+
+			let signed_auth =
+				eip7702::sign_authorization(&signing_key, chain_id, target, U256::zero());
+			authorization_list.push(signed_auth);
+		}
+
+		let new_account_count;
+		#[block]
+		{
+			new_account_count = eip7702::process_authorizations::<T>(&authorization_list, chain_id);
+		}
+
+		assert_eq!(new_account_count, 0u32);
 		Ok(())
 	}
 
@@ -1264,7 +1301,8 @@ mod benchmarks {
 		let mut transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
 			weight_limit: Default::default(),
 			deposit_limit: BalanceOf::<T>::max_value(),
-		});
+		})
+		.unwrap();
 		let exec_config = ExecConfig::new_substrate_tx();
 		let contract_account = &instance.account_id;
 		let origin = &ExecOrigin::from_account_id(caller);

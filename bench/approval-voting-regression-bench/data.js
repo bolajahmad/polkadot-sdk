@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770213027448,
+  "lastUpdate": 1770216797018,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "e1026d7ee22a593cf566a99484eee02a03ecc236",
-          "message": "RuntimeAllocator: Align returned pointers (#8891)\n\nRust recently switched the default alignment of u128 to 16bytes:\nhttps://blog.rust-lang.org/2024/03/30/i128-layout-update/ This broke the\nassumption of our host allocator that the biggest alignment is 8 bytes.\n\nTo fix the alignment issue, the runtime allocator now takes care of\naligned the returned pointer. We are abusing the fact that we know how\nthe host allocator is working and storing some extra data in its header.\nThis is not a perfect solution as we don't align the host side pointers,\nbut the host side is mainly allocating `u8` arrays that should be fine\nwith the `8byte` alignment. Any node side change would be a consensus\nbreaking change.\n\n\nCloses: https://github.com/paritytech/polkadot-sdk/issues/8818\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-27T10:53:44Z",
-          "tree_id": "e70aa26bbd2c4f3a9858fc4b04fb7eca8c10362b",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/e1026d7ee22a593cf566a99484eee02a03ecc236"
-        },
-        "date": 1751026680457,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 63638.95,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 52942.40000000001,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.00001977349,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.429227334480001,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.000019440069999999995,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.917103623970007,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.369676930829999,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.00001977349,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.3983704426099997,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005635462520000004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.3735703576700002,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.4597575609500103,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.284895905772621,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.000019440069999999995,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.8808655349099976,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting",
             "value": 0.000028376050000000004,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "30b2aebc07f724c3ce85cb78c08d94ff40a0c3f0",
+          "message": "pallet-dap: mark funds as inactive  + expect buffer account to be pre-funded (#10957)\n\nIn pallet-dap, mark funds in the issuance buffer as inactive so they do\nnot participate in governance.\nIn production, the buffer account must be pre-funded (e.g., via genesis\nallocation or transfer) before the pallet receives any funds. These\npre-funded tokens are not deactivate. The expectation is that we\npre-fund with ED so this is negligible.\n\nDriven-by: \n- removed the `InitBufferAccount` migration since the buffer account is\nnow expected to be pre-funded externally.\n-  remove DAP dependency from main staking-async crate\n- For delegated staking, redirect slashes to DAP for Westend AssetHub.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T13:29:05Z",
+          "tree_id": "6eefa4986f79a63d283698b86fe50864207bd521",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/30b2aebc07f724c3ce85cb78c08d94ff40a0c3f0"
+        },
+        "date": 1770216774770,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 52941.7,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 63624.1,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.6830146561399983,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.000024887970000000004,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.8790837228531245,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.6775525877099993,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.00002450633,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.6345365111400003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.6353534486600028,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3117060599600032,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.000024887970000000004,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8245772651000005,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.00002450633,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.772412945660005,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.005672416950000004,
             "unit": "seconds"
           }
         ]

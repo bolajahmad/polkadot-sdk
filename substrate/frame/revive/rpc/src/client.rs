@@ -83,30 +83,23 @@ pub enum SubscriptionType {
 }
 
 /// Submit Error reason.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error, Debug)]
 pub enum SubmitError {
 	/// Transaction was usurped by another with the same nonce.
+	#[error("Transaction was usurped by another with the same nonce")]
 	Usurped,
 	/// Transaction was dropped from the pool.
+	#[error("Transaction was dropped")]
 	Dropped,
 	/// Transaction is invalid (e.g. bad nonce, signature, etc).
+	#[error("Transaction is invalid (e.g. bad nonce, signature, etc)")]
 	Invalid,
 	/// Transaction stream ended without a terminal status.
+	#[error("Transaction stream ended without status")]
 	StreamEnded,
 	/// Unknown transaction status.
+	#[error("Unknown transaction status")]
 	Unknown,
-}
-
-impl std::fmt::Display for SubmitError {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Self::Usurped => write!(f, "Transaction was usurped by another with the same nonce"),
-			Self::Dropped => write!(f, "Transaction was dropped"),
-			Self::Invalid => write!(f, "Transaction is invalid (e.g. bad nonce, signature, etc)"),
-			Self::StreamEnded => write!(f, "Transaction stream ended without status"),
-			Self::Unknown => write!(f, "Unknown transaction status"),
-		}
-	}
 }
 
 impl From<TransactionStatus<SubstrateBlockHash>> for SubmitError {

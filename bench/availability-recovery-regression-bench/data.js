@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770208817066,
+  "lastUpdate": 1770212961124,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "oliver.tale-yazdi@parity.io",
-            "name": "Oliver Tale-Yazdi",
-            "username": "ggwpez"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "ffb2fddf5157e478e2df56536475d67c2b770b96",
-          "message": "Run SemVer check also with R0 label (#8981)\n\n- **Dont skip semver check for R0 label**\n- **Rename `R0-silent` to `R0-no-crate-publish-required`**\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
-          "timestamp": "2025-06-27T12:32:13Z",
-          "tree_id": "0e4663af28a4c33b98538e48d5ad0fe4957ff18f",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/ffb2fddf5157e478e2df56536475d67c2b770b96"
-        },
-        "date": 1751033267900,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.370725485533333,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19886354506666665,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12498347440000002,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "3e53570b1619e7de01e71929179ec9d03d727425",
+          "message": "Add StakingOperator proxy type to Westend AssetHub (#10980)\n\nIntroduces StakingOperator proxy type that allows validator operational\ntasks (validate, chill, kick) and session key management (set_keys,\npurge_keys) without access to fund management operations.\n\nThis enables pure proxy stashes to delegate validator operations: now\nthat pallet_staking_async_rc_client provides\nset_keys/purge_keys on AssetHub, pure proxies can fully utilize\nStakingOperator.\n\n*NOTE**: This is similar to\nhttps://github.com/polkadot-fellows/runtimes/pull/1033, which introduced\nStakingOperator on Polkadot and Kusama. That change predated the\nintroduction of session key handling on AssetHub. Now that session key\nhandling is available, a follow-up PR will be implemented in the\nruntimes repository to restrict StakingOperator solely to AssetHub and\nenable session key handling via StakingOperator on AssetHub.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T12:35:18Z",
+          "tree_id": "6c68b5404e6b048cf099afe2dae55c8df93cf43f",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3e53570b1619e7de01e71929179ec9d03d727425"
+        },
+        "date": 1770212936754,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12446584746666664,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.273175634033333,
             "unit": "seconds"
           }
         ]

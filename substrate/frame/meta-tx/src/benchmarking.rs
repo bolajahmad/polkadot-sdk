@@ -19,7 +19,7 @@
 
 use super::*;
 use frame_benchmarking::v2::*;
-use frame_support::traits::UnfilteredDispatchable;
+use frame_support::{traits::UnfilteredDispatchable, MAX_EXTRINSIC_DEPTH};
 use sp_runtime::impl_tx_ext_default;
 
 pub mod types {
@@ -76,16 +76,80 @@ fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
 	frame_system::Pallet::<T>::assert_last_event(generic_event.into());
 }
 
+/// Creates a call nested to the specified depth using meta-tx dispatch calls.
+/// This is used to benchmark the worst-case scenario where `get_dispatch_info`
+/// is called recursively up to `MAX_EXTRINSIC_DEPTH` times.
+fn create_nested_call<T: Config>(depth: u32) -> <T as frame_system::Config>::RuntimeCall
+where
+	<T as Config>::Extension: Default,
+	<T as frame_system::Config>::RuntimeCall: From<Call<T>>,
+{
+	let mut call: <T as frame_system::Config>::RuntimeCall =
+		frame_system::Call::<T>::remark { remark: vec![] }.into();
+
+	for _ in 0..depth {
+		let meta_tx = MetaTxFor::<T>::new(call, 0u8, T::Extension::default());
+		call = Call::<T>::dispatch { meta_tx: Box::new(meta_tx) }.into();
+	}
+
+	call
+}
+
 #[benchmarks(
 	where
 		T: Config,
 		<T as Config>::Extension: Default,
+		<T as frame_system::Config>::RuntimeCall: From<Call<T>>,
 	)]
 mod benchmarks {
 	use super::*;
 
+	/// Benchmark the worst-case dispatch with a call nested to `MAX_EXTRINSIC_DEPTH`.
+	/// This captures the quadratic complexity of `get_dispatch_info` on nested calls.
 	#[benchmark]
 	fn bare_dispatch() {
+		// Create a call nested to MAX_EXTRINSIC_DEPTH to capture worst-case weight
+		// from recursive `get_dispatch_info` calls.
+		let nested_call = create_nested_call::<T>(MAX_EXTRINSIC_DEPTH - 1);
+		let meta_ext = T::Extension::default();
+		let _meta_ext_weight = meta_ext.weight(&nested_call);
+
+		#[cfg(not(test))]
+		assert!(
+			_meta_ext_weight.is_zero(),
+			"meta tx extension weight for the benchmarks must be zero. \
+			use `pallet_meta_tx::WeightlessExtension` as `pallet_meta_tx::Config::Extension` \
+			with the `runtime-benchmarks` feature enabled.",
+		);
+
+		let meta_tx = MetaTxFor::<T>::new(nested_call.clone(), 0u8, meta_ext.clone());
+		let meta_call = nested_call.clone();
+		let meta_ext_weight = meta_ext.weight(&meta_call);
+
+		let caller = whitelisted_caller();
+		let origin: <T as frame_system::Config>::RuntimeOrigin =
+			frame_system::RawOrigin::Signed(caller).into();
+		let call = Call::<T>::dispatch { meta_tx: Box::new(meta_tx) };
+
+		#[block]
+		{
+			let _ = call.dispatch_bypass_filter(origin);
+		}
+
+		let info = meta_call.get_dispatch_info();
+		assert_last_event::<T>(
+			Event::Dispatched {
+				result: Ok(PostDispatchInfo {
+					actual_weight: Some(info.call_weight + meta_ext_weight),
+					pays_fee: Pays::Yes,
+				}),
+			}
+			.into(),
+		);
+	}
+
+	#[benchmark]
+	fn bare_dispatch_no_nesting() {
 		let meta_call = frame_system::Call::<T>::remark { remark: vec![] }.into();
 		let meta_ext = T::Extension::default();
 		let meta_ext_weight = meta_ext.weight(&meta_call);

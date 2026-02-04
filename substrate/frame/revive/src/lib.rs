@@ -1270,7 +1270,6 @@ pub mod pallet {
 			let signer = Self::ensure_eth_signed(origin)?;
 			let origin = OriginFor::<T>::signed(signer.clone());
 			Self::ensure_non_contract_if_signed(&origin)?;
-
 			let mut call = Call::<T>::eth_instantiate_with_code {
 				value,
 				weight_limit,

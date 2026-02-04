@@ -531,7 +531,6 @@ mod test {
 			builder.check().unwrap();
 		let expected_effective_gas_price =
 			ExtBuilder::default().build().execute_with(|| Pallet::<Test>::evm_base_fee());
-		let tx_input = tx.input.clone().to_vec();
 
 		match call {
 			RuntimeCall::Contracts(crate::Call::eth_call_with_authorization_list::<Test> {
@@ -545,7 +544,7 @@ mod test {
 				..
 			}) if dest == tx.to.unwrap() &&
 				value == tx.value.unwrap_or_default().as_u64().into() &&
-				data == tx_input &&
+				data == tx.input.to_vec() &&
 				transaction_encoded == signed_transaction.signed_payload() &&
 				effective_gas_price == expected_effective_gas_price =>
 			{

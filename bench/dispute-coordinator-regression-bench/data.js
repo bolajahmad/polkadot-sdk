@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770160249399,
+  "lastUpdate": 1770181113034,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23029,6 +23029,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.006672917660000004,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexandre.balde@parity.io",
+            "name": "Alexandre R. Baldé",
+            "username": "rockbmb"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "eeee11ea6f7d34ad79199c33d28ecb0940fd6c31",
+          "message": "Expand multisig pallet tests (#10843)\n\n# Description\n\n* Add tests to `SenderInSignatories/SignatoriesOutOfOrder` error cases\n* Add clarifying note to `approve_as_multi/as_multi` comments\n\nFollow-up from\nhttps://github.com/open-web3-stack/polkadot-ecosystem-tests/pull/305 and\nhttps://github.com/open-web3-stack/polkadot-ecosystem-tests/pull/323\n\n## Integration\n\nN/A\n\n## Review Notes\n\nN/A\n\n# Checklist\n\n* [x] My PR includes a detailed description as outlined in the\n\"Description\" and its two subsections above.\n* [x] My PR follows the [labeling requirements](\n\nhttps://github.com/paritytech/polkadot-sdk/blob/master/docs/contributor/CONTRIBUTING.md#Process\n) of this project (at minimum one label for `T` required)\n    * External contributors: Use `/cmd label <label-name>` to add labels\n    * Maintainers can also add labels manually\n* [x] I have made corresponding changes to the documentation (if\napplicable)\n* [x] I have added tests that prove my fix is effective or that my\nfeature works (if applicable)",
+          "timestamp": "2026-02-04T02:43:48Z",
+          "tree_id": "82b0a20956dbae44ac339cdeb69f63f05031ffb8",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/eeee11ea6f7d34ad79199c33d28ecb0940fd6c31"
+        },
+        "date": 1770181088771,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006574606849999996,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009230805549999981,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.002679322139999999,
             "unit": "seconds"
           }
         ]

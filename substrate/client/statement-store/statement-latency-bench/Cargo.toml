@@ -18,6 +18,7 @@ codec = { workspace = true }
 env_logger = { workspace = true }
 jsonrpsee = { workspace = true, features = ["ws-client", "client-ws-transport-tls"] }
 log = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 sp-core = { workspace = true, default-features = true }
 sp-statement-store = { workspace = true, default-features = true, features = ["serde"] }

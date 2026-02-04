@@ -157,7 +157,7 @@ async fn run_client(
 	barrier.wait().await;
 
 	if is_leader(client_id) {
-		debug!(
+		info!(
 			"All {} tasks synchronized and starting in {:.3}s",
 			num_clients,
 			sync_start.elapsed().as_secs_f64()
@@ -341,10 +341,7 @@ async fn main() -> Result<(), anyhow::Error> {
 	);
 
 	// Generate unique test run ID to avoid interference with old data
-	let test_run_id = std::time::SystemTime::now()
-		.duration_since(std::time::UNIX_EPOCH)
-		.expect("System time is before UNIX epoch")
-		.as_secs();
+	let test_run_id: u64 = rand::random();
 
 	let args = Args::parse();
 	let messages_pattern = parse_messages_pattern(&args.messages_pattern)?;
@@ -363,7 +360,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
 	let rpc_clients = connect_to_endpoints(&args.rpc_endpoints).await?;
 
-	debug!("Spawning {} client tasks...", args.num_clients);
+	info!("Spawning {} client tasks... {}", args.num_clients, test_run_id);
 	let sync_start = std::time::Instant::now();
 	let barrier = Arc::new(Barrier::new(args.num_clients as usize));
 

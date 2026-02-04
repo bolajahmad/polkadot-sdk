@@ -809,7 +809,7 @@ async fn request_collation(
 	let relay_parent = pending_collation.scheduling_parent;
 	let para_id = pending_collation.para_id;
 	let peer_id = pending_collation.peer_id;
-	let prospective_candidate = pending_collation.prospective_candidate.clone();
+	let prospective_candidate = pending_collation.prospective_candidate;
 
 	let per_relay_parent = state
 		.per_scheduling_parent
@@ -825,7 +825,8 @@ async fn request_collation(
 			let requests = Requests::CollationFetchingV1(req);
 			(requests, response_recv.boxed())
 		},
-		(CollationVersion::V2, Some(ProspectiveCandidate { candidate_hash, .. })) => {
+		(CollationVersion::V2, Some(ProspectiveCandidate { candidate_hash, .. })) |
+		(CollationVersion::V3, Some(ProspectiveCandidate { candidate_hash, .. })) => {
 			let (req, response_recv) = OutgoingRequest::new(
 				Recipient::Peer(peer_id),
 				request_v2::CollationFetchingRequest { relay_parent, para_id, candidate_hash },
@@ -2347,7 +2348,8 @@ async fn kick_off_seconding<Context>(
 			collation_event.collator_protocol_version,
 			collation_event.pending_collation.prospective_candidate,
 		) {
-			(CollationVersion::V2, Some(ProspectiveCandidate { parent_head_data_hash, .. })) => {
+			(CollationVersion::V2, Some(ProspectiveCandidate { parent_head_data_hash, .. })) |
+			(CollationVersion::V3, Some(ProspectiveCandidate { parent_head_data_hash, .. })) => {
 				let pvd = request_prospective_validation_data(
 					ctx.sender(),
 					scheduling_parent,

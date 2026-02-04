@@ -577,37 +577,45 @@ async fn handle_collation_message<AD>(
 				?peer,
 			);
 
-			let (events, reports) =
-				if expected_versions[PeerSet::Collation] == Some(CollationVersion::V1.into()) {
-					handle_peer_messages::<protocol_v1::CollationProtocol, _>(
-						peer,
-						PeerSet::Collation,
-						&mut shared.0.lock().collation_peers,
-						vec![notification.into()],
-						metrics,
-					)
-				} else if expected_versions[PeerSet::Collation] == Some(CollationVersion::V2.into())
-				{
-					handle_peer_messages::<protocol_v2::CollationProtocol, _>(
-						peer,
-						PeerSet::Collation,
-						&mut shared.0.lock().collation_peers,
-						vec![notification.into()],
-						metrics,
-					)
-				} else {
-					gum::warn!(
-						target: LOG_TARGET,
-						version = ?expected_versions[PeerSet::Collation],
-						"Major logic bug. Peer somehow has unsupported collation protocol version."
-					);
+			let (events, reports) = if expected_versions[PeerSet::Collation] ==
+				Some(CollationVersion::V1.into())
+			{
+				handle_peer_messages::<protocol_v1::CollationProtocol, _>(
+					peer,
+					PeerSet::Collation,
+					&mut shared.0.lock().collation_peers,
+					vec![notification.into()],
+					metrics,
+				)
+			} else if expected_versions[PeerSet::Collation] == Some(CollationVersion::V2.into()) {
+				handle_peer_messages::<protocol_v2::CollationProtocol, _>(
+					peer,
+					PeerSet::Collation,
+					&mut shared.0.lock().collation_peers,
+					vec![notification.into()],
+					metrics,
+				)
+			} else if expected_versions[PeerSet::Collation] == Some(CollationVersion::V3.into()) {
+				handle_peer_messages::<v3_collation::CollationProtocol, _>(
+					peer,
+					PeerSet::Collation,
+					&mut shared.0.lock().collation_peers,
+					vec![notification.into()],
+					metrics,
+				)
+			} else {
+				gum::warn!(
+					target: LOG_TARGET,
+					version = ?expected_versions[PeerSet::Collation],
+					"Major logic bug. Peer somehow has unsupported collation protocol version."
+				);
 
-					never!("Only versions 1 and 2 are supported; peer set connection checked above; qed");
+				never!("Only versions 1, 2 and 3 are supported; peer set connection checked above; qed");
 
-					// If a peer somehow triggers this, we'll disconnect them
-					// eventually.
-					(Vec::new(), vec![UNCONNECTED_PEERSET_COST])
-				};
+				// If a peer somehow triggers this, we'll disconnect them
+				// eventually.
+				(Vec::new(), vec![UNCONNECTED_PEERSET_COST])
+			};
 
 			for report in reports {
 				network_service.report_peer(peer, report.into());

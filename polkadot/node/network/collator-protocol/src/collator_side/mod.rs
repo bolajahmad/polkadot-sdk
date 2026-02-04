@@ -29,7 +29,7 @@ use sp_core::Pair;
 
 use polkadot_node_network_protocol::{
 	self as net_protocol,
-	peer_set::{CollationVersion, PeerSet},
+	peer_set::{CollationVersion, PeerSet, ProtocolVersion},
 	request_response::{
 		incoming::{self, OutgoingResponse},
 		v2 as request_v2, IncomingRequestReceiver,
@@ -700,6 +700,7 @@ async fn determine_our_validators<Context>(
 /// Construct the declare message to be sent to validator.
 fn declare_message(
 	state: &mut State,
+	version: CollationVersion,
 ) -> Option<
 	CollationProtocols<
 		protocol_v1::CollationProtocol,
@@ -708,19 +709,47 @@ fn declare_message(
 	>,
 > {
 	let para_id = state.collating_on?;
-	let declare_signature_payload = protocol_v2::declare_signature_payload(&state.local_peer_id);
-	let wire_message = protocol_v2::CollatorProtocolMessage::Declare(
-		state.collator_pair.public(),
-		para_id,
-		state.collator_pair.sign(&declare_signature_payload),
-	);
-	Some(CollationProtocols::V2(protocol_v2::CollationProtocol::CollatorProtocol(wire_message)))
+	match version {
+		CollationVersion::V2 => {
+			let declare_signature_payload =
+				protocol_v2::declare_signature_payload(&state.local_peer_id);
+			let wire_message = protocol_v2::CollatorProtocolMessage::Declare(
+				state.collator_pair.public(),
+				para_id,
+				state.collator_pair.sign(&declare_signature_payload),
+			);
+			Some(CollationProtocols::V2(protocol_v2::CollationProtocol::CollatorProtocol(
+				wire_message,
+			)))
+		},
+		CollationVersion::V3 => {
+			let declare_signature_payload =
+				protocol_v3::declare_signature_payload(&state.local_peer_id);
+			let wire_message = protocol_v3::CollatorProtocolMessage::Declare(
+				state.collator_pair.public(),
+				para_id,
+				state.collator_pair.sign(&declare_signature_payload),
+			);
+			Some(CollationProtocols::V3(protocol_v3::CollationProtocol::CollatorProtocol(
+				wire_message,
+			)))
+		},
+		_ => {
+			gum::warn!(target: LOG_TARGET, ?version, "Attempting to declare with an unsupported collation version");
+			None
+		},
+	}
 }
 
 /// Issue versioned `Declare` collation message to the given `peer`.
 #[overseer::contextbounds(CollatorProtocol, prefix = self::overseer)]
-async fn declare<Context>(ctx: &mut Context, state: &mut State, peer: &PeerId) {
-	if let Some(wire_message) = declare_message(state) {
+async fn declare<Context>(
+	ctx: &mut Context,
+	state: &mut State,
+	peer: &PeerId,
+	version: CollationVersion,
+) {
+	if let Some(wire_message) = declare_message(state, version) {
 		ctx.send_message(NetworkBridgeTxMessage::SendCollationMessage(vec![*peer], wire_message))
 			.await;
 	}
@@ -895,19 +924,20 @@ async fn advertise_collation<Context>(
 			},
 		}
 
+		// Get the candidate descriptor version from the receipt
+		let candidate_descriptor_version =
+			collation.receipt.descriptor.version(per_scheduling_parent.v3_enabled);
+
 		gum::debug!(
 			target: LOG_TARGET,
 			?scheduling_parent,
 			?candidate_hash,
 			peer_id = %peer,
+			?candidate_descriptor_version,
 			"Advertising collation.",
 		);
 
 		collation.status.advance_to_advertised();
-
-		// Get the candidate descriptor version from the receipt
-		let candidate_descriptor_version =
-			collation.receipt.descriptor.version(per_scheduling_parent.v3_enabled);
 
 		let message = match peer_version {
 			CollationVersion::V3 => {
@@ -1468,7 +1498,7 @@ async fn handle_network_msg<Context>(
 				);
 				state.peer_ids.insert(peer_id, authority_ids);
 
-				declare(ctx, state, &peer_id).await;
+				declare(ctx, state, &peer_id, version).await;
 			}
 		},
 		PeerViewChange(peer_id, view) => {
@@ -1503,7 +1533,10 @@ async fn handle_network_msg<Context>(
 			gum::trace!(target: LOG_TARGET, ?peer_id, ?authority_ids, "Updated authority ids");
 			if state.peer_data.contains_key(&peer_id) {
 				if state.peer_ids.insert(peer_id, authority_ids).is_none() {
-					declare(ctx, state, &peer_id).await;
+					// Assume collation version v2 if the peer_id entry doesn't exist when
+					// the message arrives. Usually `PeerConnected` should happen before,
+					// which comes with the versioning information.
+					declare(ctx, state, &peer_id, CollationVersion::V2).await;
 				}
 			}
 		},

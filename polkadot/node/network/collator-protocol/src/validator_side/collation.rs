@@ -209,7 +209,7 @@ pub fn fetched_collation_sanity_check(
 		let fetched_version = fetched.descriptor.version(v3_enabled);
 		if advertised_version != &fetched_version {
 			return Err(SecondingError::DescriptorVersionMismatch(
-				advertised_version.clone(),
+				*advertised_version,
 				fetched_version,
 			))
 		}

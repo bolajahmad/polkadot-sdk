@@ -386,6 +386,12 @@ impl ExtBuilder {
 	}
 }
 
+/// Bump block number, and force the caller to name the next expected block.
+///
+/// This is useful to keep tests readable by writing `bump_block_number(42)`, making it clear that
+/// we bumped the block, and the new one is 42.
+///
+/// Using `bump_block_number(System::block_number() + 1)` is cheating :)
 pub fn bump_block_number(next: BlockNumber) {
 	frame_system::Pallet::<T>::set_block_number(frame_system::Pallet::<T>::block_number() + 1);
 	assert_eq!(next, System::block_number(), "next expected block number is not guessed correctly");
@@ -395,14 +401,15 @@ parameter_types! {
 	pub static OracleEventIndex: usize = 0;
 }
 
+/// Read all events from the oracle pallet since the last time this was called.
 pub fn oracle_events_since_last_call() -> Vec<pallet_price_oracle::Event<Runtime>> {
 	let all: Vec<_> = System::events()
 		.into_iter()
-		.filter_map(|r| if let RuntimeEvent::PriceOracle(inner) = r.event { Some(inner) } else { None })
+		.filter_map(
+			|r| if let RuntimeEvent::PriceOracle(inner) = r.event { Some(inner) } else { None },
+		)
 		.collect();
 	let seen = OracleEventIndex::get();
 	OracleEventIndex::set(all.len());
 	all.into_iter().skip(seen).collect()
 }
-
-

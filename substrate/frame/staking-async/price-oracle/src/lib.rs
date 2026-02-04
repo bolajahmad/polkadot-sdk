@@ -105,6 +105,7 @@
 
 extern crate alloc;
 
+/// The logging target used everywhere in this pallet.
 pub(crate) const LOG_TARGET: &str = "runtime::price-oracle";
 
 #[macro_export]

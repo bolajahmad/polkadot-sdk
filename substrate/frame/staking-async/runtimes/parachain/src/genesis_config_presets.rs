@@ -17,7 +17,7 @@
 
 //! # Staking Async Runtime genesis config presets
 
-use crate::*;
+use crate::{staking::DapPalletId, *};
 use alloc::{
 	string::{String, ToString},
 	vec,
@@ -123,10 +123,8 @@ pub fn get_preset(id: &PresetId) -> Option<Vec<u8>> {
 			// generate no new "fake" validators.
 			params.dev_stakers = Some((0, 500));
 			// set expected relay validators in genesis so they are elected
-			params.validators = vec![
-				Sr25519Keyring::Alice.to_account_id(),
-				Sr25519Keyring::Bob.to_account_id(),
-			];
+			params.validators =
+				vec![Sr25519Keyring::Alice.to_account_id(), Sr25519Keyring::Bob.to_account_id()];
 			staking_async_parachain_genesis(params, id.to_string())
 		},
 		"real-m" => {

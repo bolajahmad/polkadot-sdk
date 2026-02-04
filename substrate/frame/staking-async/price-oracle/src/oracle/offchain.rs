@@ -517,7 +517,9 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 		local_block_number: BlockNumberFor<T>,
 	) -> Result<u32, OffchainError> {
 		// Only run at the specified interval.
-		if local_block_number % T::PriceUpdateInterval::get() != Zero::zero() {
+		if T::PriceUpdateInterval::get() == Zero::zero() ||
+			local_block_number % T::PriceUpdateInterval::get() != Zero::zero()
+		{
 			return Ok(0);
 		}
 
@@ -968,7 +970,7 @@ mod ocw_tests {
 	fn roll_next_and_set_response(
 		pool_state: Arc<RwLock<PoolState>>,
 		offchain_state: Arc<RwLock<OffchainState>>,
-		response: PendingRequest,
+		maybe_response: Option<PendingRequest>,
 	) -> (Result<u32, OffchainError>, Vec<Result<(), UberDispatchError>>) {
 		// first, block initialization
 		let now = System::block_number();
@@ -1018,7 +1020,9 @@ mod ocw_tests {
 		pool_state.write().transactions.clear();
 
 		// then the offchain worker runs
-		offchain_state.write().expect_request(response);
+		if let Some(response) = maybe_response {
+			offchain_state.write().expect_request(response);
+		}
 		let ocw_result = OracleOffchainWorker::<Runtime>::offchain_worker(now);
 
 		// then finalize
@@ -1027,24 +1031,49 @@ mod ocw_tests {
 		(ocw_result, tx_results)
 	}
 
-	fn good_response() -> PendingRequest {
-		PendingRequest {
+	fn good_response() -> Option<PendingRequest> {
+		Some(PendingRequest {
 			method: "GET".into(),
 			uri: "ocw.local.io/price".into(),
 			response: Some(br#"{"USD": 4.2}"#.to_vec()),
 			sent: true,
 			..Default::default()
-		}
+		})
 	}
 
-	fn bad_response() -> PendingRequest {
-		PendingRequest {
+	fn bad_response() -> Option<PendingRequest> {
+		Some(PendingRequest {
 			method: "GET".into(),
 			uri: "ocw.local.io/price".into(),
 			response: Some(Default::default()),
 			sent: true,
 			..Default::default()
-		}
+		})
+	}
+
+	#[test]
+	fn wont_run_on_update_interval_zero() {
+		ExtBuilder::default().price_update_interval(0).build_offchain_and_execute(
+			|pool_state, offchain_state| {
+				// given
+				assert_eq!(PriceUpdateInterval::get(), 0);
+
+				// when we roll a bunch of blocks forward
+				for _ in 0..10 {
+					let (ocw_result, tx_results) = roll_next_and_set_response(
+						Arc::clone(&pool_state),
+						Arc::clone(&offchain_state),
+						None,
+					);
+					bump_block_number(System::block_number() + 1);
+
+					// nothing is submitted
+					assert_eq!(ocw_result.unwrap(), 0);
+					assert!(tx_results.is_empty());
+					assert!(pool_state.read().transactions.is_empty());
+				}
+			},
+		);
 	}
 
 	#[test]

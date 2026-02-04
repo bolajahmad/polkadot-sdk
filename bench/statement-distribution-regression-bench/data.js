@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770241844559,
+  "lastUpdate": 1770245785596,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "oliver.tale-yazdi@parity.io",
-            "name": "Oliver Tale-Yazdi",
-            "username": "ggwpez"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "ffb2fddf5157e478e2df56536475d67c2b770b96",
-          "message": "Run SemVer check also with R0 label (#8981)\n\n- **Dont skip semver check for R0 label**\n- **Rename `R0-silent` to `R0-no-crate-publish-required`**\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
-          "timestamp": "2025-06-27T12:32:13Z",
-          "tree_id": "0e4663af28a4c33b98538e48d5ad0fe4957ff18f",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/ffb2fddf5157e478e2df56536475d67c2b770b96"
-        },
-        "date": 1751033350959,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.95199999999998,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04519792156399991,
-            "unit": "seconds"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.033993918079999984,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.03875900832999999,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@kchr.de",
+            "name": "Bastian Köcher",
+            "username": "bkchr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0be9d3a1924bc3278e816495c925bddb07965844",
+          "message": "FixedPoint: Support parsing `x.y` format (#9184)\n\nThis makes it easier to declare a fixed point value. The old format is\nalso still supported.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
+          "timestamp": "2026-02-04T21:21:05Z",
+          "tree_id": "607bd7ed665e626059dc8fe90b415e3264704b78",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/0be9d3a1924bc3278e816495c925bddb07965844"
+        },
+        "date": 1770245761523,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.02399999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.038675757978000005,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06535138265799992,
             "unit": "seconds"
           }
         ]

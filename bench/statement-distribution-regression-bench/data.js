@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770187436101,
+  "lastUpdate": 1770201611649,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "117115317+lrubasze@users.noreply.github.com",
-            "name": "Lukasz Rubaszewski",
-            "username": "lrubasze"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "dbfed5a584d5f16602f0094ae2ac153fd62912be",
-          "message": "Make zombienet CI great again (#8748)\n\nThis PR re-enables Zombienet CI tests.\n\n\nChanges:\n- Enable Zombienet Polkadot and Substrate tests\n- Zombienet Cumulus will be enabled separately, when being migrated to\n`zombienet-sdk`\n- Switch zombienet from `k8s` to `native` provider\n`k8s` turned out to be unstable for both `zombienet` and\n`zombienet-sdk`. Issues observed:\n  - problem with launching a pod\n- pods (and thus nodes) were not spawned at the same time (differences\nup to 120s), which affected some tests\n  - `kubectl` command failed \n  Observed many times for:\n    - kubectl cp\n    - kubectl exec\n    - kubectl logs\nIf we ever want to switch back to `k8s` we must ensure above issues no\nlonger exist.\n- Tweaks some tests to make sure they constantly pass\nAuthors of those tests are kindly asked to review the changes.\n- Some improvements and fixes `zombienet` and `zombienet-sdk` frameworks\n- Assign more beefy runners for more demanding tests\nRule of thumb: use large runner if spawned network consist of more than\n4 nodes\n- Disable some tests to let their authors to stabilize them\nCreated a dedicated `.github/zombienet-flaky-tests` file for more\nclarity\nATM there are 16 flaky tests. Their authors are kindly asked to fix them\nand re-enable.\n\n---------\n\nCo-authored-by: Javier Viola <javier@parity.io>\nCo-authored-by: Javier Viola <363911+pepoviola@users.noreply.github.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Anthony Lazam <xlzm.tech@gmail.com>",
-          "timestamp": "2025-06-26T10:01:28Z",
-          "tree_id": "f2cb70189cb93c0c4946240369572a0947e05f70",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/dbfed5a584d5f16602f0094ae2ac153fd62912be"
-        },
-        "date": 1750937279235,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.94799999999995,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.03403928842599999,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04569062694399993,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.06792206219199994,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alin@parity.io",
+            "name": "Alin Dima",
+            "username": "alindima"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a40ab3cd1348c871523a2bfccb71f484cd5591af",
+          "message": "collator-protocol-revamp: CollationManager and subsystem impl (#8541)\n\nImplements the `CollationManager` and the new collator protocol\n(validator side) subsystem.\n\nIssues https://github.com/paritytech/polkadot-sdk/issues/8182 and\nhttps://github.com/paritytech/polkadot-sdk/issues/7752.\n\nThese are the big remaining parts which would enable us to test the\nentire implementation.\n\nTODO:\n- [ ] add a couple more unit tests (see the suggestions at the bottom of\nthe tests file)\n- [x] polish the ClaimQueueState and verify if it's sufficiently covered\nby unit tests\n  - https://github.com/paritytech/polkadot-sdk/pull/10334\n  - https://github.com/paritytech/polkadot-sdk/pull/10368\n- [x] add metrics and polish logs -\nhttps://github.com/paritytech/polkadot-sdk/pull/10730\n- [x] add a CLI parameter for enabling the experimental subsystem (and\nremove the compile-time feature) ->\nhttps://github.com/paritytech/polkadot-sdk/pull/10285\n- [x] implement registered paras update, using\nhttps://github.com/paritytech/polkadot-sdk/pull/9055\n- [ ] do some manual zombienet tests with v1 protocol version and with\nrestarting validators (including syncing with warp sync)\n- [x] prdoc\n- [x] Rollback \n-\nhttps://github.com/paritytech/polkadot-sdk/pull/8541/commits/03e89150bd87e63a6a74e9ce1b9d1122b9239d14\n-\nhttps://github.com/paritytech/polkadot-sdk/pull/8541/commits/05e1497a3f785f41aac81e08f13676bdc96b9035\nThese commits were added just to run the CI tests for this PR with the\nnew experimental protocol\n\nAfter merging: \n- [ ] versi testing\n\n\n\nUses a slightly modified version of the ClaimQueueState written by\n@tdimitrov in https://github.com/paritytech/polkadot-sdk/pull/7114.\n\n---------\n\nCo-authored-by: Tsvetomir Dimitrov <tsvetomir@parity.io>\nCo-authored-by: Serban Iorga <serban@parity.io>\nCo-authored-by: Serban Iorga <serban300@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T08:56:37Z",
+          "tree_id": "7ee158481ac5f452aa18dcac48dc2b98b1a1aa9b",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a40ab3cd1348c871523a2bfccb71f484cd5591af"
+        },
+        "date": 1770201587554,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.058,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06530434925199993,
+            "unit": "seconds"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03835715703000001,
             "unit": "seconds"
           }
         ]

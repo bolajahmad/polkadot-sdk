@@ -207,6 +207,7 @@ parameter_types! {
 	pub static MaxVoteAge: u64 = 4;
 	pub static NextTallyFails: Option<TallyOuterError<()>> = None;
 	pub static Authorities: Option<Vec<(u64, Percent)>> = None;
+	pub static MaxAuthorities: u32 = 4;
 }
 
 pub struct TestTally;
@@ -241,7 +242,7 @@ impl pallet_price_oracle::Config for Runtime {
 	type PriceUpdateInterval = PriceUpdateInterval;
 	type AssetId = u32;
 	type HistoryDepth = HistoryDepth;
-	type MaxAuthorities = ConstU32<4>;
+	type MaxAuthorities = MaxAuthorities;
 	type MaxEndpointsPerAsset = ConstU32<8>;
 	type MaxVotesPerBlock = MaxVotesPerBlock;
 	type MaxVoteAge = MaxVoteAge;
@@ -250,10 +251,10 @@ impl pallet_price_oracle::Config for Runtime {
 	type RelayBlockNumberProvider = System;
 	type TimeProvider = TimeProvider;
 	type OnPriceUpdate = OnPriceUpdate;
-	type WeightInfo = ();
 	type DefaultRequestDeadline = ConstU64<2000>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = ();
+	type WeightInfo = ();
 }
 
 pub struct ExtBuilder {
@@ -306,6 +307,11 @@ impl ExtBuilder {
 		self
 	}
 
+	pub fn max_authorities(self, max: u32) -> Self {
+		MaxAuthorities::set(max);
+		self
+	}
+
 	pub fn empty(mut self) -> Self {
 		self.assets = vec![];
 		self
@@ -325,6 +331,7 @@ impl ExtBuilder {
 		let mut storage =
 			frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
 
+		// default authorities for all tests.
 		let authorities = Authorities::take().unwrap_or_else(|| {
 			vec![
 				(1, Percent::from_percent(100)),
@@ -350,6 +357,7 @@ impl ExtBuilder {
 	) -> (sp_io::TestExternalities, Arc<RwLock<PoolState>>, Arc<RwLock<OffchainState>>) {
 		// set keys for 1 account that is actually an authority.
 		UintAuthorityId::set_all_keys(vec![1]);
+
 		let mut ext = self.build();
 		let (offchain, offchain_state) = TestOffchainExt::new();
 		let (pool, pool_state) = TestTransactionPoolExt::new();

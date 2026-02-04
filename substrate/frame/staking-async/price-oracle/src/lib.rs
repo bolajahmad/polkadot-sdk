@@ -77,15 +77,11 @@
 //!
 //! ## Future Work / Ideas
 //!
-//! For MVP:
-//! - [x] doc cleanup
-//! - [x] Cleanup and have a minimal simulation crate.
-//! - [x] vibe code a simple UI in PJS
-//! - [x] test setup should have faster update times (2/1)
-//!
-//! Later:
 //! - [ ] Companion binary to manage the OCW storage + submit transactions
 //! - [ ] OCWs should not overlap, add the lock mechanism from EPMB
+//! - [ ] OCW-fork: Maybe the OCW should include the block has on top of which it is built, such
+//!   that we are sure we won't include a transaction from an OCW instance running on a fork on the
+//!   main chain?
 //! - [ ] One papi test for quick-ish sanity test
 //! - [ ] papi test for validator disabling/swapping (checked manually, see
 //!   `TweakValidatorSetOption::UsePreviousKickRandom` in the rc)
@@ -103,9 +99,7 @@
 //! - [ ] More integration tests in this crate (ocw running auto, using real tx-extensions/pool
 //!   validation etc)
 //! - [ ] Integration tests in integration-tests crate.
-//! - [ ] OCW-fork: Maybe the OCW should include the block has on top of which it is built, such
-//!   that we are sure we won't include a transaction from an OCW instance running on a fork on the
-//!   main chain?
+//! - [ ] handle validator disabling via a message from RC
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

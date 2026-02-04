@@ -18,10 +18,7 @@
 //! Benchmarking for pallet-price-oracle
 
 use super::*;
-use crate::oracle::{
-	offchain::{Endpoint, Method, ParsingMethod},
-	*,
-};
+use crate::oracle::offchain::*;
 use frame_benchmarking::v2::*;
 use frame_support::pallet_prelude::*;
 use sp_runtime::FixedU128;
@@ -79,8 +76,6 @@ mod benchmarks {
 				StorageManager::<T>::add_vote(
 					asset_id,
 					frame_benchmarking::account::<T::AccountId>("voter", 0, idx),
-					// TODO: using `let vote` in this macro messes things up... some bug in the
-					// source.
 					Vote { price: FixedU128::from_rational(idx as u128, 10), produced_in: now },
 				)
 			})
@@ -102,6 +97,8 @@ mod benchmarks {
 
 	#[benchmark]
 	fn vote() -> Result<(), BenchmarkError> {
+		assert!(T::MaxAuthorities::get() > 0, "MaxAuthorities must be greater than 0");
+
 		// register a valid asset.
 		let asset_id = T::BenchmarkHelper::asset_id();
 		let endpoints = vec![Endpoint {
@@ -117,6 +114,9 @@ mod benchmarks {
 		let bounded = BoundedVec::<_, _>::try_from(endpoints).expect("endpoints should fit");
 		StorageManager::<T>::register_asset(asset_id, bounded)?;
 		let now = Pallet::<T>::local_block_number();
+
+		// nuke existing authorities.
+		Authorities::<T>::mutate(|a| a.clear());
 
 		// grab a random account and register them as an authority.
 		let authority = frame_benchmarking::account::<T::AccountId>("authority", 0, 0);

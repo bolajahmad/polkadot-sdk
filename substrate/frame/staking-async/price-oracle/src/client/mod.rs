@@ -46,21 +46,15 @@
 //! Every time `new_session` receives some validator set as return value, it is only enacted on the
 //! next session rotation.
 
-pub mod weights;
-
-#[cfg(feature = "runtime-benchmarks")]
-pub mod benchmarking;
 #[cfg(test)]
 pub mod mock;
 #[cfg(test)]
 pub mod test;
 
 pub use pallet::*;
-pub use weights::WeightInfo;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::{BlockNumberFor, *};
 	extern crate alloc;
@@ -70,9 +64,6 @@ pub mod pallet {
 	pub trait Config: frame_system::Config {
 		/// The origin representing the relay chain.
 		type RelayChainOrigin: EnsureOrigin<Self::RuntimeOrigin>;
-
-		/// Weight information for extrinsics in this pallet.
-		type WeightInfo: WeightInfo;
 	}
 
 	#[pallet::pallet]
@@ -130,7 +121,7 @@ pub mod pallet {
 		///
 		/// Dispatch origin of this call must be [`Config::RelayChainOrigin`].
 		#[pallet::call_index(0)]
-		#[pallet::weight(T::WeightInfo::relay_new_validator_set())]
+		#[pallet::weight({T::DbWeight::get().reads_writes(1, 1)})]
 		pub fn relay_new_validator_set(
 			origin: OriginFor<T>,
 			validators: Vec<T::AccountId>,

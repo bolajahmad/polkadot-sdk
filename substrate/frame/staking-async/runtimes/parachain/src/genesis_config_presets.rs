@@ -58,10 +58,13 @@ fn staking_async_parachain_genesis(params: GenesisParams, preset: String) -> ser
 		root,
 		id,
 	} = params;
+	// Fund DAP buffer account with ED so it can receive slashes.
+	let dap_buffer: AccountId = DapPalletId::get().into_account_truncating();
+	let mut balances: Vec<_> = endowed_accounts.iter().cloned().map(|k| (k, endowment)).collect();
+	balances.push((dap_buffer, STAKING_ASYNC_PARA_ED));
+
 	build_struct_json_patch!(RuntimeGenesisConfig {
-		balances: BalancesConfig {
-			balances: endowed_accounts.iter().cloned().map(|k| (k, endowment)).collect(),
-		},
+		balances: BalancesConfig { balances },
 		parachain_info: ParachainInfoConfig { parachain_id: id },
 		collator_selection: CollatorSelectionConfig {
 			invulnerables: invulnerables.iter().cloned().map(|(acc, _)| acc).collect(),

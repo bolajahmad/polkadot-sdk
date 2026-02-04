@@ -18,7 +18,7 @@ impl-trait-for-tuples = { workspace = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
 
-# todo; remove, only needed for one trait that should go to support.
+# because we have to act as session handler and should-end-session etc.
 pallet-session = { workspace = true }
 
 sp-runtime = { workspace = true }

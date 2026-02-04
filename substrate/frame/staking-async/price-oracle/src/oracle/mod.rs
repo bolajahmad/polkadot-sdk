@@ -1047,7 +1047,7 @@ pub mod pallet {
 		}
 
 		fn on_disabled(_: u32) {
-			// TODO
+			// TODO: should be able to handle -- needs a message from RC in client.
 		}
 	}
 }

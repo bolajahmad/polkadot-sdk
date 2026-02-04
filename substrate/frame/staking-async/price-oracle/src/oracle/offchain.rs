@@ -69,7 +69,6 @@ use frame_system::{
 	offchain::{SendSignedTransaction, Signer},
 	pallet_prelude::BlockNumberFor,
 };
-use oracle::Event;
 use scale_info::TypeInfo;
 use sp_core::{ConstU32, Get};
 use sp_runtime::{
@@ -592,8 +591,20 @@ impl<T: crate::oracle::Config> OracleOffchainWorker<T> {
 			let call =
 				crate::oracle::Call::<T>::vote { asset_id, price, produced_in: local_block_number };
 
-			// TODO: handle
-			let _res = signer.send_signed_transaction(|_account| call.clone());
+			signer
+				.send_signed_transaction(|_account| call.clone())
+				.into_iter()
+				.map(|(account_used, result)| {
+					ocw_log!(
+						debug,
+						"result from sending with account {:?}, is {:?}",
+						account_used.id,
+						result
+					);
+					result.map_err(|_| OffchainError::Other("send_signed_transaction"))
+				})
+				.collect::<Result<(), _>>()?;
+
 			ocw_log!(debug, "Submitted vote for asset {:?}", asset_id);
 
 			assets_updated += 1;
@@ -719,7 +730,7 @@ mod ocw_tests {
 	use crate::oracle::{
 		mock::*,
 		offchain::{Endpoint, Method, ParsingMethod, RequestData},
-		StorageManager, TallyOuterError,
+		Event, StorageManager, TallyOuterError,
 	};
 	use frame_support::{
 		dispatch::{DispatchClass, DispatchErrorWithPostInfo, GetDispatchInfo},

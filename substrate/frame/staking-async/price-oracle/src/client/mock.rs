@@ -39,7 +39,6 @@ impl frame_system::Config for Runtime {
 
 impl pallet_price_oracle_client::Config for Runtime {
 	type RelayChainOrigin = EnsureRoot<Self::AccountId>;
-	type WeightInfo = ();
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

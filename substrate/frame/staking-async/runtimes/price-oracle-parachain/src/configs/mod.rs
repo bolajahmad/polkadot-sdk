@@ -418,5 +418,4 @@ impl price_oracle::oracle::Config for Runtime {
 
 impl price_oracle::client::Config for Runtime {
 	type RelayChainOrigin = EnsureRoot<AccountId>;
-	type WeightInfo = price_oracle::client::weights::SubstrateWeight<Runtime>;
 }

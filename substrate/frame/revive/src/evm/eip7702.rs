@@ -70,8 +70,7 @@ pub fn process_authorizations<T: Config>(
 /// Validate a single authorization tuple
 ///
 /// Returns the authority address and whether it's a new account if validation succeeds,
-/// None otherwise. This is exposed for benchmarking purposes.
-pub(crate) fn validate_authorization<T: Config>(
+fn validate_authorization<T: Config>(
 	auth: &AuthorizationListEntry,
 	chain_id: U256,
 ) -> Option<(H160, bool)> {
@@ -108,9 +107,7 @@ pub(crate) fn validate_authorization<T: Config>(
 }
 
 /// Apply a delegation for a single authority
-///
-/// This is exposed for benchmarking purposes.
-pub(crate) fn apply_delegation<T: Config>(authority: &H160, target_address: H160) {
+fn apply_delegation<T: Config>(authority: &H160, target_address: H160) {
 	if target_address.is_zero() {
 		AccountInfo::<T>::clear_delegation(authority);
 	} else {

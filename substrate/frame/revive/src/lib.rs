@@ -1627,7 +1627,7 @@ impl<T: Config> Pallet<T> {
 
 		let mut meter = TransactionMeter::new(limits);
 
-		let mut base_call_weight = base_info.call_weight;
+		let base_call_weight = base_info.call_weight;
 		if !authorization_list.is_empty() {
 			let new_account_count = evm::eip7702::process_authorizations::<T>(
 				&authorization_list,

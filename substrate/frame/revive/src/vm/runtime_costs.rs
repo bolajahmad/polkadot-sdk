@@ -178,10 +178,6 @@ pub enum RuntimeCosts {
 	Blake2F(u32),
 	/// Weight of calling `Modexp` precompile
 	Modexp(u64),
-	/// Weight of validating an EIP-7702 authorization entry.
-	ValidateAuthorization,
-	/// Weight of applying an EIP-7702 delegation.
-	ApplyDelegation { is_new_account: bool },
 	/// Refund delta between new and existing account delegation.
 	ApplyDelegationNewAccountDelta(u32),
 }
@@ -344,9 +340,6 @@ impl<T: Config> Token<T> for RuntimeCosts {
 			Identity(len) => T::WeightInfo::identity(len),
 			Blake2F(rounds) => T::WeightInfo::blake2f(rounds),
 			Modexp(gas) => Weight::from_parts(gas.saturating_mul(WEIGHT_PER_GAS), 0),
-			ValidateAuthorization => T::WeightInfo::validate_authorization(),
-			ApplyDelegation { is_new_account } =>
-				T::WeightInfo::apply_delegation(is_new_account as u32),
 			ApplyDelegationNewAccountDelta(count) => T::WeightInfo::apply_delegation(1)
 				.saturating_sub(T::WeightInfo::apply_delegation(0))
 				.saturating_mul(count.into()),

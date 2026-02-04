@@ -1,8 +1,8 @@
 title: 'FixedPoint: Add support for `x.y` parsing'
 doc:
-- audience: Todo
+- audience: RuntimeDev
   description: |-
-    Small prerequisit for price-oracle pallets/PRs coming soon. Adds support for parsing `x.y` to `FixedPoint` numbers.
+    Adds support for parsing `x.y` to `FixedPoint` numbers.
 
     Note that this is different from `from_str` which parses the number as `type INNER` and constructs a new value.
 
@@ -11,7 +11,6 @@ doc:
     FixedU128::from_float_str(100) = FixedU128::from_u32(100)
     ```
 
-    Can replace https://github.com/paritytech/polkadot-sdk/pull/9184 which I found later.
 crates:
 - name: sp-arithmetic
   bump: minor

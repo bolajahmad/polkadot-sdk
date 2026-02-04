@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770208850079,
+  "lastUpdate": 1770212994040,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "e1026d7ee22a593cf566a99484eee02a03ecc236",
-          "message": "RuntimeAllocator: Align returned pointers (#8891)\n\nRust recently switched the default alignment of u128 to 16bytes:\nhttps://blog.rust-lang.org/2024/03/30/i128-layout-update/ This broke the\nassumption of our host allocator that the biggest alignment is 8 bytes.\n\nTo fix the alignment issue, the runtime allocator now takes care of\naligned the returned pointer. We are abusing the fact that we know how\nthe host allocator is working and storing some extra data in its header.\nThis is not a perfect solution as we don't align the host side pointers,\nbut the host side is mainly allocating `u8` arrays that should be fine\nwith the `8byte` alignment. Any node side change would be a consensus\nbreaking change.\n\n\nCloses: https://github.com/paritytech/polkadot-sdk/issues/8818\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-27T10:53:44Z",
-          "tree_id": "e70aa26bbd2c4f3a9858fc4b04fb7eca8c10362b",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/e1026d7ee22a593cf566a99484eee02a03ecc236"
-        },
-        "date": 1751026653361,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008805733106666767,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1569265581533333,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012894975739999998,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.0223021891,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "bitfield-distribution",
             "value": 0.023033555939999992,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "3e53570b1619e7de01e71929179ec9d03d727425",
+          "message": "Add StakingOperator proxy type to Westend AssetHub (#10980)\n\nIntroduces StakingOperator proxy type that allows validator operational\ntasks (validate, chill, kick) and session key management (set_keys,\npurge_keys) without access to fund management operations.\n\nThis enables pure proxy stashes to delegate validator operations: now\nthat pallet_staking_async_rc_client provides\nset_keys/purge_keys on AssetHub, pure proxies can fully utilize\nStakingOperator.\n\n*NOTE**: This is similar to\nhttps://github.com/polkadot-fellows/runtimes/pull/1033, which introduced\nStakingOperator on Polkadot and Kusama. That change predated the\nintroduction of session key handling on AssetHub. Now that session key\nhandling is available, a follow-up PR will be implemented in the\nruntimes repository to restrict StakingOperator solely to AssetHub and\nenable session key handling via StakingOperator on AssetHub.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T12:35:18Z",
+          "tree_id": "6c68b5404e6b048cf099afe2dae55c8df93cf43f",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3e53570b1619e7de01e71929179ec9d03d727425"
+        },
+        "date": 1770212970272,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.006901423046666666,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14501502872666663,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.02316240588666667,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.010508049726666649,
             "unit": "seconds"
           }
         ]

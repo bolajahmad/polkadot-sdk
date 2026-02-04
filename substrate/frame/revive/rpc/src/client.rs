@@ -83,7 +83,7 @@ pub enum SubscriptionType {
 }
 
 /// Submit Error reason.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub enum SubmitError {
 	/// Transaction was usurped by another with the same nonce.
 	#[error("Transaction was usurped by another with the same nonce")]

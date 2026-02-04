@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770212994040,
+  "lastUpdate": 1770216768201,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "oliver.tale-yazdi@parity.io",
-            "name": "Oliver Tale-Yazdi",
-            "username": "ggwpez"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "ffb2fddf5157e478e2df56536475d67c2b770b96",
-          "message": "Run SemVer check also with R0 label (#8981)\n\n- **Dont skip semver check for R0 label**\n- **Rename `R0-silent` to `R0-no-crate-publish-required`**\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
-          "timestamp": "2025-06-27T12:32:13Z",
-          "tree_id": "0e4663af28a4c33b98538e48d5ad0fe4957ff18f",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/ffb2fddf5157e478e2df56536475d67c2b770b96"
-        },
-        "date": 1751033295627,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008719648060000078,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1569581874866667,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.02249437153333334,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.01297835658,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.010508049726666649,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "30b2aebc07f724c3ce85cb78c08d94ff40a0c3f0",
+          "message": "pallet-dap: mark funds as inactive  + expect buffer account to be pre-funded (#10957)\n\nIn pallet-dap, mark funds in the issuance buffer as inactive so they do\nnot participate in governance.\nIn production, the buffer account must be pre-funded (e.g., via genesis\nallocation or transfer) before the pallet receives any funds. These\npre-funded tokens are not deactivate. The expectation is that we\npre-fund with ED so this is negligible.\n\nDriven-by: \n- removed the `InitBufferAccount` migration since the buffer account is\nnow expected to be pre-funded externally.\n-  remove DAP dependency from main staking-async crate\n- For delegated staking, redirect slashes to DAP for Westend AssetHub.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T13:29:05Z",
+          "tree_id": "6eefa4986f79a63d283698b86fe50864207bd521",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/30b2aebc07f724c3ce85cb78c08d94ff40a0c3f0"
+        },
+        "date": 1770216746012,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.00982879494666666,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14407708518000006,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.00679294775333333,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.02303931457333333,
             "unit": "seconds"
           }
         ]

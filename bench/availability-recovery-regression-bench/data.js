@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770180982702,
+  "lastUpdate": 1770187333385,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "gui.thiolliere@gmail.com",
-            "name": "Guillaume Thiolliere",
-            "username": "gui1117"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "18cd0b4d8ff6a2eea379a3b166fe21aec180778f",
-          "message": "Enable statement store in polkadot-omni-node and polkadot-parachain (#8076)\n\nIn `polkadot-omni-node-lib`, when starting the node, when the runtime\nfor the best hash contains the runtime api: `ValidateStatement`, then we\nstart the statement store.\n\nThe statement store is an off-chain data-store for signed statements\naccessible via RPC and offchain worker.\nIt uses the runtime api to get the allowance associated to an account.\n\nThis takes effect in `polkadot-omni-node` and `polkadot-parachain` and\nany node depending on `polkadot-omni-node-lib`.\n\n</br>\n\n</br>\n\n ----\n\n### Old description:\n\nWe want to enable statement store for people chain.\n\nThis PR introduces and enables the statement store and add a new\nargument `disable_statement_store` in `polkadot-omni-node-lib`.\nThis takes effect in `polkadot-omni-node` and `polkadot-parachain` and\nany node depending on `polkadot-omni-node-lib`.\n\nThe reasoning is following other service such as `offchain_worker` the\ndefault behavior is to support it, otherwise I expect not many collator\nto explictly opt-in (but I can be wrong assuming this).\nDo system chain collator use `omni-node` or `polkadot-parachain`? we\ncould otherwise only enable it for `polkadot-parachain`. Or we could\nalso create a new binary for people chain and enable it only for this\nnew binary, and remove people chain from `polkadot-parachain`.\n\nIf the runtime doesn't support the API then it any submission will fail\nwith `Error calling into the runtime`.\n\nIt would be ideal to target the next cut-off for this issue/PR given\nthat it can take time for node operator to update their node.\n\nTo have a configurable CLI and default behavior for statement-store, I\ndid in this PR: https://github.com/paritytech/polkadot-sdk/pull/8421\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Sebastian Kunert <skunert49@gmail.com>\nCo-authored-by: Iulian Barbu <14218860+iulianbarbu@users.noreply.github.com>",
-          "timestamp": "2025-06-26T14:44:56Z",
-          "tree_id": "9d7792b62cc997aad62d005d4685d62689efae28",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/18cd0b4d8ff6a2eea379a3b166fe21aec180778f"
-        },
-        "date": 1750953265314,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.22306457473333,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19923374746666664,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12375631353333331,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "6c01d65fb821be787b894d513604d1c532220746",
+          "message": "ci: improve try-runtime snapshot caching strategy (#10972)\n\nSplit check-runtime-migration into two jobs, similarly to what runtimes\nrepo already does:\n- `prepare-snapshots`: creates snapshots only when cache miss\n- `check-runtime-migration`: restores cached snapshots, runs checks\n\nCache strategy changes:\n- Restore uses prefix key (matches any date, enables fallback to older\nsnapshots)\n- Save uses dated key (fresh snapshots don't overwrite until successful)\n- Scheduled runs skip cache check, always create fresh snapshots\n- PRs reuse existing snapshots, only create if cache is empty\n\nThis prevents multiple concurrent jobs from hammering RPC endpoints when\ncache misses occur, and provides automatic fallback to older snapshots\nwhen daily refresh fails.\n\nNote that this is a behavioral change: PRs now match any date and not\ntoday-only, falling back to the most recent snapshot.",
+          "timestamp": "2026-02-04T05:32:25Z",
+          "tree_id": "ebbc361570d0c8da8ef43b5f1c3c797f92859c28",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/6c01d65fb821be787b894d513604d1c532220746"
+        },
+        "date": 1770187309321,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.263915447200002,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12173551596666668,
             "unit": "seconds"
           }
         ]

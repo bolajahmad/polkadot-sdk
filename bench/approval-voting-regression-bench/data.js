@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770208882988,
+  "lastUpdate": 1770213027448,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "225d1742d4b9d578588daf7fd508d00b002a0de3",
-          "message": "pallet-balances: Do not create account in benchmarking (#8932)\n\nThis particular benchmark is about benchmarking the account creation, so\nwe should not create it before :)\n\n\nCloses: https://github.com/paritytech/polkadot-sdk/issues/8927\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-27T08:26:29Z",
-          "tree_id": "78dc175eb3b966f16377c0ad0396f2e61dd917d1",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/225d1742d4b9d578588daf7fd508d00b002a0de3"
-        },
-        "date": 1751017213391,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 52939.90000000001,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 63628.19999999999,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.00001824963,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.4145286306700005,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.4428565959500013,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.3927323099400004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.9198231134499988,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.3766363331824962,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 12.042289782850023,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.3892158143200004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.00001824963,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.4774618012300225,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.000018620849999999996,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.0056715172900000015,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.000018620849999999996,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting-parallel/approval-voting-parallel-2",
             "value": 2.7054696783099987,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "3e53570b1619e7de01e71929179ec9d03d727425",
+          "message": "Add StakingOperator proxy type to Westend AssetHub (#10980)\n\nIntroduces StakingOperator proxy type that allows validator operational\ntasks (validate, chill, kick) and session key management (set_keys,\npurge_keys) without access to fund management operations.\n\nThis enables pure proxy stashes to delegate validator operations: now\nthat pallet_staking_async_rc_client provides\nset_keys/purge_keys on AssetHub, pure proxies can fully utilize\nStakingOperator.\n\n*NOTE**: This is similar to\nhttps://github.com/polkadot-fellows/runtimes/pull/1033, which introduced\nStakingOperator on Polkadot and Kusama. That change predated the\nintroduction of session key handling on AssetHub. Now that session key\nhandling is available, a follow-up PR will be implemented in the\nruntimes repository to restrict StakingOperator solely to AssetHub and\nenable session key handling via StakingOperator on AssetHub.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T12:35:18Z",
+          "tree_id": "6c68b5404e6b048cf099afe2dae55c8df93cf43f",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3e53570b1619e7de01e71929179ec9d03d727425"
+        },
+        "date": 1770213003140,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 52938.2,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 63619.25,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.6610011283400015,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.005870040910000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.743031375140002,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8420150450599857,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.7360863230730335,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.000028376050000000004,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.000028803089999999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.7147603981499993,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3923546419399986,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.710372108409999,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 14.069404737949986,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.000028803089999999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.000028376050000000004,
             "unit": "seconds"
           }
         ]

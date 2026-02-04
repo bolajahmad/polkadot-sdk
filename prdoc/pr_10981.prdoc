@@ -1,6 +1,6 @@
 title: 'FixedPoint: Add support for `x.y` parsing'
 doc:
-- audience: RuntimeDev
+- audience: Runtime Dev
   description: |-
     Adds support for parsing `x.y` to `FixedPoint` numbers.
 

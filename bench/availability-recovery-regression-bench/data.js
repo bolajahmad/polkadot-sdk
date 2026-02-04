@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770216739404,
+  "lastUpdate": 1770219561846,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "ab81eee9c67e1be6a6bab4cad484786dc653c4db",
-          "message": "contracts-fixtures: Rebuild `core` and `alloc` for MVP (#9014)\n\nWe are using the MVP target of Wasm, which means that newer language\nfeatures are disabled by default. However the build script was failing\nwith the following error:\n```\n  Caused by:\n      Unknown opcode 252\n```\n\nThis is caused by the `core` and `alloc` crate being precompiled, but\nnot for the MVP target. The pull request is fixing this by explicetly\ncompiling these crates for MVP. We are doing the same with the\n`wasm-builder`.",
-          "timestamp": "2025-06-28T09:18:29Z",
-          "tree_id": "e8102af9f5ebc4b5c0d0c34e62bd3950c64b802f",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/ab81eee9c67e1be6a6bab4cad484786dc653c4db"
-        },
-        "date": 1751105790645,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.205905307533332,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19791342063333334,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-recovery",
             "value": 11.452606897033332,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "skunert49@gmail.com",
+            "name": "Sebastian Kunert",
+            "username": "skunert"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "a21dbd56b740a79515aa130d7ff7bace144a7adc",
+          "message": "fatxpool: Do not remove listener for finalized view (#10965)\n\nInstead of immediately removing the listener for finalized view, lets\nkeep them around while the view is still in the `active_views`. Once the\nnext block is finalized, we will remove it. This should fix manual-seal\nproblems where new blocks are immeditaly finalized.\n\n\nfixes #10332\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Michal Kucharczyk <1728078+michalkucharczyk@users.noreply.github.com>",
+          "timestamp": "2026-02-04T14:29:07Z",
+          "tree_id": "27255ccbd963aa2584f652f0ab4fe25defe20291",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a21dbd56b740a79515aa130d7ff7bace144a7adc"
+        },
+        "date": 1770219537696,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.246496871466666,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12440135743333336,
             "unit": "seconds"
           }
         ]

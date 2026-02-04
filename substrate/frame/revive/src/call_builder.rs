@@ -100,8 +100,7 @@ where
 			transaction_meter: TransactionMeter::new(TransactionLimits::WeightAndDeposit {
 				weight_limit: Weight::MAX,
 				deposit_limit: default_deposit_limit::<T>(),
-			})
-			.unwrap(),
+			}),
 			value: 0u32.into(),
 			data: vec![],
 			transient_storage_size: 0,
@@ -114,8 +113,7 @@ where
 		self.transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
 			weight_limit: Weight::MAX,
 			deposit_limit: balance,
-		})
-		.unwrap();
+		});
 	}
 
 	/// Set the call's origin.

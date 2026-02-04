@@ -19,7 +19,6 @@
 
 use crate::{
 	evm::fees::InfoT,
-	metering::TransactionMeter,
 	storage::AccountInfo,
 	test_utils::builder::Contract,
 	tests::{builder, TestSigner, *},
@@ -28,7 +27,6 @@ use crate::{
 use frame_support::{
 	assert_ok,
 	traits::fungible::{Balanced, Mutate},
-	weights::Weight,
 };
 use sp_core::{H160, H256, U256};
 
@@ -155,11 +153,7 @@ fn valid_signature_is_verified_correctly() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth = signer.sign_authorization(chain_id, target, nonce);
 
-		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
-			&[auth],
-			chain_id,
-			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
-		));
+		crate::evm::eip7702::process_authorizations::<Test>(&[auth], chain_id);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target));
@@ -184,11 +178,7 @@ fn invalid_chain_id_rejects_authorization() {
 		let auth = signer.sign_authorization(wrong_chain_id, target, nonce);
 
 		// Authorization with wrong chain_id should be skipped (not error)
-		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
-			&[auth],
-			correct_chain_id,
-			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
-		));
+		crate::evm::eip7702::process_authorizations::<Test>(&[auth], correct_chain_id);
 
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
 	});
@@ -213,11 +203,7 @@ fn nonce_mismatch_rejects_authorization() {
 		let auth = signer.sign_authorization(chain_id, target, wrong_nonce);
 
 		// Authorization with wrong nonce should be skipped (not error)
-		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
-			&[auth],
-			chain_id,
-			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
-		));
+		crate::evm::eip7702::process_authorizations::<Test>(&[auth], chain_id);
 
 		assert!(!AccountInfo::<Test>::is_delegated(&signer.address));
 	});
@@ -246,11 +232,7 @@ fn multiple_authorizations_from_same_authority_first_wins() {
 		let auth2 = signer.sign_authorization(chain_id, target2, nonce);
 		let auth3 = signer.sign_authorization(chain_id, target3, nonce);
 
-		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
-			&[auth1, auth2, auth3],
-			chain_id,
-			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
-		));
+		crate::evm::eip7702::process_authorizations::<Test>(&[auth1, auth2, auth3], chain_id);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		// First authorization wins since we process blindly
@@ -274,11 +256,7 @@ fn authorization_increments_nonce() {
 		let nonce_before = frame_system::Pallet::<Test>::account_nonce(&authority_id);
 		let auth = signer.sign_authorization(chain_id, target, U256::from(nonce_before));
 
-		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
-			&[auth],
-			chain_id,
-			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
-		));
+		crate::evm::eip7702::process_authorizations::<Test>(&[auth], chain_id);
 
 		let nonce_after = frame_system::Pallet::<Test>::account_nonce(&authority_id);
 		assert_eq!(nonce_after, nonce_before + 1);
@@ -301,11 +279,7 @@ fn chain_id_zero_accepts_any_chain() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth = signer.sign_authorization(U256::zero(), target, nonce);
 
-		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
-			&[auth],
-			current_chain_id,
-			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
-		));
+		crate::evm::eip7702::process_authorizations::<Test>(&[auth], current_chain_id);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target));
@@ -326,11 +300,7 @@ fn new_account_sets_delegation() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth = signer.sign_authorization(chain_id, target, nonce);
 
-		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
-			&[auth],
-			chain_id,
-			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
-		));
+		crate::evm::eip7702::process_authorizations::<Test>(&[auth], chain_id);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target));
@@ -353,21 +323,13 @@ fn clearing_delegation_with_zero_address() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth1 = signer.sign_authorization(chain_id, target, nonce);
 
-		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
-			&[auth1],
-			chain_id,
-			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
-		));
+		crate::evm::eip7702::process_authorizations::<Test>(&[auth1], chain_id);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 
 		let new_nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth2 = signer.sign_authorization(chain_id, H160::zero(), new_nonce);
-		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
-			&[auth2],
-			chain_id,
-			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
-		));
+		crate::evm::eip7702::process_authorizations::<Test>(&[auth2], chain_id);
 
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), None);
@@ -405,11 +367,10 @@ fn process_multiple_authorizations_from_different_signers() {
 		let auth2 = signer2.sign_authorization(chain_id, target, nonce2);
 		let auth3 = signer3.sign_authorization(chain_id, target, nonce3);
 
-		assert_ok!(crate::evm::eip7702::process_authorizations::<Test>(
+		crate::evm::eip7702::process_authorizations::<Test>(
 			&[auth1, auth2, auth3],
 			chain_id,
-			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
-		));
+		);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority1));
 		assert!(AccountInfo::<Test>::is_delegated(&authority2));

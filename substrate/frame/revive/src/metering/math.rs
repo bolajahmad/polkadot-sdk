@@ -44,8 +44,8 @@ pub mod substrate_execution {
 	pub fn new_root<T: Config>(
 		weight_limit: Weight,
 		deposit_limit: BalanceOf<T>,
-	) -> Result<TransactionMeter<T>, DispatchError> {
-		Ok(TransactionMeter {
+	) -> TransactionMeter<T> {
+		TransactionMeter {
 			weight: WeightMeter::new(weight_limit, None),
 			deposit: RootStorageMeter::new(Some(deposit_limit)),
 			// ignore max total gas for Substrate executions
@@ -54,7 +54,7 @@ pub mod substrate_execution {
 			total_consumed_deposit_before: Default::default(),
 			transaction_limits: TransactionLimits::WeightAndDeposit { weight_limit, deposit_limit },
 			_phantom: PhantomData,
-		})
+		}
 	}
 
 	/// Create a nested (frame) meter derived from a parent `ResourceMeter`.
@@ -257,13 +257,13 @@ pub mod ethereum_execution {
 	///
 	/// This constructs a root `TransactionMeter` where the global limit is an
 	/// ethereum-gas budget (`max_total_gas`). Weight and deposit meters are left unbounded
-	/// (None). The function validates that there is positive gas left after initialization,
-	/// otherwise it returns an error.
+	/// (None). The function does not validate remaining gas after initialization; the first
+	/// gas-consuming operation will return `OutOfGas` if the limit is exhausted.
 	pub fn new_root<T: Config>(
 		eth_gas_limit: BalanceOf<T>,
 		weight_limit: Weight,
 		eth_tx_info: EthTxInfo<T>,
-	) -> Result<TransactionMeter<T>, DispatchError> {
+	) -> TransactionMeter<T> {
 		let meter = TransactionMeter {
 			weight: WeightMeter::new(weight_limit, None),
 			deposit: RootStorageMeter::new(None),
@@ -278,11 +278,7 @@ pub mod ethereum_execution {
 			_phantom: PhantomData,
 		};
 
-		if meter.eth_gas_left().is_some() {
-			Ok(meter)
-		} else {
-			return Err(<Error<T>>::OutOfGas.into());
-		}
+		meter
 	}
 
 	/// Create a nested (frame) meter for an Ethereum-style execution.

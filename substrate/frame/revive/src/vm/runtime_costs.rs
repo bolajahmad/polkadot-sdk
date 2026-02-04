@@ -182,6 +182,8 @@ pub enum RuntimeCosts {
 	ValidateAuthorization,
 	/// Weight of applying an EIP-7702 delegation.
 	ApplyDelegation { is_new_account: bool },
+	/// Refund delta between new and existing account delegation.
+	ApplyDelegationNewAccountDelta(u32),
 }
 
 /// For functions that modify storage, benchmarks are performed with one item in the
@@ -345,6 +347,9 @@ impl<T: Config> Token<T> for RuntimeCosts {
 			ValidateAuthorization => T::WeightInfo::validate_authorization(),
 			ApplyDelegation { is_new_account } =>
 				T::WeightInfo::apply_delegation(is_new_account as u32),
+			ApplyDelegationNewAccountDelta(count) => T::WeightInfo::apply_delegation(1)
+				.saturating_sub(T::WeightInfo::apply_delegation(0))
+				.saturating_mul(count.into()),
 		}
 	}
 }

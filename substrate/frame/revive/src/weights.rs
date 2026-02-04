@@ -75,6 +75,7 @@ pub trait WeightInfo {
 	fn on_initialize_per_trie_key(k: u32, ) -> Weight;
 	fn validate_authorization() -> Weight;
 	fn apply_delegation(n: u32) -> Weight;
+	fn process_authorization(n: u32, ) -> Weight;
 	fn call_with_pvm_code_per_byte(c: u32, ) -> Weight;
 	fn call_with_evm_code_per_byte(c: u32, ) -> Weight;
 	fn basic_block_compilation(b: u32, ) -> Weight;
@@ -221,6 +222,16 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Minimum execution time: 26_717_329 picoseconds (new)
 		Weight::from_parts(16_894_325, 0)
 			.saturating_add(Weight::from_parts(9_823_004, 0).saturating_mul(n.into()))
+	}
+	/// The range of component `n` is `[0, 255]`.
+	fn process_authorization(n: u32) -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: TBD (placeholder)
+		Weight::from_parts(0, 0)
+			.saturating_add(Weight::from_parts(63_360_000, 0).saturating_mul(n.into()))
+			.saturating_add(Weight::from_parts(26_717_329, 0).saturating_mul(n.into()))
 	}
 	/// Storage: `Revive::AccountInfoOf` (r:2 w:1)
 	/// Proof: `Revive::AccountInfoOf` (`max_values`: None, `max_size`: Some(247), added: 2722, mode: `Measured`)
@@ -1527,6 +1538,16 @@ impl WeightInfo for () {
 		// Minimum execution time: 26_717_329 picoseconds (new)
 		Weight::from_parts(16_894_325, 0)
 			.saturating_add(Weight::from_parts(9_823_004, 0).saturating_mul(n.into()))
+	}
+	/// The range of component `n` is `[0, 255]`.
+	fn process_authorization(n: u32) -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: TBD (placeholder)
+		Weight::from_parts(0, 0)
+			.saturating_add(Weight::from_parts(63_360_000, 0).saturating_mul(n.into()))
+			.saturating_add(Weight::from_parts(26_717_329, 0).saturating_mul(n.into()))
 	}
 	/// Storage: `Revive::AccountInfoOf` (r:2 w:1)
 	/// Proof: `Revive::AccountInfoOf` (`max_values`: None, `max_size`: Some(247), added: 2722, mode: `Measured`)

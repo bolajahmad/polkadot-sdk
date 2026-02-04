@@ -228,6 +228,13 @@ impl<T: Config> WeightMeter<T> {
 		self.weight_consumed = self.weight_consumed.saturating_sub(adjustment);
 	}
 
+	/// Refund a weight token without a prior charge.
+	///
+	/// This reduces the consumed weight while keeping the peak requirement intact.
+	pub fn refund_weight<Tok: Token<T>>(&mut self, token: Tok) {
+		self.weight_consumed = self.weight_consumed.saturating_sub(token.weight());
+	}
+
 	/// Hand over the gas metering responsibility from the executor to this meter.
 	///
 	/// Needs to be called when entering a host function to update this meter with the

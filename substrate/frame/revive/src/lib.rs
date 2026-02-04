@@ -1366,6 +1366,7 @@ pub mod pallet {
 			T::WeightInfo::eth_call(Pallet::<T>::has_dust(*value).into())
 			.saturating_add(*weight_limit)
 			.saturating_add(T::WeightInfo::on_finalize_block_per_tx(transaction_encoded.len() as u32))
+			.saturating_add(T::WeightInfo::process_authorization(authorization_list.len() as u32))
 		)]
 		pub fn eth_call_with_authorization_list(
 			origin: OriginFor<T>,
@@ -1616,46 +1617,27 @@ impl<T: Config> Pallet<T> {
 		let base_info = T::FeeInfo::base_dispatch_info(&mut call);
 		drop(call);
 
+		let auth_count = authorization_list.len() as u32;
 		let extra_weight = base_info.total_weight();
-
 		let limits = TransactionLimits::EthereumGas {
 			eth_gas_limit: eth_gas_limit.saturated_into(),
 			weight_limit,
 			eth_tx_info: EthTxInfo::new(encoded_len, extra_weight),
 		};
+
 		let mut meter = TransactionMeter::new(limits);
 
-		// Process authorizations OUTSIDE the transaction context
-		// so delegation changes persist even if the call fails
+		let mut base_call_weight = base_info.call_weight;
 		if !authorization_list.is_empty() {
-			if let Ok(meter) = &mut meter {
-				evm::eip7702::process_authorizations::<T>(
-					&authorization_list,
-					U256::from(T::ChainId::get()),
-					meter,
-				)?;
-			}
+			let new_account_count = evm::eip7702::process_authorizations::<T>(
+				&authorization_list,
+				U256::from(T::ChainId::get()),
+			);
+			let refund_count = auth_count.saturating_sub(new_account_count);
+			meter.refund_weight(RuntimeCosts::ApplyDelegationNewAccountDelta(refund_count));
 		}
 
 		block_storage::with_ethereum_context::<T>(transaction_encoded, || {
-			let mut meter = match meter {
-				Ok(meter) => meter,
-				Err(error) =>
-					return block_storage::EthereumCallResult {
-						receipt_gas_info: ReceiptGasInfo {
-							gas_used: U256::zero(),
-							effective_gas_price,
-						},
-						result: Err(DispatchErrorWithPostInfo {
-							post_info: PostDispatchInfo {
-								actual_weight: Some(base_info.call_weight),
-								pays_fee: Pays::Yes,
-							},
-							error,
-						}),
-					},
-			};
-
 			let output = Self::bare_call_internal(
 				origin,
 				dest,
@@ -1668,7 +1650,7 @@ impl<T: Config> Pallet<T> {
 			block_storage::EthereumCallResult::new::<T>(
 				signer,
 				output,
-				base_info.call_weight,
+				base_call_weight,
 				encoded_len,
 				&info,
 				effective_gas_price,
@@ -1690,10 +1672,7 @@ impl<T: Config> Pallet<T> {
 		data: Vec<u8>,
 		exec_config: ExecConfig<T>,
 	) -> ContractResult<ExecReturnValue, BalanceOf<T>> {
-		let mut transaction_meter = match TransactionMeter::new(transaction_limits) {
-			Ok(transaction_meter) => transaction_meter,
-			Err(error) => return ContractResult { result: Err(error), ..Default::default() },
-		};
+		let mut transaction_meter = TransactionMeter::new(transaction_limits);
 
 		Self::bare_call_internal(origin, dest, evm_value, data, exec_config, &mut transaction_meter)
 	}
@@ -1782,10 +1761,7 @@ impl<T: Config> Pallet<T> {
 		salt: Option<[u8; 32]>,
 		exec_config: ExecConfig<T>,
 	) -> ContractResult<InstantiateReturnValue, BalanceOf<T>> {
-		let mut transaction_meter = match TransactionMeter::new(transaction_limits) {
-			Ok(transaction_meter) => transaction_meter,
-			Err(error) => return ContractResult { result: Err(error), ..Default::default() },
-		};
+		let mut transaction_meter = TransactionMeter::new(transaction_limits);
 
 		let mut storage_deposit = Default::default();
 
@@ -1931,7 +1907,9 @@ impl<T: Config> Pallet<T> {
 		// in those cases we skip the check that the caller has enough balance
 		// to pay for the fees
 		let base_info = T::FeeInfo::base_dispatch_info(&mut call_info.call);
-		let base_weight = base_info.total_weight();
+		let auth_weight =
+			T::WeightInfo::process_authorization(call_info.authorization_list.len() as u32);
+		let base_weight = base_info.total_weight().saturating_sub(auth_weight);
 		let exec_config =
 			ExecConfig::new_eth_tx(effective_gas_price, call_info.encoded_len, base_weight)
 				.with_dry_run(dry_run_config);
@@ -1960,46 +1938,42 @@ impl<T: Config> Pallet<T> {
 			}
 		};
 
-		// Create TransactionLimits with full gas limit
-		let transaction_limits = TransactionLimits::EthereumGas {
-			eth_gas_limit: call_info.eth_gas_limit.saturated_into(),
-			weight_limit: Self::evm_max_extrinsic_weight(),
-			eth_tx_info: EthTxInfo::new(call_info.encoded_len, base_weight),
-		};
-
-		// EIP-7702: Process authorizations using TransactionMeter
-		let mut transaction_meter = TransactionMeter::new(transaction_limits.clone())
-			.map_err(|e| EthTransactError::Message(format!("Failed to create meter: {e:?}")))?;
-
-		if !call_info.authorization_list.is_empty() {
-			evm::eip7702::process_authorizations::<T>(
-				&call_info.authorization_list,
-				U256::from(T::ChainId::get()),
-				&mut transaction_meter,
-			)
-			.map_err(|e| {
-				EthTransactError::Message(format!("Authorization processing failed: {e:?}"))
-			})?;
-		}
-
+		let auth_count = call_info.authorization_list.len() as u32;
 		let mut eth_gas_limit = call_info.eth_gas_limit.saturated_into();
 		if !call_info.authorization_list.is_empty() {
-			let auth_gas = metering::SignedGas::<T>::from_weight_fee(T::FeeInfo::weight_to_fee(
-				&transaction_meter.weight_consumed(),
-			))
-			.to_ethereum_gas()
-			.unwrap_or_default();
-
-			if auth_gas > eth_gas_limit {
+			let auth_gas =
+				metering::SignedGas::<T>::from_weight_fee(T::FeeInfo::weight_to_fee(&auth_weight))
+					.to_ethereum_gas()
+					.unwrap_or_default();
+			if auth_gas > call_info.eth_gas_limit.saturated_into() {
 				return Err(EthTransactError::Message(alloc::string::String::from(
 					"Out of gas after authorization processing",
 				)));
 			}
 
-			eth_gas_limit = eth_gas_limit.saturating_sub(auth_gas);
+			let new_account_count = evm::eip7702::process_authorizations::<T>(
+				&call_info.authorization_list,
+				U256::from(T::ChainId::get()),
+			);
+
+			let refund_count = auth_count.saturating_sub(new_account_count);
+			let refund_weight = <RuntimeCosts as WeightToken<T>>::weight(
+				&RuntimeCosts::ApplyDelegationNewAccountDelta(refund_count),
+			);
+			let actual_auth_weight = auth_weight.saturating_sub(refund_weight);
+			let actual_auth_gas = metering::SignedGas::<T>::from_weight_fee(
+				T::FeeInfo::weight_to_fee(&actual_auth_weight),
+			)
+			.to_ethereum_gas()
+			.unwrap_or_default();
+			if actual_auth_gas > eth_gas_limit {
+				return Err(EthTransactError::Message(alloc::string::String::from(
+					"Out of gas after authorization processing",
+				)));
+			}
+			eth_gas_limit = eth_gas_limit.saturating_sub(actual_auth_gas);
 		}
 
-		// Recreate limits with adjusted gas for bare_call
 		let transaction_limits = TransactionLimits::EthereumGas {
 			eth_gas_limit,
 			weight_limit: Self::evm_max_extrinsic_weight(),
@@ -2321,7 +2295,7 @@ impl<T: Config> Pallet<T> {
 		let mut meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
 			weight_limit: Default::default(),
 			deposit_limit: storage_deposit_limit,
-		})?;
+		});
 
 		let module = Self::try_upload_code(
 			origin,

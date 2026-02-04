@@ -156,7 +156,6 @@ fn substrate_metering_initialization_works() {
 					});
 
 				if let Some((gas_left, ref_time_left, proof_size_left, deposit_left)) = remaining {
-					let transaction_meter = transaction_meter.unwrap();
 					assert_eq!(
 						gas_left.div_ceil(gas_scale),
 						transaction_meter.eth_gas_left().unwrap()
@@ -167,7 +166,7 @@ fn substrate_metering_initialization_works() {
 					);
 					assert_eq!(deposit_left, transaction_meter.deposit_left().unwrap());
 				} else {
-					assert!(transaction_meter.is_err());
+					assert!(transaction_meter.eth_gas_left().is_none());
 				}
 			});
 	}
@@ -191,8 +190,7 @@ fn substrate_metering_initialization_works() {
 						eth_gas_limit: 5_000_000_000 / gas_scale,
 						weight_limit: Weight::from_parts(ref_time_limit, proof_size_limit),
 						eth_tx_info,
-					})
-					.unwrap();
+					});
 
 				assert_eq!(
 					Weight::from_parts(ref_time_left, proof_size_left),
@@ -283,8 +281,7 @@ fn substrate_metering_charges_works() {
 						eth_gas_limit: eth_gas_limit.div_ceil(gas_scale),
 						weight_limit: Weight::MAX,
 						eth_tx_info,
-					})
-					.unwrap();
+					});
 
 				for (charge, remaining) in charges {
 					let is_ok = match charge {
@@ -510,8 +507,7 @@ fn substrate_nesting_works() {
 						eth_gas_limit: eth_gas_limit.div_ceil(gas_scale),
 						weight_limit: Weight::MAX,
 						eth_tx_info: eth_tx_info.clone(),
-					})
-					.unwrap();
+					});
 
 				transaction_meter
 					.charge_deposit(
@@ -613,8 +609,7 @@ fn substrate_nesting_charges_works() {
 						eth_gas_limit: eth_gas_limit.div_ceil(gas_scale),
 						weight_limit: Weight::MAX,
 						eth_tx_info,
-					})
-					.unwrap();
+					});
 
 				transaction_meter
 					.charge_deposit(

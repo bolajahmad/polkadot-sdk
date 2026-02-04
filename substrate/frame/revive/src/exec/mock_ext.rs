@@ -46,8 +46,7 @@ impl<T: Config> MockExt<T> {
 		let transaction_meter = TransactionMeter::new(TransactionLimits::WeightAndDeposit {
 			weight_limit: Weight::MAX,
 			deposit_limit: BalanceOf::<T>::max_value(),
-		})
-		.unwrap();
+		});
 		let frame_meter = transaction_meter.new_nested(&CallResources::NoLimits).unwrap();
 		Self { frame_meter, _phantom: PhantomData }
 	}

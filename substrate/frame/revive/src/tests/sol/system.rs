@@ -228,7 +228,7 @@ fn gas_works(fixture_type: FixtureType) {
 			deposit_limit: deposit_limit::<Test>(),
 		};
 		let hold_initial =
-			TransactionMeter::<Test>::new(limits.clone()).unwrap().eth_gas_left().unwrap();
+			TransactionMeter::<Test>::new(limits.clone()).eth_gas_left().unwrap();
 
 		<Test as Config>::FeeInfo::deposit_txfee(<Test as Config>::Currency::issue(hold_initial));
 		let mut exec_config = ExecConfig::new_substrate_tx();

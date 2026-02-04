@@ -24,12 +24,10 @@
 use crate::{
 	address::AddressMapper,
 	evm::api::{recover_eth_address_from_message, AuthorizationListEntry},
-	metering::TransactionMeter,
 	storage::AccountInfo,
-	Config, RuntimeCosts, LOG_TARGET,
+	Config, LOG_TARGET,
 };
 use alloc::vec::Vec;
-use frame_support::dispatch::DispatchResult;
 use sp_core::{H160, U256};
 use sp_runtime::SaturatedConversion;
 
@@ -41,24 +39,32 @@ pub const EIP7702_MAGIC: u8 = 0x05;
 /// # Parameters
 /// - `authorization_list`: List of authorization tuples to process
 /// - `chain_id`: Current chain ID
-/// - `meter`: Transaction meter to charge weight from
+///
+/// # Returns
+/// Returns the number of authorizations that created new accounts.
+///
+/// # Note
+/// This function does NOT charge the meter. The caller should account for the
+/// authorization list weight via pre-dispatch and refund based on the number
+/// of authorizations that did not create new accounts.
 pub fn process_authorizations<T: Config>(
 	authorization_list: &[AuthorizationListEntry],
 	chain_id: U256,
-	meter: &mut TransactionMeter<T>,
-) -> DispatchResult {
-	for auth in authorization_list.iter() {
-		meter.charge_weight_token(RuntimeCosts::ValidateAuthorization)?;
+) -> u32 {
+	let mut new_account_count = 0u32;
 
+	for auth in authorization_list.iter() {
 		let Some((authority, is_new_account)) = validate_authorization::<T>(auth, chain_id) else {
 			continue;
 		};
+		if is_new_account {
+			new_account_count = new_account_count.saturating_add(1);
+		}
 
-		meter.charge_weight_token(RuntimeCosts::ApplyDelegation { is_new_account })?;
 		apply_delegation::<T>(&authority, auth.address);
 	}
 
-	Ok(())
+	new_account_count
 }
 
 /// Validate a single authorization tuple

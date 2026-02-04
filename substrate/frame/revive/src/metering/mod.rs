@@ -293,6 +293,11 @@ impl<T: Config, S: State> ResourceMeter<T, S> {
 		self.weight.adjust_weight(charged_amount, token);
 	}
 
+	/// Refund a weight token without a prior charge.
+	pub fn refund_weight<Tok: Token<T>>(&mut self, token: Tok) {
+		self.weight.refund_weight(token);
+	}
+
 	/// Synchronize meter state with PolkaVM executor's fuel consumption.
 	///
 	/// Maps the VM's internal fuel accounting to weight consumption:
@@ -474,7 +479,7 @@ impl<T: Config> TransactionMeter<T> {
 	/// Initializes either:
 	/// - An ethereum-style gas-based meter or
 	/// - A substrate-style meter with explicit weight and deposit limits
-	pub fn new(transaction_limits: TransactionLimits<T>) -> Result<Self, DispatchError> {
+	pub fn new(transaction_limits: TransactionLimits<T>) -> Self {
 		log::debug!(
 			target: LOG_TARGET,
 			"Start new meter: transaction_limits={transaction_limits:?}",
@@ -485,9 +490,12 @@ impl<T: Config> TransactionMeter<T> {
 				math::ethereum_execution::new_root(eth_gas_limit, weight_limit, eth_tx_info),
 			TransactionLimits::WeightAndDeposit { weight_limit, deposit_limit } =>
 				math::substrate_execution::new_root(weight_limit, deposit_limit),
-		}?;
+		};
 
-		transaction_meter.adjust_effective_weight_limit()?;
+		if let Err(error) = transaction_meter.adjust_effective_weight_limit() {
+			log::debug!(target: LOG_TARGET, "New meter out of gas: {error:?}");
+			transaction_meter.consume_all_weight();
+		}
 
 		log::trace!(
 			target: LOG_TARGET,
@@ -502,7 +510,7 @@ impl<T: Config> TransactionMeter<T> {
 			transaction_meter.deposit_consumed(),
 		);
 
-		Ok(transaction_meter)
+		transaction_meter
 	}
 
 	/// Convenience constructor for substrate-style weight+deposit limits.
@@ -510,7 +518,7 @@ impl<T: Config> TransactionMeter<T> {
 		weight_limit: Weight,
 		deposit_limit: BalanceOf<T>,
 	) -> Result<Self, DispatchError> {
-		Self::new(TransactionLimits::WeightAndDeposit { weight_limit, deposit_limit })
+		Ok(Self::new(TransactionLimits::WeightAndDeposit { weight_limit, deposit_limit }))
 	}
 
 	/// Execute all postponed storage deposit operations.

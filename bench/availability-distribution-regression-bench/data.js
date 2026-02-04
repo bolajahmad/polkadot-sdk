@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770181015300,
+  "lastUpdate": 1770187367597,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "yrong1997@gmail.com",
-            "name": "Ron",
-            "username": "yrong"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "3bc4d127c52f2d6570c588537d7945b24b61d61c",
-          "message": "Snowbridge: Improve local and testnet setup (#8848)\n\n### Context \n\n- The Prague-Electra fork is already live on the mainnet - enables it\nfor the local setup (with feature `fast-runtime`) by default.\n - Improve Penpal Runtime to include `pallet-utility`.\n\n---------\n\nCo-authored-by: Clara van Staden <claravanstaden64@gmail.com>",
-          "timestamp": "2025-06-26T12:44:22Z",
-          "tree_id": "0b04a7e49f6181884cf881c7fdeb08e3c813d8f0",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/3bc4d127c52f2d6570c588537d7945b24b61d61c"
-        },
-        "date": 1750945709776,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012969817893333332,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.02235369452,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1572581619666667,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008766555626666762,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-distribution",
             "value": 0.007149660313333331,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "6c01d65fb821be787b894d513604d1c532220746",
+          "message": "ci: improve try-runtime snapshot caching strategy (#10972)\n\nSplit check-runtime-migration into two jobs, similarly to what runtimes\nrepo already does:\n- `prepare-snapshots`: creates snapshots only when cache miss\n- `check-runtime-migration`: restores cached snapshots, runs checks\n\nCache strategy changes:\n- Restore uses prefix key (matches any date, enables fallback to older\nsnapshots)\n- Save uses dated key (fresh snapshots don't overwrite until successful)\n- Scheduled runs skip cache check, always create fresh snapshots\n- PRs reuse existing snapshots, only create if cache is empty\n\nThis prevents multiple concurrent jobs from hammering RPC endpoints when\ncache misses occur, and provides automatic fallback to older snapshots\nwhen daily refresh fails.\n\nNote that this is a behavioral change: PRs now match any date and not\ntoday-only, falling back to the most recent snapshot.",
+          "timestamp": "2026-02-04T05:32:25Z",
+          "tree_id": "ebbc361570d0c8da8ef43b5f1c3c797f92859c28",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/6c01d65fb821be787b894d513604d1c532220746"
+        },
+        "date": 1770187342961,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.1464208257600001,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.00962109440666664,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.006902305353333337,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.022927256126666667,
             "unit": "seconds"
           }
         ]

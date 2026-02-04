@@ -17,12 +17,10 @@
 //! The [`EthRpcServer`] RPC server implementation
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use std::{future::Future, pin::Pin};
-
 use client::ClientError;
 use jsonrpsee::{
 	core::{async_trait, RpcResult},
-	types::{ErrorCode, ErrorObject, ErrorObjectOwned},
+	types::{ErrorCode, ErrorObjectOwned},
 };
 use pallet_revive::{evm::*, EthTransactInfo};
 use sp_core::{keccak_256, H160, H256, U256};
@@ -150,32 +148,131 @@ impl EthRpcServer for EthRpcServerImpl {
 		Ok(receipt)
 	}
 
+	/// Performs gas estimations to find the lowest gas limit required to run the transaction.
+	///
+	/// This method implements the same gas estimation logic found in Geth which performs binary
+	/// search with some simple heuristics to find the smallest gas limit for the transaction.
 	async fn estimate_gas(
 		&self,
 		transaction: GenericTransaction,
 		block: Option<BlockNumberOrTag>,
 	) -> RpcResult<U256> {
 		log::trace!(target: LOG_TARGET, "estimate_gas transaction={transaction:?} block={block:?}");
-		// If the transaction's gas is specified then we don't need to perform binary search to find
-		// the lowest fee and just execute the dry run as is.
-		let estimation = if transaction.gas.is_some() {
-			self.dry_run(transaction, block).await?.eth_gas
-		} else {
-			let lowest_gas = U256::zero();
-			let highest_gas = {
-				let block = block.unwrap_or_default();
-				let hash = self.client.block_hash_for_tag(block.clone().into()).await?;
-				self.client.runtime_api(hash).block_gas_limit_from_weights().await? * U256::from(2)
-			};
-			let range = BinarySearchRange::new(
-				Inclusivity::Inclusive(lowest_gas),
-				Inclusivity::Inclusive(highest_gas),
-			);
-
-			self.estimate_gas_binary_search(None, range, transaction, block).await?
+		let mut low = U256::zero();
+		let mut high = {
+			let block = block.unwrap_or_default();
+			let hash = self.client.block_hash_for_tag(block.into()).await?;
+			self.client.runtime_api(hash).block_gas_limit().await?
 		};
-		log::trace!(target: LOG_TARGET, "estimate_gas result={estimation:?}");
-		Ok(estimation)
+		log::trace!(target: LOG_TARGET, "estimate_gas low={low} high={high}");
+
+		// Cap the high at transaction's gas limit if it's been specified by the user.
+		if let Some(gas_limit) = transaction.gas {
+			high = gas_limit;
+			log::trace!(target: LOG_TARGET, "estimate_gas high=transaction.gas={high}");
+		}
+
+		// Cap the high based on the account's balance.
+		let fee_cap = transaction.max_fee_per_gas.or(transaction.gas_price);
+		if let (Some(fee_cap), Some(from)) = (fee_cap, transaction.from) {
+			let mut available = self.get_balance(from, block.unwrap_or_default().into()).await?;
+			if let Some(value) = transaction.value {
+				available = available.checked_sub(value).ok_or_else(|| {
+					ErrorObjectOwned::owned(-32000, "insufficient funds for transfer", None::<()>)
+				})?;
+			}
+			if let Some(allowance) = available.checked_div(fee_cap) {
+				if high > allowance {
+					high = allowance;
+					log::trace!(target: LOG_TARGET, "estimate_gas high=allowance={high}");
+				}
+			}
+		}
+
+		// TODO: Implement a short circuit for simple transfers. We just need to determine the gas
+		// needed for it.
+
+		// Performing the dry-run with the maximum gas limit. If it fails, then there's no need to
+		// perform the binary search.
+		let mut mutated_transaction = transaction.clone();
+		mutated_transaction.gas = Some(high);
+		let first_dry_run_result = self.dry_run(mutated_transaction, block).await?;
+		low = first_dry_run_result.eth_gas - U256::one();
+
+		// Performing the binary search for the lowest gas limit.
+		while low + U256::one() < high {
+			// Early return if the range has gotten small enough (1.5%)
+			let error_ratio = high
+				.checked_sub(low)
+				.and_then(|value| value.checked_mul(U256::from(1000)))
+				.and_then(|value| value.checked_div(high))
+				.ok_or_else(|| {
+					ErrorObjectOwned::owned(
+						-32000,
+						"failed to calculate error ratio in gas estimation",
+						None::<()>,
+					)
+				})?;
+			if error_ratio <= U256::from(15) {
+				break;
+			}
+
+			let midpoint = high
+				.checked_sub(low)
+				.and_then(|value| value.checked_div(U256::from(2)))
+				.and_then(|value| value.checked_add(low))
+				.ok_or_else(|| {
+					ErrorObjectOwned::owned(
+						-32000,
+						"failed to calculate midpoint in gas estimation",
+						None::<()>,
+					)
+				})?
+				.min(low.checked_mul(U256::from(2)).ok_or_else(|| {
+					ErrorObjectOwned::owned(
+						-32000,
+						"failed to calculate midpoint in gas estimation",
+						None::<()>,
+					)
+				})?);
+
+			let mut mutated_transaction = transaction.clone();
+			mutated_transaction.gas = Some(midpoint);
+			let dry_run_result = self.dry_run(mutated_transaction, block).await;
+			match dry_run_result {
+				Ok(eth_transact_info) => {
+					high = midpoint;
+					log::trace!(
+						target: LOG_TARGET,
+						"estimate_gas dry run succeeded, low={} mid={} high={} return_value={}",
+						low,
+						midpoint,
+						high,
+						String::from_utf8_lossy(eth_transact_info.data.as_slice())
+					);
+				},
+				Err(_) => {
+					low = midpoint;
+					log::trace!(target: LOG_TARGET, "estimate_gas dry run failed, low={low} mid={midpoint} high={high}");
+				},
+			}
+		}
+
+		// Adding a 2% margin to the gas estimate. We're forced to do this for PolkaVM due to the
+		// round downs that take place when converting the weight to fuel.
+		let gas_estimate = high
+			.checked_div(U256::from(50))
+			.and_then(|margin| high.checked_add(margin))
+			.ok_or_else(|| {
+				ErrorObjectOwned::owned(
+					-32000,
+					"failed to add a margin to the gas estimate",
+					None::<()>,
+				)
+			})?;
+
+		log::trace!(target: LOG_TARGET, "estimate_gas result={gas_estimate:?} - first_dry_run_result={}", first_dry_run_result.eth_gas);
+		Ok(gas_estimate)
 	}
 
 	async fn call(
@@ -511,111 +608,4 @@ impl EthRpcServerImpl {
 		let runtime_api = self.client.runtime_api(hash);
 		runtime_api.dry_run(transaction, block.into()).await.map_err(Into::into)
 	}
-
-	fn estimate_gas_binary_search(
-		&self,
-		lowest_limit: Option<U256>,
-		range: BinarySearchRange<U256>,
-		transaction: GenericTransaction,
-		block: Option<BlockNumberOrTag>,
-	) -> Pin<Box<dyn Future<Output = RpcResult<U256>> + Send + '_>> {
-		Box::pin(async move {
-			let (left, mid, right) = match (range.left_mid_right(), lowest_limit) {
-				(Some(left_mid_right), _) => left_mid_right,
-				(None, Some(lowest_limit)) => return Ok(lowest_limit),
-				(None, None) =>
-					return Err(ErrorObject::owned(-32000, "Gas estimation failed", None::<()>)),
-			};
-
-			let mut mutated_transaction = transaction.clone();
-			mutated_transaction.gas = Some(mid);
-			let dry_run_result = self.dry_run(mutated_transaction.clone(), block).await;
-
-			match (dry_run_result, left, right) {
-				// Dry run succeeded and there's no left range. This is the lowest that the fee can
-				// get.
-				(Ok(dry_run_result), None, _) =>
-					Ok(lowest_limit.unwrap_or(dry_run_result.eth_gas).min(dry_run_result.eth_gas)),
-				// Dry run succeeded and there's a left range, try to reduce the fees even further.
-				(Ok(dry_run_result), Some(range), _) => {
-					let lowest_limit =
-						lowest_limit.unwrap_or(dry_run_result.eth_gas).min(dry_run_result.eth_gas);
-					self.estimate_gas_binary_search(Some(lowest_limit), range, transaction, block)
-						.await
-				},
-				// Dry run failed and there's no right range, this is potentially the lowest that
-				// the fees can get.
-				(Err(err), _, None) => lowest_limit.ok_or(err),
-				// Dry run failed, and there's a right range. If we've previously been able to find
-				// a lowest_limit then we continue and try to find a lower limit. If not, then we
-				// stop.
-				(Err(err), _, Some(range)) =>
-					if lowest_limit.is_some() ||
-						[
-							"OutOfGas",
-							"InvalidInstruction",
-							"InvalidGenericTransaction",
-							"StorageDepositNotEnoughFunds",
-						]
-						.iter()
-						.any(|str| err.message().contains(str))
-					{
-						self.estimate_gas_binary_search(lowest_limit, range, transaction, block)
-							.await
-					} else {
-						Err(err)
-					},
-			}
-		})
-	}
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct BinarySearchRange<T> {
-	start: Inclusivity<T>,
-	end: Inclusivity<T>,
-}
-
-impl BinarySearchRange<U256> {
-	pub fn new(start: Inclusivity<U256>, end: Inclusivity<U256>) -> Self {
-		Self { start, end }
-	}
-
-	pub fn left_mid_right(&self) -> Option<(Option<Self>, U256, Option<Self>)> {
-		match (self.start, self.end) {
-			(Inclusivity::Inclusive(start_inclusive), Inclusivity::Inclusive(end_inclusive)) => {
-				let mid_point =
-					start_inclusive.checked_add(end_inclusive)?.checked_div(U256::from(2))?;
-
-				let left = (mid_point != start_inclusive).then_some(Self {
-					start: Inclusivity::Inclusive(start_inclusive),
-					end: Inclusivity::Exclusive(mid_point),
-				});
-				let right = (mid_point != end_inclusive).then_some(Self {
-					start: Inclusivity::Exclusive(mid_point),
-					end: Inclusivity::Inclusive(end_inclusive),
-				});
-				Some((left, mid_point, right))
-			},
-			(start @ Inclusivity::Inclusive(..), Inclusivity::Exclusive(end_exclusive)) => {
-				let end = Inclusivity::Inclusive(end_exclusive.checked_sub(U256::one())?);
-				Self { start, end }.left_mid_right()
-			},
-			(Inclusivity::Exclusive(start_exclusive), end @ Inclusivity::Inclusive(_)) => {
-				let start = Inclusivity::Inclusive(start_exclusive.checked_add(U256::one())?);
-				Self { start, end }.left_mid_right()
-			},
-			(Inclusivity::Exclusive(start_exclusive), Inclusivity::Exclusive(end_exclusive)) => {
-				let start = Inclusivity::Inclusive(start_exclusive.checked_add(U256::one())?);
-				let end = Inclusivity::Inclusive(end_exclusive.checked_sub(U256::one())?);
-				Self { start, end }.left_mid_right()
-			},
-		}
-	}
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum Inclusivity<T> {
-	Inclusive(T),
-	Exclusive(T),
 }

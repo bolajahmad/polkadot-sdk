@@ -530,7 +530,8 @@ macro_rules! whitelist_account {
 /// This pre-loads the key into the proof recorder so that reading it during benchmarking
 /// doesn't count towards PoV.
 pub fn add_to_whitelist_child(child_trie_key: Vec<u8>, key: Vec<u8>) {
-	self::benchmarking::add_to_whitelist(
-		sp_storage::TrackedStorageKey::new_child(child_trie_key, key),
-	);
+	self::benchmarking::add_to_whitelist(sp_storage::TrackedStorageKey::new_child(
+		child_trie_key,
+		key,
+	));
 }

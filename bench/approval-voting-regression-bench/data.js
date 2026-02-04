@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770187401602,
+  "lastUpdate": 1770201578706,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "yrong1997@gmail.com",
-            "name": "Ron",
-            "username": "yrong"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "3bc4d127c52f2d6570c588537d7945b24b61d61c",
-          "message": "Snowbridge: Improve local and testnet setup (#8848)\n\n### Context \n\n- The Prague-Electra fork is already live on the mainnet - enables it\nfor the local setup (with feature `fast-runtime`) by default.\n - Improve Penpal Runtime to include `pallet-utility`.\n\n---------\n\nCo-authored-by: Clara van Staden <claravanstaden64@gmail.com>",
-          "timestamp": "2025-06-26T12:44:22Z",
-          "tree_id": "0b04a7e49f6181884cf881c7fdeb08e3c813d8f0",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/3bc4d127c52f2d6570c588537d7945b24b61d61c"
-        },
-        "date": 1750945736808,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 63629.65,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 52941.8,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.3925211138100018,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.402517277869998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005484986280000003,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.000020508049999999998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.4819857000300239,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.4187548631022913,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.000020096630000000002,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.918382943690008,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.403578502160001,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.438662309189998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.000020508049999999998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 12.04313283303003,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.000020096630000000002,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting-parallel/approval-voting-gather-signatures",
             "value": 0.00609088304,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alin@parity.io",
+            "name": "Alin Dima",
+            "username": "alindima"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a40ab3cd1348c871523a2bfccb71f484cd5591af",
+          "message": "collator-protocol-revamp: CollationManager and subsystem impl (#8541)\n\nImplements the `CollationManager` and the new collator protocol\n(validator side) subsystem.\n\nIssues https://github.com/paritytech/polkadot-sdk/issues/8182 and\nhttps://github.com/paritytech/polkadot-sdk/issues/7752.\n\nThese are the big remaining parts which would enable us to test the\nentire implementation.\n\nTODO:\n- [ ] add a couple more unit tests (see the suggestions at the bottom of\nthe tests file)\n- [x] polish the ClaimQueueState and verify if it's sufficiently covered\nby unit tests\n  - https://github.com/paritytech/polkadot-sdk/pull/10334\n  - https://github.com/paritytech/polkadot-sdk/pull/10368\n- [x] add metrics and polish logs -\nhttps://github.com/paritytech/polkadot-sdk/pull/10730\n- [x] add a CLI parameter for enabling the experimental subsystem (and\nremove the compile-time feature) ->\nhttps://github.com/paritytech/polkadot-sdk/pull/10285\n- [x] implement registered paras update, using\nhttps://github.com/paritytech/polkadot-sdk/pull/9055\n- [ ] do some manual zombienet tests with v1 protocol version and with\nrestarting validators (including syncing with warp sync)\n- [x] prdoc\n- [x] Rollback \n-\nhttps://github.com/paritytech/polkadot-sdk/pull/8541/commits/03e89150bd87e63a6a74e9ce1b9d1122b9239d14\n-\nhttps://github.com/paritytech/polkadot-sdk/pull/8541/commits/05e1497a3f785f41aac81e08f13676bdc96b9035\nThese commits were added just to run the CI tests for this PR with the\nnew experimental protocol\n\nAfter merging: \n- [ ] versi testing\n\n\n\nUses a slightly modified version of the ClaimQueueState written by\n@tdimitrov in https://github.com/paritytech/polkadot-sdk/pull/7114.\n\n---------\n\nCo-authored-by: Tsvetomir Dimitrov <tsvetomir@parity.io>\nCo-authored-by: Serban Iorga <serban@parity.io>\nCo-authored-by: Serban Iorga <serban300@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T08:56:37Z",
+          "tree_id": "7ee158481ac5f452aa18dcac48dc2b98b1a1aa9b",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a40ab3cd1348c871523a2bfccb71f484cd5591af"
+        },
+        "date": 1770201554774,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 52940.3,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 63635.159999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.000021461860000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.6362686872399985,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.000020838079999999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.837353350129996,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.005279563530000002,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.678501013020002,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.6673058564699987,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.36304787571999,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.800464588000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.000021461860000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.000020838079999999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.6864857661500015,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.564196970993288,
             "unit": "seconds"
           }
         ]

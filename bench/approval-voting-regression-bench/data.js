@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770160183696,
+  "lastUpdate": 1770181047519,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "117115317+lrubasze@users.noreply.github.com",
-            "name": "Lukasz Rubaszewski",
-            "username": "lrubasze"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "dbfed5a584d5f16602f0094ae2ac153fd62912be",
-          "message": "Make zombienet CI great again (#8748)\n\nThis PR re-enables Zombienet CI tests.\n\n\nChanges:\n- Enable Zombienet Polkadot and Substrate tests\n- Zombienet Cumulus will be enabled separately, when being migrated to\n`zombienet-sdk`\n- Switch zombienet from `k8s` to `native` provider\n`k8s` turned out to be unstable for both `zombienet` and\n`zombienet-sdk`. Issues observed:\n  - problem with launching a pod\n- pods (and thus nodes) were not spawned at the same time (differences\nup to 120s), which affected some tests\n  - `kubectl` command failed \n  Observed many times for:\n    - kubectl cp\n    - kubectl exec\n    - kubectl logs\nIf we ever want to switch back to `k8s` we must ensure above issues no\nlonger exist.\n- Tweaks some tests to make sure they constantly pass\nAuthors of those tests are kindly asked to review the changes.\n- Some improvements and fixes `zombienet` and `zombienet-sdk` frameworks\n- Assign more beefy runners for more demanding tests\nRule of thumb: use large runner if spawned network consist of more than\n4 nodes\n- Disable some tests to let their authors to stabilize them\nCreated a dedicated `.github/zombienet-flaky-tests` file for more\nclarity\nATM there are 16 flaky tests. Their authors are kindly asked to fix them\nand re-enable.\n\n---------\n\nCo-authored-by: Javier Viola <javier@parity.io>\nCo-authored-by: Javier Viola <363911+pepoviola@users.noreply.github.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Anthony Lazam <xlzm.tech@gmail.com>",
-          "timestamp": "2025-06-26T10:01:28Z",
-          "tree_id": "f2cb70189cb93c0c4946240369572a0947e05f70",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/dbfed5a584d5f16602f0094ae2ac153fd62912be"
-        },
-        "date": 1750937251935,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 52945,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 63643.090000000004,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.8873215854600016,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.4138169675600016,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.00001966084,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.3927084315799987,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005371896820000004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.00001966084,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.3795780087900007,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.908955543750029,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.3677393788900005,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.46241927465002475,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.00002045723,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.00002045723,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.3400035719025722,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting-parallel/approval-voting-parallel-1",
             "value": 2.5926778921700007,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexandre.balde@parity.io",
+            "name": "Alexandre R. Baldé",
+            "username": "rockbmb"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "eeee11ea6f7d34ad79199c33d28ecb0940fd6c31",
+          "message": "Expand multisig pallet tests (#10843)\n\n# Description\n\n* Add tests to `SenderInSignatories/SignatoriesOutOfOrder` error cases\n* Add clarifying note to `approve_as_multi/as_multi` comments\n\nFollow-up from\nhttps://github.com/open-web3-stack/polkadot-ecosystem-tests/pull/305 and\nhttps://github.com/open-web3-stack/polkadot-ecosystem-tests/pull/323\n\n## Integration\n\nN/A\n\n## Review Notes\n\nN/A\n\n# Checklist\n\n* [x] My PR includes a detailed description as outlined in the\n\"Description\" and its two subsections above.\n* [x] My PR follows the [labeling requirements](\n\nhttps://github.com/paritytech/polkadot-sdk/blob/master/docs/contributor/CONTRIBUTING.md#Process\n) of this project (at minimum one label for `T` required)\n    * External contributors: Use `/cmd label <label-name>` to add labels\n    * Maintainers can also add labels manually\n* [x] I have made corresponding changes to the documentation (if\napplicable)\n* [x] I have added tests that prove my fix is effective or that my\nfeature works (if applicable)",
+          "timestamp": "2026-02-04T02:43:48Z",
+          "tree_id": "82b0a20956dbae44ac339cdeb69f63f05031ffb8",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/eeee11ea6f7d34ad79199c33d28ecb0940fd6c31"
+        },
+        "date": 1770181023557,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 63634.90000000001,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 52942.8,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8021984899199804,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.00002367836,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.6755748356700004,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.000021569260000000004,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.6488843431199984,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.00002367836,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.652633200803009,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.005273040960000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.000021569260000000004,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.861480512839975,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.6997102538299975,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.6616055821299973,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.368233967210003,
             "unit": "seconds"
           }
         ]

@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770221556502,
+  "lastUpdate": 1770241742201,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "pgherveou@gmail.com",
-            "name": "PG Herveou",
-            "username": "pgherveou"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "0511431bf95ae81b284887100444bd1c560188e0",
-          "message": "Add address revive runtime API (#8851)\n\nThis gives an easy way for substrate user to convert an Account ID into\nthe mapped H160 address, by calling a new `address` runtime API\nfunction.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-30T04:07:31Z",
-          "tree_id": "6edc783272386590f5912f28df95c8afc764d3e5",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/0511431bf95ae81b284887100444bd1c560188e0"
-        },
-        "date": 1751260126997,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19977409579999997,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.350777991300003,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.11938560949999999,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eresav@me.com",
+            "name": "Andrei Eres",
+            "username": "AndreiEres"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a09c18f60eb31198d1422c7d4903b82a0c507e9c",
+          "message": "statement-store: validation without runtime (#10787)\n\n# Description\n\nFixes https://github.com/paritytech/polkadot-sdk/issues/10799\n\nThis removes slow runtime validation from statement-submission hot path.\nValidation now happens on the node side via direct signature\nverification and storage reads for account quotas.\n\n## Integration\n\nNode validates signatures directly, reads quotas from storage. Setting\nallowances is implementing in another PR.\n\n---------\n\nSigned-off-by: Alexandru Gheorghe <alexandru.gheorghe@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Alexandru Gheorghe <49718502+alexggh@users.noreply.github.com>\nCo-authored-by: Alexandru Gheorghe <alexandru.gheorghe@parity.io>",
+          "timestamp": "2026-02-04T20:37:11Z",
+          "tree_id": "c68144a42eb5a7b82421e852f69b10c1f1bcb1c1",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a09c18f60eb31198d1422c7d4903b82a0c507e9c"
+        },
+        "date": 1770241717176,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.047091334466668,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.11519459773333332,
             "unit": "seconds"
           }
         ]

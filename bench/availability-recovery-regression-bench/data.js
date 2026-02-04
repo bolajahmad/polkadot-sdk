@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770201513575,
+  "lastUpdate": 1770208817066,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "e1026d7ee22a593cf566a99484eee02a03ecc236",
-          "message": "RuntimeAllocator: Align returned pointers (#8891)\n\nRust recently switched the default alignment of u128 to 16bytes:\nhttps://blog.rust-lang.org/2024/03/30/i128-layout-update/ This broke the\nassumption of our host allocator that the biggest alignment is 8 bytes.\n\nTo fix the alignment issue, the runtime allocator now takes care of\naligned the returned pointer. We are abusing the fact that we know how\nthe host allocator is working and storing some extra data in its header.\nThis is not a perfect solution as we don't align the host side pointers,\nbut the host side is mainly allocating `u8` arrays that should be fine\nwith the `8byte` alignment. Any node side change would be a consensus\nbreaking change.\n\n\nCloses: https://github.com/paritytech/polkadot-sdk/issues/8818\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-27T10:53:44Z",
-          "tree_id": "e70aa26bbd2c4f3a9858fc4b04fb7eca8c10362b",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/e1026d7ee22a593cf566a99484eee02a03ecc236"
-        },
-        "date": 1751026626430,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.234173898366668,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.2013051148333333,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.11829510156666664,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "5588131+kianenigma@users.noreply.github.com",
+            "name": "Kian Paimani",
+            "username": "kianenigma"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "89669b38344e4378581c34b7833d109e3ad477a5",
+          "message": "Remove unused code in staking-async (#10842)\n\n- remove the `reward-fn` from `pallet-staking-async`. This crate is no\nlonger needed.\n- rename `ahm-test` to `integration-tests`\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T11:34:00Z",
+          "tree_id": "a8b5a9abec24dd000c1670c0722bf883b0ecf7a6",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/89669b38344e4378581c34b7833d109e3ad477a5"
+        },
+        "date": 1770208793553,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.252273513566667,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12498347440000002,
             "unit": "seconds"
           }
         ]

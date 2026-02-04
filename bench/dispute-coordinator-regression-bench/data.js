@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770187469705,
+  "lastUpdate": 1770201644804,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23127,6 +23127,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "dispute-coordinator",
             "value": 0.0026891092600000006,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alin@parity.io",
+            "name": "Alin Dima",
+            "username": "alindima"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a40ab3cd1348c871523a2bfccb71f484cd5591af",
+          "message": "collator-protocol-revamp: CollationManager and subsystem impl (#8541)\n\nImplements the `CollationManager` and the new collator protocol\n(validator side) subsystem.\n\nIssues https://github.com/paritytech/polkadot-sdk/issues/8182 and\nhttps://github.com/paritytech/polkadot-sdk/issues/7752.\n\nThese are the big remaining parts which would enable us to test the\nentire implementation.\n\nTODO:\n- [ ] add a couple more unit tests (see the suggestions at the bottom of\nthe tests file)\n- [x] polish the ClaimQueueState and verify if it's sufficiently covered\nby unit tests\n  - https://github.com/paritytech/polkadot-sdk/pull/10334\n  - https://github.com/paritytech/polkadot-sdk/pull/10368\n- [x] add metrics and polish logs -\nhttps://github.com/paritytech/polkadot-sdk/pull/10730\n- [x] add a CLI parameter for enabling the experimental subsystem (and\nremove the compile-time feature) ->\nhttps://github.com/paritytech/polkadot-sdk/pull/10285\n- [x] implement registered paras update, using\nhttps://github.com/paritytech/polkadot-sdk/pull/9055\n- [ ] do some manual zombienet tests with v1 protocol version and with\nrestarting validators (including syncing with warp sync)\n- [x] prdoc\n- [x] Rollback \n-\nhttps://github.com/paritytech/polkadot-sdk/pull/8541/commits/03e89150bd87e63a6a74e9ce1b9d1122b9239d14\n-\nhttps://github.com/paritytech/polkadot-sdk/pull/8541/commits/05e1497a3f785f41aac81e08f13676bdc96b9035\nThese commits were added just to run the CI tests for this PR with the\nnew experimental protocol\n\nAfter merging: \n- [ ] versi testing\n\n\n\nUses a slightly modified version of the ClaimQueueState written by\n@tdimitrov in https://github.com/paritytech/polkadot-sdk/pull/7114.\n\n---------\n\nCo-authored-by: Tsvetomir Dimitrov <tsvetomir@parity.io>\nCo-authored-by: Serban Iorga <serban@parity.io>\nCo-authored-by: Serban Iorga <serban300@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-04T08:56:37Z",
+          "tree_id": "7ee158481ac5f452aa18dcac48dc2b98b1a1aa9b",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a40ab3cd1348c871523a2bfccb71f484cd5591af"
+        },
+        "date": 1770201620459,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006483365669999996,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.00272779345,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009286944479999988,
             "unit": "seconds"
           }
         ]

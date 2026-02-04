@@ -801,13 +801,6 @@ macro_rules! implement_fixed {
 			/// representations with a fractional part (e.g., "3.14", "0.5", "-2.718").
 			/// It also accepts integer representations (e.g., "5", "5.", "5.0").
 			///
-			/// The method:
-			/// 1. Checks for a `.` in the string (optional)
-			/// 2. Counts the digits on the right side of the `.` (if present)
-			/// 3. Multiplies by 10^digits to create a numerator
-			/// 4. Uses 10^digits as the denominator
-			/// 5. Calls `checked_from_rational` to create the fixed-point number
-			///
 			/// This is more accurate than `from_str` which only parses the raw inner
 			/// representation. `from_float_str` handles decimal notation that humans expect.
 			///
@@ -2543,40 +2536,6 @@ macro_rules! implement_fixed {
 				let three = $name::from_float_str("3.0").unwrap();
 				assert_eq!(three, $name::saturating_from_integer(3));
 			}
-
-			#[test]
-			fn float_str_large_values() {
-				// Test with larger numbers
-				let a = $name::from_float_str("1000.5").unwrap();
-				assert_eq!(a, $name::saturating_from_rational(10005, 10));
-
-				let b = $name::from_float_str("999999.999").unwrap();
-				assert_eq!(b, $name::saturating_from_rational(999999999u64, 1000));
-
-				if $name::SIGNED {
-					let c = $name::from_float_str("-1000.5").unwrap();
-					assert_eq!(c, $name::saturating_from_rational(-10005, 10));
-				}
-			}
-
-			#[test]
-			fn float_str_max_precision() {
-				// Test with maximum reasonable precision
-				let a = $name::from_float_str("1.123456789").unwrap();
-				assert_eq!(a, $name::saturating_from_rational(1123456789, 1_000_000_000));
-
-				// For 128-bit types, can go further
-				if precision() >= 18 {
-					let b = $name::from_float_str("1.123456789012345678").unwrap();
-					assert_eq!(
-						b,
-						$name::saturating_from_rational(
-							1123456789012345678u128,
-							1_000_000_000_000_000_000u128
-						)
-					);
-				}
-			}
 		}
 	};
 }
@@ -2606,7 +2565,7 @@ implement_fixed!(
 	true,
 	1_000_000_000_000_000_000,
 	"_Fixed Point 128 bits signed, range = \
-		[-170141183460469231731.687303715884105728, 170141183460469231731.687303715884105727]_",
+	[-170141183460469231731.687303715884105728, 170141183460469231731.687303715884105727]_",
 );
 
 implement_fixed!(

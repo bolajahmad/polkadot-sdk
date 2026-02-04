@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770219561846,
+  "lastUpdate": 1770221556502,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "pgherveou@gmail.com",
-            "name": "PG Herveou",
-            "username": "pgherveou"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "220b5aa6446b3fc0e5accefed96abfc7d45f9a18",
-          "message": "Fix prestate create traces (#8935)\n\nFix an issue on the prestate tracer, for CREATE trace.\nThe tracer was not reporting the created properly in the created trace.\n\nAlso added tests in evm-test-suite\nhttps://github.com/paritytech/evm-test-suite/pull/97\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Alexander Theißen <alex.theissen@me.com>\nCo-authored-by: xermicus <cyrill@parity.io>",
-          "timestamp": "2025-06-29T20:51:48Z",
-          "tree_id": "1e6f2d483f0f3e3fece691fdea354a7b89de0942",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/220b5aa6446b3fc0e5accefed96abfc7d45f9a18"
-        },
-        "date": 1751239710819,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.247046005866668,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.2000806886,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12440135743333336,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "10196091+Ank4n@users.noreply.github.com",
+            "name": "Ankan",
+            "username": "Ank4n"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "aaf8ab15b68a826e79fded0f4d7aca6da631eed0",
+          "message": "[Pool] Use active era for withdrawals (#10986)\n\nStandardising using active era in pools and staking. Current Era should\nonly be used for election logic\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Kian Paimani <5588131+kianenigma@users.noreply.github.com>",
+          "timestamp": "2026-02-04T15:01:29Z",
+          "tree_id": "daec796376b0adfb04642cc8ff0bf86b60d2f4e5",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/aaf8ab15b68a826e79fded0f4d7aca6da631eed0"
+        },
+        "date": 1770221532538,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.305550219966666,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.11938560949999999,
             "unit": "seconds"
           }
         ]

@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770241742201,
+  "lastUpdate": 1770245686399,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "44604217+tmpolaczyk@users.noreply.github.com",
-            "name": "tmpolaczyk",
-            "username": "tmpolaczyk"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "d30a5fbbd973035893a1a25e1bcf9d9fb2c24d53",
-          "message": "Fix pallet_migrations benchmark when FailedMigrationHandler emits events (#8694)\n\nWhen FailedMigrationHandler emits events, the `UpgradeFailed` event is\nnot the last one, so `assert_last_event` fails. Fixed by checking that\nthe `UpgradeFailed` event is emitted, even if it is not the last one.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Bastian Köcher <git@kchr.de>",
-          "timestamp": "2025-06-30T07:38:13Z",
-          "tree_id": "55c79a51c2be86abbf231a1611a4ef1332748aed",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/d30a5fbbd973035893a1a25e1bcf9d9fb2c24d53"
-        },
-        "date": 1751273241510,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.183538736,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.1968387942,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.11519459773333332,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@kchr.de",
+            "name": "Bastian Köcher",
+            "username": "bkchr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0be9d3a1924bc3278e816495c925bddb07965844",
+          "message": "FixedPoint: Support parsing `x.y` format (#9184)\n\nThis makes it easier to declare a fixed point value. The old format is\nalso still supported.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
+          "timestamp": "2026-02-04T21:21:05Z",
+          "tree_id": "607bd7ed665e626059dc8fe90b415e3264704b78",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/0be9d3a1924bc3278e816495c925bddb07965844"
+        },
+        "date": 1770245662647,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12211833136666668,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.246381456566663,
             "unit": "seconds"
           }
         ]

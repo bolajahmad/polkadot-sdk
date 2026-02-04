@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770216854320,
+  "lastUpdate": 1770221690747,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23323,6 +23323,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.006960746129999994,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "10196091+Ank4n@users.noreply.github.com",
+            "name": "Ankan",
+            "username": "Ank4n"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "aaf8ab15b68a826e79fded0f4d7aca6da631eed0",
+          "message": "[Pool] Use active era for withdrawals (#10986)\n\nStandardising using active era in pools and staking. Current Era should\nonly be used for election logic\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Kian Paimani <5588131+kianenigma@users.noreply.github.com>",
+          "timestamp": "2026-02-04T15:01:29Z",
+          "tree_id": "daec796376b0adfb04642cc8ff0bf86b60d2f4e5",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/aaf8ab15b68a826e79fded0f4d7aca6da631eed0"
+        },
+        "date": 1770221665837,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009671610089999975,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.0069560511600000015,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.00279360815,
             "unit": "seconds"
           }
         ]

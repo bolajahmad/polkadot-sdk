@@ -59,7 +59,7 @@ use polkadot_sdk::{
 		traits::{Convert, Verify},
 		SaturatedConversion,
 	},
-	staging_parachain_info as parachain_info, staging_xcm as xcm, *,
+	staging_parachain_info as parachain_info, *,
 };
 #[cfg(not(feature = "runtime-benchmarks"))]
 use polkadot_sdk::{staging_xcm_builder as xcm_builder, staging_xcm_executor as xcm_executor};
@@ -393,9 +393,14 @@ impl frame_system::offchain::AppCrypto<<Signature as Verify>::Signer, Signature>
 	type GenericSignature = sp_core::sr25519::Signature;
 }
 
+parameter_types! {
+	// declared as storage to be adjustable via txs in future papi-tests.
+	pub storage PriceUpdateInterval: BlockNumber = 1;
+}
+
 impl price_oracle::oracle::Config for Runtime {
 	type AuthorityId = OracleId;
-	type PriceUpdateInterval = ConstU32<3>;
+	type PriceUpdateInterval = PriceUpdateInterval;
 	type AssetId = u32;
 	type MaxAuthorities = ConstU32<8>;
 	type HistoryDepth = ConstU32<42>;
@@ -403,7 +408,7 @@ impl price_oracle::oracle::Config for Runtime {
 	type MaxVoteAge = ConstU32<4>;
 	type MaxVotesPerBlock = Self::MaxAuthorities;
 	type RelayBlockNumberProvider =
-		cumulus_pallet_parachain_system::RelaychainBlockNumberProvider<Self>;
+		cumulus_pallet_parachain_system::RelaychainDataProvider<Self>;
 	type TimeProvider = crate::Timestamp;
 	type TallyManager = price_oracle::tally::SimpleAverage<Self>;
 	type WeightInfo = price_oracle::oracle::weights::SubstrateWeight<Self>;

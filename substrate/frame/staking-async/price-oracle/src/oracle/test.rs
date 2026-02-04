@@ -18,7 +18,7 @@
 //! Tests for pallet-price-oracle
 
 use crate::oracle::{self, mock::*, PriceData, StorageManager, TallyOuterError, TimePoint, Vote};
-use frame_support::{pallet_prelude::*, testing_prelude::*};
+use frame_support::{pallet_prelude::*, testing_prelude::*, traits::Get};
 use sp_runtime::{DispatchError, FixedU128, Percent};
 use substrate_test_utils::assert_eq_uvec;
 
@@ -37,18 +37,32 @@ mod setup {
 	}
 
 	#[test]
+	#[should_panic(expected = "genesis authorities should fit")]
 	fn too_many_authorities() {
-		todo!()
+		// given max authorities is 4
+		// then build will panic.
+		ExtBuilder::default().authorities(5).build();
 	}
 
 	#[test]
+	#[should_panic(expected = "genesis endpoints should fit")]
 	fn too_many_endpoints() {
-		todo!()
+		use crate::oracle::offchain::{Endpoint, Method, ParsingMethod};
+		// given max endpoints per asset is 8
+		let endpoints = (0..9).map(|_| Endpoint::default()).collect::<Vec<_>>();
+		// then build will panic.
+		ExtBuilder::default().only_asset(1, endpoints).build();
 	}
 
 	#[test]
+	#[should_panic(expected = "genesis endpoints should be valid")]
 	fn invalid_endpoint() {
-		todo!()
+		use crate::oracle::offchain::{Endpoint, Method, ParsingMethod};
+		// given an endpoint with invalid UTF-8 URL
+		// then build will panic.
+		let invalid_endpoint =
+			Endpoint { url: vec![0xff, 0xfe].try_into().unwrap(), ..Default::default() };
+		ExtBuilder::default().only_asset(1, vec![invalid_endpoint]).build();
 	}
 
 	#[test]
@@ -714,18 +728,116 @@ mod tally_on_finalize {
 
 	#[test]
 	fn registers_weight_on_init() {
-		todo!();
+		use crate::oracle::weights::WeightInfo;
+		ExtBuilder::default().build_and_execute(|| {
+			// given 1 registered asset
+			assert_eq!(StorageManager::<T>::tracked_assets().len(), 1);
+
+			// when on_init, then the weight of 1 is returned.
+			assert_eq!(
+				PriceOracle::on_initialize(System::block_number()),
+				<Runtime as crate::oracle::Config>::WeightInfo::on_finalize_per_asset()
+			);
+		});
+
+		ExtBuilder::default().extra_asset(2, Default::default()).build_and_execute(|| {
+			// given 2 registered assets
+			assert_eq!(StorageManager::<T>::tracked_assets().len(), 2);
+
+			// when on_init, then the weight of 2 is returned.
+			assert_eq!(
+				PriceOracle::on_initialize(System::block_number()),
+				<Runtime as crate::oracle::Config>::WeightInfo::on_finalize_per_asset()
+					.saturating_mul(2)
+			);
+		});
 	}
 }
 
 mod on_session_change {
-	#[test]
-	fn respects_max_authorities() {
-		todo!()
-	}
+	use frame_support::traits::OneSessionHandler;
+
+	use super::*;
 
 	#[test]
 	fn updates_authorities_on_session_change() {
-		todo!()
+		ExtBuilder::default().build_and_execute(|| {
+			// given this initial authorities
+			assert_eq!(
+				oracle::Authorities::<T>::get()
+					.into_iter()
+					.map(|(who, _)| who)
+					.collect::<Vec<_>>(),
+				vec![1, 2, 3, 4]
+			);
+
+			// when a new session with no change happens.
+			<PriceOracle as OneSessionHandler<AccountId>>::on_new_session(
+				false,
+				vec![(&5, TestAuthId), (&6, TestAuthId), (&7, TestAuthId), (&8, TestAuthId)]
+					.into_iter(),
+				Default::default(),
+			);
+
+			// then nada
+			assert_eq!(
+				oracle::Authorities::<T>::get()
+					.into_iter()
+					.map(|(who, _)| who)
+					.collect::<Vec<_>>(),
+				vec![1, 2, 3, 4]
+			);
+
+			// when a new session with a change happens.
+			<PriceOracle as OneSessionHandler<AccountId>>::on_new_session(
+				true,
+				vec![(&5, TestAuthId), (&6, TestAuthId), (&7, TestAuthId), (&8, TestAuthId)]
+					.into_iter(),
+				Default::default(),
+			);
+
+			// then the authorities are updated.
+			assert_eq!(
+				oracle::Authorities::<T>::get()
+					.into_iter()
+					.map(|(who, _)| who)
+					.collect::<Vec<_>>(),
+				vec![5, 6, 7, 8]
+			);
+		});
+	}
+
+	#[test]
+	#[should_panic(
+		expected = "Defensive failure has been triggered!: (9, 100%): \"new session authorities exceeded max authorities\""
+	)]
+	fn respects_max_authorities() {
+		ExtBuilder::default().build_and_execute(|| {
+			// given maximum of 4
+			assert_eq!(<<T as oracle::Config>::MaxAuthorities as Get<u32>>::get(), 4u32);
+
+			// when a new session with a change happens, and by any chance it is more than 4.
+			<PriceOracle as OneSessionHandler<AccountId>>::on_new_session(
+				true,
+				vec![
+					(&5, TestAuthId),
+					(&6, TestAuthId),
+					(&7, TestAuthId),
+					(&8, TestAuthId),
+					(&9, TestAuthId),
+				]
+				.into_iter(),
+				Default::default(),
+			);
+
+			// then the authorities are updated.
+			assert_eq!(
+				oracle::Authorities::<T>::get()
+					.into_iter()
+					.map(|(who, _)| who)
+					.collect::<Vec<_>>(),
+				vec![5, 6, 7, 8]
+			);
+		});
 	}
 }

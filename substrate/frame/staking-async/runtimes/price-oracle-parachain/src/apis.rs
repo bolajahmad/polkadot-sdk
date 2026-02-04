@@ -29,10 +29,7 @@ use super::{
 };
 use alloc::vec::Vec;
 use cumulus_primitives_core::ParaId;
-use frame_support::{
-	genesis_builder_helper::{build_state, get_preset},
-	weights::Weight,
-};
+use frame_support::genesis_builder_helper::{build_state, get_preset};
 use pallet_aura::Authorities;
 use polkadot_sdk::{staging_parachain_info as parachain_info, *};
 use sp_api::impl_runtime_apis;

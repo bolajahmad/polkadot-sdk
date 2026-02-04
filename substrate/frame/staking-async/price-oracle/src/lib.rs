@@ -70,7 +70,35 @@
 //!
 //! ## Future Work / Ideas
 //!
-//! TODO
+//! For MVP:
+//! - [x] doc cleanup
+//! - [x] Cleanup and have a minimal simulation crate.
+//! - [x] vibe code a simple UI in PJS
+//! - [x] test setup should have faster update times (2/1)
+//!
+//! Later:
+//! - [ ] Companion binary to manage the OCW storage + submit transactions
+//! - [ ] OCWs should not overlap, add the lock mechanism from EPMB
+//! - [ ] One papi test for quick-ish sanity test
+//! - [ ] papi test for validator disabling/swapping (checked manually, see
+//!   `TweakValidatorSetOption::UsePreviousKickRandom` in the rc)
+//! - [ ] Westend integration
+//! 	- [ ] Add the ability to send the price updates to westend AH. Simple.
+//! - [ ] Add all the other transactions to manage and have a manager origin.
+//! - [ ] ZN atm is using the same session key as the stash keys. It should be altered to actually
+//!   generate new session keys that are not the same as `derive("Alice")` etc and put them in the
+//!   keystore and register them. Alternatively, we can write some scripts that at startup. Without
+//!   this, our setup is not realistic
+//! - [ ] Randomness audit: Where does the OCW randomness come from? We must be sure that validators
+//!   don't all pick the same random endpoint for each block's OCW thread.
+//! - [ ] Transaction tracing: can the OCW track the status of a previously submitted transaction?
+//!   If yes, it will be useful to prevent new OCW from running.
+//! - [ ] More integration tests in this crate (ocw running auto, using real tx-extensions/pool
+//!   validation etc)
+//! - [ ] Integration tests in integration-tests crate.
+//! - [ ] OCW-fork: Maybe the OCW should include the block has on top of which it is built, such
+//!   that we are sure we won't include a transaction from an OCW instance running on a fork on the
+//!   main chain?
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

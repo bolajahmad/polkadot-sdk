@@ -74,6 +74,10 @@
 //!
 //! The vote-age is always measured only on the basis of the local block number.
 //!
+//! NOTE: The runtime level code will decide how the final transaction is built. It is highly
+//! recommended that this code will set the longevity of the transaction (`Era` mortality) to the
+//! same value as [`crate::oracle::Config::MaxVoteAge`].
+//!
 //! ### Tallying
 //!
 //! This pallet makes no assumptions about what tally algorithm is being used. It collects sensible
@@ -127,40 +131,11 @@
 //! 	* The long term plan for this would be for the tally algorithm to return a confidence score for
 //!    each authority, gradually signaling those who are consistently diverging from the majority.
 //! 	* Privileged calls (fellowship etc.) can always do this too.
-
-/*
-Doc: why time is the way it is. We record 3 points, but the voting stuff is all around local block number. This will work best with dual-core. in general, single-core in mind for now.
-Next:
-
-V0: next week
-
-- [x] Add confidence to the endpoint, last over-engineering!
-- [x] Authorities should be stored in BTree for easy retreival
-- Tests for OCW struct actually running:
-	- [x] local http server running, recoding incoming requests.
-	- [x] test all sorts of endpoint params: body, header, method,
-	- [x] test offchain data-base key being fetched if needed.
-	- [x] Test that apis that require ocw key, but is is not present are skipped.
-	- [x] e2e tests where pallet moves forward, and 1 OCW is submitting stuff (stretch)
-- [x] Benchmarking for on_init
-- New tx extension to:
-	- [x] Should also read the authorities, and block any tx from other than these folks, if signed origin
-	- [x] tests
-- [x] Tests for existing tx-extension (minimal)
-- [x] vote should be operational
-- [x] Cleanup test runtime (remove tx-extension, make it more realistic)
-- [ ] One papi test for quick-ish sanity test
-- [ ] Westend integration
-- [ ] doc cleanup
-- [ ] Cleanup and have a minimal simulation crate.
-- [ ] vibe code a simple UI in PJS
-
-V1:
-- [ ] Add all the other transactions to manage and have a manager origin.
-- [ ] Prep for final integration: How to properly prevent this chain from being accessed? tx-extension/block teleportation? both?
-
-
- */
+//!
+//! ### Implementation Notes
+//!
+//! While some items are made public to be accessible in tests/benchmarks, all price-related storage
+//! items must happen via the [`StorageManager`] struct.
 
 pub mod offchain;
 pub mod weights;

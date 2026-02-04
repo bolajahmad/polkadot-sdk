@@ -202,6 +202,7 @@ parameter_types! {
 	pub static MaxVotesPerBlock: u32 = 8;
 	pub static MaxVoteAge: u64 = 4;
 	pub static NextTallyFails: Option<TallyOuterError<()>> = None;
+	pub static Authorities: Option<Vec<(u64, Percent)>> = None;
 }
 
 pub struct TestTally;
@@ -236,7 +237,7 @@ impl pallet_price_oracle::Config for Runtime {
 	type PriceUpdateInterval = PriceUpdateInterval;
 	type AssetId = u32;
 	type HistoryDepth = HistoryDepth;
-	type MaxAuthorities = ConstU32<8>;
+	type MaxAuthorities = ConstU32<4>;
 	type MaxEndpointsPerAsset = ConstU32<8>;
 	type MaxVotesPerBlock = MaxVotesPerBlock;
 	type MaxVoteAge = MaxVoteAge;
@@ -300,6 +301,13 @@ impl ExtBuilder {
 		self.assets = vec![];
 		self
 	}
+
+	pub fn authorities(self, count: u32) -> Self {
+		Authorities::set(Some(
+			(1..=count as u64).map(|i| (i, Percent::from_percent(100))).collect(),
+		));
+		self
+	}
 }
 
 impl ExtBuilder {
@@ -308,13 +316,17 @@ impl ExtBuilder {
 		let mut storage =
 			frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
 
-		let _ = pallet_price_oracle::GenesisConfig::<Runtime> {
-			maybe_authorities: Some(vec![
+		let authorities = Authorities::take().unwrap_or_else(|| {
+			vec![
 				(1, Percent::from_percent(100)),
 				(2, Percent::from_percent(100)),
 				(3, Percent::from_percent(100)),
 				(4, Percent::from_percent(100)),
-			]),
+			]
+		});
+
+		let _ = pallet_price_oracle::GenesisConfig::<Runtime> {
+			maybe_authorities: Some(authorities),
 			tracked_assets: self.assets,
 		}
 		.assimilate_storage(&mut storage);

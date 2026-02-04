@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770216768201,
+  "lastUpdate": 1770219594663,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "donal.murray@parity.io",
-            "name": "Dónal Murray",
-            "username": "seadanda"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "4e122d496f68a820e0e13f63435b6d74fb53be0d",
-          "message": "[AHM] The Asset Hub Migration on Westend (#7997)\n\nPost AHM changes for Westend Relay and Asset Hub.\n\nChanges:\n- Add Async staking pallets to Westend Relay and Asset Hub\n- XCM stuff?\n- Deploy pallet-ah-ops\n- Deprecate pallet function\n`pallet_utility::Pallet::<T>::derivative_account_id` in favour of\nfreestanding function `pallet_utility::derivative_account_id`.\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>\nSigned-off-by: Alexandru Gheorghe <alexandru.gheorghe@parity.io>\nSigned-off-by: Iulian Barbu <iulian.barbu@parity.io>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>\nCo-authored-by: muharem <ismailov.m.h@gmail.com>\nCo-authored-by: polka.dom <polkadotdom@gmail.com>\nCo-authored-by: Ankan <ankan.anurag@gmail.com>\nCo-authored-by: Kian Paimani <5588131+kianenigma@users.noreply.github.com>\nCo-authored-by: Adrian Catangiu <adrian@parity.io>\nCo-authored-by: kianenigma <kian@parity.io>\nCo-authored-by: Ankan <10196091+Ank4n@users.noreply.github.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Karol Kokoszka <karol.k91@gmail.com>\nCo-authored-by: Branislav Kontur <bkontur@gmail.com>\nCo-authored-by: Paolo La Camera <paolo@parity.io>\nCo-authored-by: ordian <noreply@reusable.software>\nCo-authored-by: Javier Viola <363911+pepoviola@users.noreply.github.com>\nCo-authored-by: Dmitry Markin <dmitry@markin.tech>\nCo-authored-by: Andrei Eres <eresav@me.com>\nCo-authored-by: Tsvetomir Dimitrov <tsvetomir@parity.io>\nCo-authored-by: Javier Viola <javier@parity.io>\nCo-authored-by: Alexandru Gheorghe <49718502+alexggh@users.noreply.github.com>\nCo-authored-by: cuteolaf <OliverLim818@gmail.com>\nCo-authored-by: Michal Kucharczyk <1728078+michalkucharczyk@users.noreply.github.com>\nCo-authored-by: Serban Iorga <serban@parity.io>\nCo-authored-by: PG Herveou <pgherveou@gmail.com>\nCo-authored-by: Anthony Kveder <32168055+antkve@users.noreply.github.com>\nCo-authored-by: Alexandru Vasile <60601340+lexnv@users.noreply.github.com>\nCo-authored-by: Bastian Köcher <git@kchr.de>\nCo-authored-by: Alin Dima <alin@parity.io>\nCo-authored-by: Iulian Barbu <14218860+iulianbarbu@users.noreply.github.com>\nCo-authored-by: Steven <stevenlawrence13e@gmail.com>\nCo-authored-by: girazoki <gorka.irazoki@gmail.com>\nCo-authored-by: Evgeny Svirsky <e.svirsky@tut.by>\nCo-authored-by: Alexander Cyon <Sajjon@users.noreply.github.com>\nCo-authored-by: Koute <koute@users.noreply.github.com>\nCo-authored-by: Afounso Souza <drewsmpk@gmail.com>\nCo-authored-by: Alexandre R. Baldé <alexandre.balde@parity.io>\nCo-authored-by: Doordashcon <jesse.chejieh@gmail.com>\nCo-authored-by: Alexander Theißen <alex.theissen@me.com>\nCo-authored-by: Victor Oliva <olivarra1@gmail.com>\nCo-authored-by: Karol Kokoszka <karol@parity.io>",
-          "timestamp": "2025-06-27T15:21:49Z",
-          "tree_id": "e07b89123d6ec10848381da7ac02a652e1b8edf9",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/4e122d496f68a820e0e13f63435b6d74fb53be0d"
-        },
-        "date": 1751041516242,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022549398519999996,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15756637281333333,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013353596586666678,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.009057846553333424,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "bitfield-distribution",
             "value": 0.02303931457333333,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "skunert49@gmail.com",
+            "name": "Sebastian Kunert",
+            "username": "skunert"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "a21dbd56b740a79515aa130d7ff7bace144a7adc",
+          "message": "fatxpool: Do not remove listener for finalized view (#10965)\n\nInstead of immediately removing the listener for finalized view, lets\nkeep them around while the view is still in the `active_views`. Once the\nnext block is finalized, we will remove it. This should fix manual-seal\nproblems where new blocks are immeditaly finalized.\n\n\nfixes #10332\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Michal Kucharczyk <1728078+michalkucharczyk@users.noreply.github.com>",
+          "timestamp": "2026-02-04T14:29:07Z",
+          "tree_id": "27255ccbd963aa2584f652f0ab4fe25defe20291",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a21dbd56b740a79515aa130d7ff7bace144a7adc"
+        },
+        "date": 1770219570470,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009979810959999986,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14419528964666672,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.0069442463733333315,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.023117819693333343,
             "unit": "seconds"
           }
         ]

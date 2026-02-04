@@ -4,9 +4,19 @@ doc:
   description: |-
     ## Summary
 
-    - Makes the `weight_limit` field in `TransactionLimits::EthereumGas` non-optional, enforcing bounded execution on all Ethereum-style calls
+    This PR enforces bounded execution for Ethereum-style dry-run calls by making the weight limit mandatory.
+
+    ### Changes
+
+    - Makes the `weight_limit` field in `TransactionLimits::EthereumGas` non-optional (renamed from `maybe_weight_limit`)
     - Updates `dry_run_eth_transact` to use `evm_max_extrinsic_weight()` as the weight limit, preventing unbounded computation during dry-run RPC calls
     - Simplifies metering code by removing `Option` handling for weight limits in Ethereum execution mode
+    - Adds `test_fibonacci_large_value_runs_out_of_gas` test to validate that `OutOfGas` errors are correctly propagated through the RPC layer
+    - Improves error message preservation in `example.rs` for `eth_call` failures
+
+    ### Motivation
+
+    Previously, dry-run calls (e.g., `eth_call`) could run with unbounded weight, potentially causing resource exhaustion. This change ensures all Ethereum execution paths respect the configured weight limits.
 crates:
 - name: pallet-revive-eth-rpc
   bump: patch

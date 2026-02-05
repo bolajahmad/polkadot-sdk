@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770245686399,
+  "lastUpdate": 1770250444326,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "alex.theissen@me.com",
-            "name": "Alexander Theißen",
-            "username": "athei"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "3515d4af2993ada853fc8a5d11b2474241545840",
-          "message": "revive: Precompiles should return dummy code when queried (#9001)\n\nFixes https://github.com/paritytech/contract-issues/issues/111\n\nThis fixes both the RPC and the opcodes `EXTCODESIZE` and `EXTCODEHASH`.\n\nAlso removed the disabled host function `is_contract`. Contracts do use\n`EXTCODESIZE` to determine if something is a contract exclusively.\n\nNeed to add some differential tests to our test suite to make sure that\nthe RPC matches geth behaviour:\n\nOn kitchensink:\n\n```shell\n# primitive precompiles should not return error but 0x\n$ cast code 0x0000000000000000000000000000000000000001\n0x\n\n# this is the erc pre-compile\n$ cast code 0x0000000000000000000000000000000000010000\n0x60006000fd\n```\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-30T08:40:16Z",
-          "tree_id": "4e458f071d2f268d819085a75a9426821bf63be3",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/3515d4af2993ada853fc8a5d11b2474241545840"
-        },
-        "date": 1751277853850,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.216455609866667,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19692167713333336,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-recovery",
             "value": 11.246381456566663,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@kchr.de",
+            "name": "Bastian Köcher",
+            "username": "bkchr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "cac11f4a5325b217ca74b0c339459597daf03838",
+          "message": "Take the header size into account for the total block size (#10804)",
+          "timestamp": "2026-02-04T22:54:01Z",
+          "tree_id": "927659770ce8eb4baa4881d4a8d4a616d5920db7",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/cac11f4a5325b217ca74b0c339459597daf03838"
+        },
+        "date": 1770250419513,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12559935786666668,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.126116245066665,
             "unit": "seconds"
           }
         ]

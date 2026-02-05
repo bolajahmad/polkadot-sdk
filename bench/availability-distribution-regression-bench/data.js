@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770250479159,
+  "lastUpdate": 1770291673400,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "alex.theissen@me.com",
-            "name": "Alexander Theißen",
-            "username": "athei"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "3515d4af2993ada853fc8a5d11b2474241545840",
-          "message": "revive: Precompiles should return dummy code when queried (#9001)\n\nFixes https://github.com/paritytech/contract-issues/issues/111\n\nThis fixes both the RPC and the opcodes `EXTCODESIZE` and `EXTCODEHASH`.\n\nAlso removed the disabled host function `is_contract`. Contracts do use\n`EXTCODESIZE` to determine if something is a contract exclusively.\n\nNeed to add some differential tests to our test suite to make sure that\nthe RPC matches geth behaviour:\n\nOn kitchensink:\n\n```shell\n# primitive precompiles should not return error but 0x\n$ cast code 0x0000000000000000000000000000000000000001\n0x\n\n# this is the erc pre-compile\n$ cast code 0x0000000000000000000000000000000000010000\n0x60006000fd\n```\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-30T08:40:16Z",
-          "tree_id": "4e458f071d2f268d819085a75a9426821bf63be3",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/3515d4af2993ada853fc8a5d11b2474241545840"
-        },
-        "date": 1751277879257,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1565591969200001,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012972819980000001,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022510557653333336,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008685058793333401,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.010420444453333315,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "davxy@datawok.net",
+            "name": "Davide Galassi",
+            "username": "davxy"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e2597df86c2506780644cef6e447b7c390aa0a0",
+          "message": "Rework experimental EC hostcalls (#10830)\n\n- Change mul param to Affine form (was Projective)\n([Context](https://github.com/paritytech/polkadot-sdk/pull/10147#issuecomment-3458638915))\n    - `msm_g(1/2)(&[Affine], &[Scalar]) -> Projective` \n        - changed to `msm_g(1/2)(&[Affine], &[Scalar]) -> Affine` \n    - `mul_projective_g(1/2)(Projective, Scalar) -> Projective` \n        - changed to `mul_affine_g(1/2)(Affine, Scalar) -> Affine`\n\n- Caller-allocated buffers: Callers pre-allocate output buffers using\n`buffer_for::<T>()` instead of host allocating and returning Vec<u8>\n(introduced by https://github.com/paritytech/polkadot-sdk/pull/10969)\n- New passing strategy: `PassFatPointerAndWrite` allows host to write\ninto guest memory without reading first\n- Typed error codes: Replaces `Result<Vec<u8>, ()>` with HostcallResult\nreturning specific error variants\n- In-place operations: final_exponentiation now operates in-place via\n`PassFatPointerAndReadWrite`\n\n- Prefer panicking on error rather than returning a dummy value that the\nruntime might treat as valid. Since such panics would typically occur\nwithin the runtime, the impact looks acceptable.\n\n- Cleanup/Docs/Tests\n\n---\n\nNOTE1: Hostcalls are experimental and not exposed in production! An\n[RFC](https://github.com/polkadot-fellows/RFCs/pull/163) proposal has\nbeen opened for production usage\n\nNOTE2: The `arkworks-extensions` `Hooks` trait methods remain unchanged;\nno updates are required there. Only the hostcalls are affected.\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
+          "timestamp": "2026-02-05T10:29:03Z",
+          "tree_id": "b309e20e965902b5c93f429e1305d57f4e091102",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/4e2597df86c2506780644cef6e447b7c390aa0a0"
+        },
+        "date": 1770291651740,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007281888593333334,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.1451261424,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.02308351038666666,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.010106857759999978,
             "unit": "seconds"
           }
         ]

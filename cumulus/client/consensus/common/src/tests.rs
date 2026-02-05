@@ -983,7 +983,7 @@ fn find_best_parent_in_allowed_ancestry() {
 	}
 
 	// When there's only the included block, it should be the best parent.
-	let result = block_on(find_potential_parents(
+	let result = block_on(find_parent_for_building(
 		ParentSearchParams {
 			relay_parent,
 			para_id: ParaId::from(100),
@@ -1017,7 +1017,7 @@ fn find_best_parent_in_allowed_ancestry() {
 	);
 
 	// With ancestry_lookback: 2, the child block should be the best parent.
-	let result = block_on(find_potential_parents(
+	let result = block_on(find_parent_for_building(
 		ParentSearchParams {
 			relay_parent: search_relay_parent,
 			para_id: ParaId::from(100),
@@ -1034,7 +1034,7 @@ fn find_best_parent_in_allowed_ancestry() {
 
 	// With ancestry_lookback: 0, child block's relay parent is too old,
 	// so included block should be the best parent.
-	let result = block_on(find_potential_parents(
+	let result = block_on(find_parent_for_building(
 		ParentSearchParams {
 			relay_parent: search_relay_parent,
 			para_id: ParaId::from(100),
@@ -1091,7 +1091,7 @@ fn find_best_parent_with_pending() {
 			.insert(search_relay_parent, pending_block.header().clone());
 	}
 
-	let result = block_on(find_potential_parents(
+	let result = block_on(find_parent_for_building(
 		ParentSearchParams {
 			relay_parent: search_relay_parent,
 			para_id: ParaId::from(100),
@@ -1130,7 +1130,7 @@ fn find_best_parent_unknown_included_returns_none() {
 			.insert(search_relay_parent, included_but_unknown.header().clone());
 	}
 
-	let result = block_on(find_potential_parents(
+	let result = block_on(find_parent_for_building(
 		ParentSearchParams {
 			relay_parent: search_relay_parent,
 			para_id: ParaId::from(100),
@@ -1185,7 +1185,7 @@ fn find_best_parent_unknown_pending_returns_none() {
 			.insert(search_relay_parent, pending_but_unknown.header().clone());
 	}
 
-	let result = block_on(find_potential_parents(
+	let result = block_on(find_parent_for_building(
 		ParentSearchParams {
 			relay_parent: search_relay_parent,
 			para_id: ParaId::from(100),
@@ -1258,7 +1258,7 @@ fn find_best_parent_returns_deepest_block() {
 		last_block = block;
 	}
 
-	let result = block_on(find_potential_parents(
+	let result = block_on(find_parent_for_building(
 		ParentSearchParams {
 			relay_parent: search_relay_parent,
 			para_id: ParaId::from(100),

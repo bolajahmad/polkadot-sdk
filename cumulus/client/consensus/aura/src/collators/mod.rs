@@ -254,7 +254,7 @@ where
 		.then(|| SlotClaim::unchecked::<P>(author_pub, para_slot, timestamp))
 }
 
-/// Use [`cumulus_client_consensus_common::find_potential_parents`] to find the best parachain
+/// Use [`cumulus_client_consensus_common::find_parent_for_building`] to find the best parachain
 /// block to build on.
 async fn find_parent<Block>(
 	relay_parent: RelayHash,
@@ -274,7 +274,7 @@ where
 			.saturating_sub(1) as usize,
 	};
 
-	match cumulus_client_consensus_common::find_potential_parents::<Block>(
+	match cumulus_client_consensus_common::find_parent_for_building::<Block>(
 		parent_search_params,
 		para_backend,
 		relay_client,
@@ -287,7 +287,7 @@ where
 				target: crate::LOG_TARGET,
 				?relay_parent,
 				err = ?e,
-				"Could not fetch potential parents to build upon"
+				"Could not find parent to build upon"
 			);
 			None
 		},

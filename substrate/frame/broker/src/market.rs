@@ -15,11 +15,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use core::cmp;
 use frame_system::pallet_prelude::AccountIdFor;
 use sp_arithmetic::FixedPointNumber;
 use sp_runtime::{DispatchError, FixedU64, SaturatedConversion, Saturating};
 
-use crate::{BalanceOf, Config, Pallet, PotentialRenewalId, RelayBlockNumberOf, SaleInfo};
+use crate::{
+	BalanceOf, Config, Configuration, Pallet, PotentialRenewalId, RelayBlockNumberOf, SaleInfo,
+};
 
 // TODO: Extend the documentation.
 
@@ -51,12 +54,11 @@ pub trait Market<Balance, RelayBlockNumber, AccountId> {
 	/// This method may or may not create a bid, according to the market rules.
 	///
 	/// - `since_timeslice_start` - amount of blocks passed since the current timeslice start
-	/// - `buying_price` - price which was paid for this region the last time it was sold
 	fn place_renewal_order(
 		since_timeslice_start: RelayBlockNumber,
 		who: &AccountId,
 		renewal: PotentialRenewalId,
-		buying_price: Balance,
+		recorded_price: Balance,
 	) -> Result<RenewalOrderResult<Balance, Self::BidId>, Self::Error>;
 
 	/// Close the bid given its `BidId`.
@@ -78,7 +80,7 @@ pub enum OrderResult<Balance, BidId> {
 
 pub enum RenewalOrderResult<Balance, BidId> {
 	BidPlaced { id: BidId, bid_price: Balance },
-	Sold { price: Balance },
+	Sold { price: Balance, next_renewal_price: Balance },
 }
 
 pub enum TickAction<AccountId, Balance, BidId> {
@@ -91,6 +93,7 @@ pub enum MarketError {
 	NoSales,
 	Overpriced,
 	BidNotExist,
+	Uninitialized,
 }
 
 // TODO: Proper conversion
@@ -110,12 +113,7 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 		_who: &AccountIdFor<T>,
 		price_limit: BalanceOf<T>,
 	) -> Result<OrderResult<BalanceOf<T>, Self::BidId>, Self::Error> {
-		// TODO: Store this info in the dedicated storage item?
-		let sale = SaleInfo::<T>::get().ok_or(MarketError::NoSales)?;
-
-		let num = since_timeslice_start.min(sale.leadin_length).saturated_into();
-		let through = FixedU64::from_rational(num, sale.leadin_length.saturated_into());
-		let sell_price = leadin_factor_at(through).saturating_mul_int(sale.end_price);
+		let sell_price = sell_price::<T>(since_timeslice_start)?;
 
 		if price_limit < sell_price {
 			Err(MarketError::Overpriced)
@@ -128,9 +126,19 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 		since_timeslice_start: RelayBlockNumberOf<T>,
 		who: &AccountIdFor<T>,
 		renewal: PotentialRenewalId,
-		buying_price: BalanceOf<T>,
+		recorded_price: BalanceOf<T>,
 	) -> Result<RenewalOrderResult<BalanceOf<T>, Self::BidId>, Self::Error> {
-		return Ok(RenewalOrderResult::Sold { price: buying_price })
+		// TODO: Store `config.renewal_bump` in the market config.
+		let config = Configuration::<T>::get().ok_or(MarketError::Uninitialized)?;
+		// TODO: Don't access main pallet storage here.
+		let sale = SaleInfo::<T>::get().ok_or(MarketError::NoSales)?;
+
+		let price_cap =
+			cmp::max(recorded_price + config.renewal_bump * recorded_price, sale.end_price);
+		let sell_price = sell_price::<T>(since_timeslice_start)?;
+		let next_renewal_price = sell_price.min(price_cap);
+
+		return Ok(RenewalOrderResult::Sold { price: recorded_price, next_renewal_price })
 	}
 
 	fn close_bid(
@@ -145,6 +153,17 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 	) -> Result<Vec<TickAction<AccountIdFor<T>, BalanceOf<T>, Self::BidId>>, Self::Error> {
 		Ok(vec![])
 	}
+}
+
+fn sell_price<T: Config>(
+	since_timeslice_start: RelayBlockNumberOf<T>,
+) -> Result<BalanceOf<T>, MarketError> {
+	// TODO: Store this info in the dedicated storage item?
+	let sale = SaleInfo::<T>::get().ok_or(MarketError::NoSales)?;
+
+	let num = since_timeslice_start.min(sale.leadin_length).saturated_into();
+	let through = FixedU64::from_rational(num, sale.leadin_length.saturated_into());
+	Ok(leadin_factor_at(through).saturating_mul_int(sale.end_price))
 }
 
 fn leadin_factor_at(when: FixedU64) -> FixedU64 {

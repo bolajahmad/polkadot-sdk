@@ -206,7 +206,7 @@ impl<T: Config> Pallet<T> {
 
 				Self::deposit_event(Event::BidPlaced { bid_id: id, price: bid_price });
 			},
-			RenewalOrderResult::Sold { price } => {
+			RenewalOrderResult::Sold { price, next_renewal_price } => {
 				let old_core = core;
 
 				let core = Self::purchase_core(&who, price, &mut sale)?;
@@ -223,21 +223,11 @@ impl<T: Config> Pallet<T> {
 
 				Workplan::<T>::insert((sale.region_begin, core), &workload);
 
-				// TODO: Calculate price cap in the `Market impl`.
 				let begin = sale.region_end;
-				let end_price = sale.end_price;
-				// Renewals should never be priced lower than the current `end_price`:
-				let price_cap = cmp::max(price + config.renewal_bump * price, end_price);
-				// TODO: `price` may've changed in the Self::purchase_core call so this price needs
-				// recomputation.
-				let price = price.min(price_cap);
-				log::debug!(
-					"Renew with: sale price: {:?}, price cap: {:?}, old price: {:?}",
-					price,
-					price_cap,
-					price
-				);
-				let new_record = PotentialRenewalRecord { price, completion: Complete(workload) };
+				let new_record = PotentialRenewalRecord {
+					price: next_renewal_price,
+					completion: Complete(workload),
+				};
 				PotentialRenewals::<T>::remove(renewal_id);
 				PotentialRenewals::<T>::insert(
 					PotentialRenewalId { core, when: begin },

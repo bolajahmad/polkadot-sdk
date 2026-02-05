@@ -44,56 +44,51 @@ pub struct ParentSearchParams {
 	pub ancestry_lookback: usize,
 }
 
-/// A potential parent block returned from [`find_potential_parents`]
-#[derive(PartialEq)]
-pub struct PotentialParent<B: BlockT> {
-	/// The hash of the block.
-	pub hash: B::Hash,
-	/// The header of the block.
-	pub header: B::Header,
-	/// The depth of the block with respect to the included block.
-	pub depth: usize,
+/// Result of the parent search, containing the included block and the best parent to build on.
+pub struct ParentSearchResult<B: BlockT> {
+	/// The header of the included block (confirmed on relay chain).
+	pub included_header: B::Header,
+	/// The hash of the best parent block to build on.
+	pub best_parent_hash: B::Hash,
+	/// The header of the best parent block to build on.
+	pub best_parent_header: B::Header,
 }
 
-impl<B: BlockT> std::fmt::Debug for PotentialParent<B> {
+impl<B: BlockT> std::fmt::Debug for ParentSearchResult<B> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("PotentialParent")
-			.field("hash", &self.hash)
-			.field("depth", &self.depth)
-			.field("number", &self.header.number())
+		f.debug_struct("ParentSearchResult")
+			.field("included_number", &self.included_header.number())
+			.field("best_parent_hash", &self.best_parent_hash)
+			.field("best_parent_number", &self.best_parent_header.number())
 			.finish()
 	}
 }
 
-/// Perform a recursive search through blocks to find potential
-/// parent blocks for a new block.
+/// Find the best parent block to build on.
 ///
-/// This accepts a relay-chain block to be used as an anchor along with some arguments for
-/// filtering parachain blocks and performs a recursive search for parachain blocks.
-/// The search begins at the last included parachain block and returns a set of
-/// [`PotentialParent`]s which could be potential parents of a new block with this
-/// relay-parent according to the search parameters.
+/// This accepts a relay-chain block to be used as an anchor and searches for the best
+/// parachain block to use as a parent for a new block.
 ///
-/// A parachain block is a potential parent if it is either the last included parachain block, the
-/// pending parachain block, or all of the following hold:
-///   * its parent is a potential parent
-///   * its relay-parent is within `ancestry_lookback` of the targeted relay-parent.
-///   * its relay-parent is within the same session as the targeted relay-parent.
+/// The search starts from either the pending block (if one exists) or the included block,
+/// and finds the deepest descendant whose relay-parent is within the allowed ancestry.
+///
+/// Returns `None` if no suitable parent can be found (e.g., included block unknown locally).
 pub async fn find_potential_parents<B: BlockT>(
 	params: ParentSearchParams,
 	backend: &impl Backend<B>,
 	relay_client: &impl RelayChainInterface,
-) -> Result<Vec<PotentialParent<B>>, RelayChainError> {
+) -> Result<Option<ParentSearchResult<B>>, RelayChainError> {
 	tracing::trace!("Parent search parameters: {params:?}");
+
 	// Get the included block.
 	let Some((included_header, included_hash)) =
 		fetch_included_from_relay_chain(relay_client, backend, params.para_id, params.relay_parent)
 			.await?
 	else {
-		return Ok(Default::default());
+		return Ok(None);
 	};
 
-	// Pending header and hash.
+	// Fetch the pending block if one exists.
 	let maybe_pending = {
 		// Fetch the most recent pending header from the relay chain. We use
 		// `OccupiedCoreAssumption::Included` so the candidate pending availability gets enacted
@@ -108,18 +103,16 @@ pub async fn find_potential_parents<B: BlockT>(
 			.and_then(|p| B::Header::decode(&mut &p.parent_head.0[..]).ok())
 			.filter(|x| x.hash() != included_hash);
 
-		// If the pending block is not locally known, we can't do anything.
+		// If the pending block is not locally known, we can't proceed.
 		if let Some(header) = pending_header {
 			let pending_hash = header.hash();
 			let Ok(Some(header)) = backend.blockchain().header(pending_hash) else {
-				// We are supposed to ignore branches that don't contain the pending block, but we
-				// do not know the pending block locally.
 				tracing::warn!(
 					target: PARENT_SEARCH_LOG_TARGET,
 					%pending_hash,
 					"Failed to get header for pending block.",
 				);
-				return Ok(Default::default());
+				return Ok(None);
 			};
 			Some((header, pending_hash))
 		} else {
@@ -127,53 +120,21 @@ pub async fn find_potential_parents<B: BlockT>(
 		}
 	};
 
-	// Compute the starting point and initial potential parents based on whether there's a
-	// pending block.
-	let (start, potential_parents) = match &maybe_pending {
+	// Determine the starting point for the search.
+	let (start_hash, start_header) = match &maybe_pending {
 		Some((pending_header, pending_hash)) => {
-			let route_to_pending =
-				sp_blockchain::tree_route(backend.blockchain(), included_hash, *pending_hash)?;
-
-			// This is a defensive check, should never happen.
-			if !route_to_pending.retracted().is_empty() {
-				tracing::warn!(target: PARENT_SEARCH_LOG_TARGET, "Included block not an ancestor of pending block. This should not happen.");
-				return Ok(Default::default());
+			// Verify pending is a descendant of included.
+			let route = sp_blockchain::tree_route(backend.blockchain(), included_hash, *pending_hash)?;
+			if !route.retracted().is_empty() {
+				tracing::warn!(
+					target: PARENT_SEARCH_LOG_TARGET,
+					"Included block not an ancestor of pending block. This should not happen."
+				);
+				return Ok(None);
 			}
-
-			// Add included block and all blocks on the path included -> pending - 1 to
-			// the potential parents.
-			let mut potential_parents = vec![PotentialParent {
-				hash: included_hash,
-				header: included_header.clone(),
-				depth: 0,
-			}];
-			let num_parents_on_path = route_to_pending.enacted().len().saturating_sub(1);
-			for (num, block) in
-				route_to_pending.enacted().iter().take(num_parents_on_path).enumerate()
-			{
-				let Ok(Some(header)) = backend.blockchain().header(block.hash) else { continue };
-
-				potential_parents.push(PotentialParent {
-					hash: block.hash,
-					header,
-					depth: 1 + num,
-				});
-			}
-
-			// The search for additional potential parents starts at the pending block.
-			(
-				PotentialParent {
-					hash: *pending_hash,
-					header: pending_header.clone(),
-					depth: route_to_pending.enacted().len(),
-				},
-				potential_parents,
-			)
+			(*pending_hash, pending_header.clone())
 		},
-		None => (
-			PotentialParent { hash: included_hash, header: included_header.clone(), depth: 0 },
-			Default::default(),
-		),
+		None => (included_hash, included_header.clone()),
 	};
 
 	// Build up the ancestry record of the relay chain to compare against.
@@ -181,14 +142,21 @@ pub async fn find_potential_parents<B: BlockT>(
 		build_relay_parent_ancestry(params.ancestry_lookback, params.relay_parent, relay_client)
 			.await?;
 
-	Ok(search_child_branches_for_parents(
-		start,
+	// Search for the deepest valid parent.
+	let (best_hash, best_header) = find_deepest_valid_parent(
+		start_hash,
+		start_header,
 		included_hash,
-		maybe_pending.map(|(_, hash)| hash),
+		maybe_pending.as_ref().map(|(_, h)| *h),
 		backend,
-		rp_ancestry,
-		potential_parents,
-	))
+		&rp_ancestry,
+	);
+
+	Ok(Some(ParentSearchResult {
+		included_header,
+		best_parent_hash: best_hash,
+		best_parent_header: best_header,
+	}))
 }
 
 /// Fetch the included block from the relay chain.
@@ -277,18 +245,19 @@ async fn build_relay_parent_ancestry(
 	Ok(ancestry)
 }
 
-/// Start search for child blocks that can be used as parents.
+/// Find the deepest valid parent block starting from `start`.
 ///
-/// Performs a depth-first search starting from `start`, adding all blocks whose
-/// relay parent is within the allowed ancestry to `potential_parents`.
-pub fn search_child_branches_for_parents<Block: BlockT>(
-	start: PotentialParent<Block>,
+/// Performs a depth-first search, returning the deepest block whose relay-parent
+/// is within the allowed ancestry. The included and pending blocks are always valid
+/// regardless of their relay parent.
+fn find_deepest_valid_parent<Block: BlockT>(
+	start_hash: Block::Hash,
+	start_header: Block::Header,
 	included_hash: Block::Hash,
 	pending_hash: Option<Block::Hash>,
 	backend: &impl Backend<Block>,
-	rp_ancestry: Vec<(RelayHash, RelayHash)>,
-	mut potential_parents: Vec<PotentialParent<Block>>,
-) -> Vec<PotentialParent<Block>> {
+	rp_ancestry: &[(RelayHash, RelayHash)],
+) -> (Block::Hash, Block::Header) {
 	let is_hash_in_ancestry = |hash| rp_ancestry.iter().any(|x| x.0 == hash);
 	let is_root_in_ancestry = |root| rp_ancestry.iter().any(|x| x.1 == root);
 
@@ -297,54 +266,55 @@ pub fn search_child_branches_for_parents<Block: BlockT>(
 		?included_hash,
 		?pending_hash,
 		?rp_ancestry,
-		"Searching relay chain ancestry."
+		"Searching for deepest valid parent."
 	);
 
-	let mut frontier = vec![start];
+	// Track the best (deepest) valid parent found so far.
+	let mut best = (start_hash, start_header.clone());
+	let mut frontier = vec![(start_hash, start_header)];
 
-	while let Some(entry) = frontier.pop() {
-		let is_pending = pending_hash.as_ref().map_or(false, |h| &entry.hash == h);
-		let is_included = included_hash == entry.hash;
+	while let Some((hash, header)) = frontier.pop() {
+		let is_pending = pending_hash.as_ref().map_or(false, |h| &hash == h);
+		let is_included = included_hash == hash;
 
-		// Note: even if the pending block or included block have a relay parent
-		// outside of the expected part of the relay chain, they are always allowed
-		// because they have already been posted on chain.
-		let is_potential = is_pending || is_included || {
-			let digest = entry.header.digest();
-			let is_hash_in_ancestry_check = cumulus_primitives_core::extract_relay_parent(digest)
-				.map_or(false, is_hash_in_ancestry);
-			let is_root_in_ancestry_check =
+		// The included and pending blocks are always valid. Other blocks need their
+		// relay parent to be within the allowed ancestry.
+		let is_valid = is_pending || is_included || {
+			let digest = header.digest();
+			let relay_parent_in_ancestry = cumulus_primitives_core::extract_relay_parent(digest)
+				.map_or(false, &is_hash_in_ancestry);
+			let storage_root_in_ancestry =
 				cumulus_primitives_core::rpsr_digest::extract_relay_parent_storage_root(digest)
 					.map(|(r, _n)| r)
-					.map_or(false, is_root_in_ancestry);
+					.map_or(false, &is_root_in_ancestry);
 
-			is_hash_in_ancestry_check || is_root_in_ancestry_check
+			relay_parent_in_ancestry || storage_root_in_ancestry
 		};
-
-		let child_depth = entry.depth + 1;
-		let hash = entry.hash;
 
 		tracing::trace!(
 			target: PARENT_SEARCH_LOG_TARGET,
 			?hash,
-			is_potential,
+			is_valid,
 			is_pending,
 			is_included,
-			"Checking potential parent."
+			"Checking block."
 		);
 
-		if is_potential {
-			potential_parents.push(entry);
-		} else {
+		if !is_valid {
 			continue;
 		}
 
-		// Push children onto search frontier.
-		for child in backend.blockchain().children(hash).ok().into_iter().flatten() {
-			let Ok(Some(header)) = backend.blockchain().header(child) else { continue };
-			frontier.push(PotentialParent { hash: child, header, depth: child_depth });
+		// Update best if this block is deeper (higher block number).
+		if header.number() > best.1.number() {
+			best = (hash, header.clone());
+		}
+
+		// Explore children.
+		for child_hash in backend.blockchain().children(hash).ok().into_iter().flatten() {
+			let Ok(Some(child_header)) = backend.blockchain().header(child_hash) else { continue };
+			frontier.push((child_hash, child_header));
 		}
 	}
 
-	potential_parents
+	best
 }

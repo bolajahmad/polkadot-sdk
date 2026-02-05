@@ -58,6 +58,7 @@ use sp_api::ProvideRuntimeApi;
 use sp_application_crypto::AppPublic;
 use sp_blockchain::HeaderBackend;
 use sp_consensus_aura::{AuraApi, Slot};
+use sp_runtime::Saturating;
 use sp_core::crypto::Pair;
 use sp_inherents::CreateInherentDataProviders;
 use sp_keystore::KeystorePtr;
@@ -308,7 +309,7 @@ where
 				},
 			};
 
-			let (included_block, initial_parent) = match crate::collators::find_parent(
+			let parent_search_result = match crate::collators::find_parent(
 				relay_parent,
 				params.para_id,
 				&*params.para_backend,
@@ -316,10 +317,11 @@ where
 			)
 			.await
 			{
-				Some(value) => value,
+				Some(result) => result,
 				None => continue,
 			};
 
+			let included_header = &parent_search_result.included_header;
 			let para_client = &*params.para_client;
 			let keystore = &params.keystore;
 			let can_build_upon = |block_hash| {
@@ -335,7 +337,7 @@ where
 					relay_slot,
 					timestamp,
 					block_hash,
-					included_block.hash(),
+					included_header.hash(),
 					para_client,
 					&keystore,
 				))
@@ -343,8 +345,13 @@ where
 
 			// Build in a loop until not allowed. Note that the authorities can change
 			// at any block, so we need to re-claim our slot every time.
-			let mut parent_hash = initial_parent.hash;
-			let mut parent_header = initial_parent.header;
+			let mut parent_hash = parent_search_result.best_parent_hash;
+			let mut parent_header = parent_search_result.best_parent_header;
+			// Distance from included block to best parent.
+			let initial_parent_depth: u32 = (*parent_header.number())
+				.saturating_sub(*included_header.number())
+				.try_into()
+				.unwrap_or(u32::MAX);
 			let overseer_handle = &mut params.overseer_handle;
 
 			// Do not try to build upon an unknown, pruned or bad block
@@ -379,7 +386,7 @@ where
 				tracing::debug!(
 					target: crate::LOG_TARGET,
 					?relay_parent,
-					unincluded_segment_len = initial_parent.depth + n_built,
+					unincluded_segment_len = initial_parent_depth + n_built as u32,
 					"Slot claimed. Building"
 				);
 

@@ -1,6 +1,6 @@
 [package]
 name = "pallet-staking-async"
-version = "0.8.0"
+version = "0.9.0"
 authors.workspace = true
 edition.workspace = true
 license = "Apache-2.0"
@@ -21,6 +21,7 @@ frame-election-provider-support.workspace = true
 frame-support.workspace = true
 frame-system.workspace = true
 log = { workspace = true }
+pallet-dap = { optional = true, workspace = true }
 pallet-staking-async-rc-client.workspace = true
 rand = { features = ["alloc"], workspace = true }
 rand_chacha = { workspace = true }
@@ -32,9 +33,6 @@ sp-io.workspace = true
 sp-npos-elections.workspace = true
 sp-runtime = { features = ["serde"], workspace = true }
 sp-staking = { features = ["serde"], workspace = true }
-
-# Optional imports for benchmarking
-pallet-dap = { optional = true, workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -79,7 +77,7 @@ runtime-benchmarks = [
 	"frame-system/runtime-benchmarks",
 	"pallet-bags-list/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
-	"pallet-dap/runtime-benchmarks",
+	"pallet-dap?/runtime-benchmarks",
 	"pallet-staking-async-rc-client/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 	"sp-staking/runtime-benchmarks",
@@ -90,7 +88,7 @@ try-runtime = [
 	"frame-system/try-runtime",
 	"pallet-bags-list/try-runtime",
 	"pallet-balances/try-runtime",
-	"pallet-dap/try-runtime",
+	"pallet-dap?/try-runtime",
 	"pallet-staking-async-rc-client/try-runtime",
 	"sp-runtime/try-runtime",
 ]

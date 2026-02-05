@@ -1195,6 +1195,132 @@ fn find_best_parent_unknown_pending_returns_none() {
 	assert!(result.is_none());
 }
 
+/// Tests that the deepest block is found when there are multiple forks.
+#[test]
+fn find_best_parent_with_forks_returns_deepest() {
+	sp_tracing::try_init_simple();
+
+	let backend = Arc::new(Backend::new_test(1000, 1));
+	let client = Arc::new(TestClientBuilder::with_backend(backend.clone()).build());
+	let mut para_import =
+		ParachainBlockImport::new_with_delayed_best_block(client.clone(), backend.clone());
+
+	let relay_parent = relay_hash_from_block_num(10);
+	let search_relay_parent = relay_hash_from_block_num(20);
+	let included_block = build_and_import_block_ext(
+		&client,
+		BlockOrigin::NetworkInitialSync,
+		true,
+		&mut para_import,
+		None,
+		None,
+		Some(relay_parent),
+	);
+	let pending_block = build_and_import_block_ext(
+		&client,
+		BlockOrigin::Own,
+		true,
+		&mut para_import,
+		Some(included_block.header().hash()),
+		None,
+		Some(relay_hash_from_block_num(11)),
+	);
+
+	let relay_chain = Relaychain::new();
+	{
+		let relay_inner = &mut relay_chain.inner.lock().unwrap();
+		relay_inner
+			.relay_chain_hash_to_header
+			.insert(search_relay_parent, included_block.header().clone());
+		relay_inner
+			.relay_chain_hash_to_header_pending
+			.insert(search_relay_parent, pending_block.header().clone());
+	}
+
+	// Build forked chains from pending using different relay parents to create distinct blocks:
+	//
+	//   included -> pending -> fork1_block1 -> fork1_block2 (depth 2)
+	//                      \-> fork2_block1 -> fork2_block2 -> fork2_block3 (depth 3, deepest)
+	//                      \-> fork3_block1 (depth 1)
+
+	// Fork 1: depth 2
+	let fork1_block1 = build_and_import_block_ext(
+		&client,
+		BlockOrigin::Own,
+		false,
+		&mut para_import,
+		Some(pending_block.header().hash()),
+		None,
+		Some(relay_hash_from_block_num(12)),
+	);
+	let _fork1_block2 = build_and_import_block_ext(
+		&client,
+		BlockOrigin::Own,
+		false,
+		&mut para_import,
+		Some(fork1_block1.header().hash()),
+		None,
+		Some(relay_hash_from_block_num(13)),
+	);
+
+	// Fork 2: depth 3 (deepest)
+	let fork2_block1 = build_and_import_block_ext(
+		&client,
+		BlockOrigin::Own,
+		false,
+		&mut para_import,
+		Some(pending_block.header().hash()),
+		None,
+		Some(relay_hash_from_block_num(14)),
+	);
+	let fork2_block2 = build_and_import_block_ext(
+		&client,
+		BlockOrigin::Own,
+		false,
+		&mut para_import,
+		Some(fork2_block1.header().hash()),
+		None,
+		Some(relay_hash_from_block_num(15)),
+	);
+	let fork2_block3 = build_and_import_block_ext(
+		&client,
+		BlockOrigin::Own,
+		false,
+		&mut para_import,
+		Some(fork2_block2.header().hash()),
+		None,
+		Some(relay_hash_from_block_num(16)),
+	);
+
+	// Fork 3: depth 1
+	let _fork3_block1 = build_and_import_block_ext(
+		&client,
+		BlockOrigin::Own,
+		false,
+		&mut para_import,
+		Some(pending_block.header().hash()),
+		None,
+		Some(relay_hash_from_block_num(17)),
+	);
+
+	let result = block_on(find_parent_for_building(
+		ParentSearchParams {
+			relay_parent: search_relay_parent,
+			para_id: ParaId::from(100),
+			ancestry_lookback: 10,
+		},
+		&*backend,
+		&relay_chain,
+	))
+	.unwrap()
+	.expect("Should find a parent");
+
+	// The deepest block (fork2_block3) should be the best parent.
+	assert_eq!(result.best_parent_hash, fork2_block3.hash());
+	assert_eq!(&result.best_parent_header, fork2_block3.header());
+	assert_eq!(&result.included_header, included_block.header());
+}
+
 /// Tests that the deepest block in a chain is returned as best parent.
 #[test]
 fn find_best_parent_returns_deepest_block() {

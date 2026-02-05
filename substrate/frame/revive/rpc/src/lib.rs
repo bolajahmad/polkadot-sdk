@@ -203,8 +203,7 @@ impl EthRpcServer for EthRpcServerImpl {
 		{
 			Ok(result) => result,
 			Err(error) if error.message().contains("OutOfGas") => {
-				let max_extrinsic_weight_in_gas = runtime_api.max_extrinsic_weight_in_gas().await? *
-					U256::from(95) / U256::from(100);
+				let max_extrinsic_weight_in_gas = runtime_api.max_extrinsic_weight_in_gas().await?;
 				log::trace!(
 					target: LOG_TARGET,
 					"estimate_gas Going through the max_extrinsic_weight_in_gas route. max_extrinsic_weight_in_gas={}",

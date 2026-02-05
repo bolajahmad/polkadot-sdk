@@ -1169,6 +1169,7 @@ impl StatementStore for Store {
 
 	/// Submit a statement to the store. Validates the statement and returns validation result.
 	fn submit(&self, statement: Statement, source: StatementSource) -> SubmitResult {
+		let _histogram_submit_start_timer = self.metrics.start_submit_timer();
 		let hash = statement.hash();
 		// Get unix timestamp
 		if self.timestamp() >= statement.get_expiration_timestamp_secs().into() {
@@ -1177,6 +1178,7 @@ impl StatementStore for Store {
 				"Statement is already expired: {:?}",
 				HexDisplay::from(&hash),
 			);
+            self.metrics.report(|metrics| metrics.validations_invalid.inc());
 			return SubmitResult::Invalid(InvalidReason::AlreadyExpired);
 		}
 		let encoded_size = statement.encoded_size();
@@ -1219,7 +1221,9 @@ impl StatementStore for Store {
 			return SubmitResult::Invalid(InvalidReason::NoProof);
 		};
 
-		match statement.verify_signature() {
+        let _histogram_validation_start_timer = self.metrics.start_validation_timer();
+
+        match statement.verify_signature() {
 			SignatureVerificationResult::Valid(_) => {},
 			SignatureVerificationResult::Invalid => {
 				log::debug!(
@@ -1248,6 +1252,8 @@ impl StatementStore for Store {
 				}
 			},
 		};
+
+        drop(_histogram_validation_start_timer);
 
 		let validation = match (self.read_allowance_fn)(
 			&account_id,
@@ -1284,18 +1290,8 @@ impl StatementStore for Store {
 				match index.insert(hash, &statement, &account_id, &validation, current_time) {
 					Ok(evicted) => evicted,
 					Err(reason) => {
-						let reason_label = match &reason {
-							sp_statement_store::RejectionReason::DataTooLarge { .. } =>
-								"data_too_large",
-							sp_statement_store::RejectionReason::ChannelPriorityTooLow {
-								..
-							} => "channel_priority_too_low",
-							sp_statement_store::RejectionReason::AccountFull { .. } =>
-								"account_full",
-							sp_statement_store::RejectionReason::StoreFull => "store_full",
-						};
 						self.metrics.report(|metrics| {
-							metrics.rejections.with_label_values(&[reason_label]).inc();
+							metrics.rejections.with_label_values(&[reason.label()]).inc();
 						});
 						return SubmitResult::Rejected(reason);
 					},
@@ -1306,6 +1302,7 @@ impl StatementStore for Store {
 				commit.push((col::STATEMENTS, hash.to_vec(), None));
 				commit.push((col::EXPIRED, hash.to_vec(), Some((hash, current_time).encode())));
 			}
+			let _histogram_db_write_start_timer = self.metrics.start_db_write_timer();
 			if let Err(e) = self.db.commit(commit) {
 				log::debug!(
 					target: LOG_TARGET,
@@ -1315,6 +1312,7 @@ impl StatementStore for Store {
 				);
 				return SubmitResult::InternalError(Error::Db(e.to_string()));
 			}
+            drop(_histogram_db_write_start_timer);
 			self.subscription_manager.notify(statement);
 		} // Release index lock
 		self.metrics.report(|metrics| metrics.submitted_statements.inc());

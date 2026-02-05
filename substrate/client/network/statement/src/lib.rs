@@ -103,7 +103,7 @@ struct Metrics {
 	duplicate_statements_received: Counter<U64>,
 	bytes_sent_total: Counter<U64>,
 	bytes_received_total: Counter<U64>,
-	send_latency_seconds: Histogram,
+	sent_latency_seconds: Histogram,
 }
 
 impl Metrics {
@@ -188,10 +188,10 @@ impl Metrics {
 				)?,
 				r,
 			)?,
-			send_latency_seconds: register(
+			sent_latency_seconds: register(
 				Histogram::with_opts(
 					HistogramOpts::new(
-						"substrate_sync_statement_send_latency_seconds",
+						"substrate_sync_statement_sent_latency_seconds",
 						"Time to send statement messages to peers",
 					)
 					// Buckets from 1ms to ~10s: 0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
@@ -558,13 +558,12 @@ where
 				let encoded = chunk.encode();
 				let bytes_to_send = encoded.len() as u64;
 
-				let start = std::time::Instant::now();
+				let _sent_latency_timer = self.metrics.as_ref().map(|m| m.sent_latency_seconds.start_timer());
 				let send_result = timeout(
 					SEND_TIMEOUT,
 					self.notification_service.send_async_notification(peer, encoded),
 				)
 				.await;
-				let elapsed = start.elapsed();
 
 				if let Err(e) = send_result {
 					log::debug!(target: LOG_TARGET, "Failed to send notification to {peer}: {e:?}");
@@ -576,7 +575,6 @@ where
 					metrics.propagated_statements.inc_by(chunk.len() as u64);
 					metrics.propagated_statements_chunks.observe(chunk.len() as f64);
 					metrics.bytes_sent_total.inc_by(bytes_to_send);
-					metrics.send_latency_seconds.observe(elapsed.as_secs_f64());
 				});
 				SendChunkResult::Sent(chunk_end)
 			},

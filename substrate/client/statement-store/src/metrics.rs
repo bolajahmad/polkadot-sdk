@@ -21,7 +21,8 @@
 use std::sync::Arc;
 
 use prometheus_endpoint::{
-	register, Counter, CounterVec, Gauge, Opts, PrometheusError, Registry, U64,
+	prometheus::HistogramTimer, register, Counter, CounterVec, Gauge, Histogram, HistogramOpts,
+	Opts, PrometheusError, Registry, U64,
 };
 
 #[derive(Clone, Default)]
@@ -43,6 +44,18 @@ impl MetricsLink {
 			do_this(metrics);
 		}
 	}
+
+	pub fn start_submit_timer(&self) -> Option<HistogramTimer> {
+		self.0.as_ref().as_ref().map(|m| m.submit_duration_seconds.start_timer())
+	}
+
+	pub fn start_validation_timer(&self) -> Option<HistogramTimer> {
+		self.0.as_ref().as_ref().map(|m| m.validation_duration_seconds.start_timer())
+	}
+
+	pub fn start_db_write_timer(&self) -> Option<HistogramTimer> {
+		self.0.as_ref().as_ref().map(|m| m.db_write_duration_seconds.start_timer())
+	}
 }
 
 /// Statement store Prometheus metrics.
@@ -57,6 +70,9 @@ pub struct Metrics {
 	pub capacity_statements: Gauge<U64>,
 	pub capacity_bytes: Gauge<U64>,
 	pub rejections: CounterVec<U64>,
+	pub submit_duration_seconds: Histogram,
+	pub validation_duration_seconds: Histogram,
+	pub db_write_duration_seconds: Histogram,
 }
 
 impl Metrics {
@@ -72,7 +88,7 @@ impl Metrics {
 			validations_invalid: register(
 				Counter::new(
 					"substrate_sub_statement_store_validations_invalid",
-					"Total number of statements that were removed from the pool as invalid",
+					"Total number of statements that were fail validation during submission",
 				)?,
 				registry,
 			)?,
@@ -87,6 +103,21 @@ impl Metrics {
 				Gauge::new(
 					"substrate_sub_statement_store_statements_total",
 					"Current number of statements in the store",
+				)?,
+				registry,
+			)?,
+			capacity_statements: register(
+				Gauge::new(
+					"substrate_sub_statement_store_capacity_statements",
+					"Maximum number of statements the store can hold",
+				)?,
+				registry,
+			)?,
+
+			capacity_bytes: register(
+				Gauge::new(
+					"substrate_sub_statement_store_capacity_bytes",
+					"Maximum total size of statement data in bytes",
 				)?,
 				registry,
 			)?,
@@ -111,20 +142,6 @@ impl Metrics {
 				)?,
 				registry,
 			)?,
-			capacity_statements: register(
-				Gauge::new(
-					"substrate_sub_statement_store_capacity_statements",
-					"Maximum number of statements the store can hold",
-				)?,
-				registry,
-			)?,
-			capacity_bytes: register(
-				Gauge::new(
-					"substrate_sub_statement_store_capacity_bytes",
-					"Maximum total size of statement data in bytes",
-				)?,
-				registry,
-			)?,
 			rejections: register(
 				CounterVec::new(
 					Opts::new(
@@ -132,6 +149,42 @@ impl Metrics {
 						"Total statement rejections by reason",
 					),
 					&["reason"],
+				)?,
+				registry,
+			)?,
+			submit_duration_seconds: register(
+				Histogram::with_opts(
+					HistogramOpts::new(
+						"substrate_sub_statement_store_submit_duration_seconds",
+						"Time to submit a statement (total operation including validation and DB write)",
+					)
+					.buckets(vec![
+						0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0,
+					]),
+				)?,
+				registry,
+			)?,
+			validation_duration_seconds: register(
+				Histogram::with_opts(
+					HistogramOpts::new(
+						"substrate_sub_statement_store_validation_duration_seconds",
+						"Time to validate a statement via runtime API",
+					)
+					.buckets(vec![
+						0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0,
+					]),
+				)?,
+				registry,
+			)?,
+			db_write_duration_seconds: register(
+				Histogram::with_opts(
+					HistogramOpts::new(
+						"substrate_sub_statement_store_db_write_duration_seconds",
+						"Time to write statement to database",
+					)
+					.buckets(vec![
+						0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0,
+					]),
 				)?,
 				registry,
 			)?,

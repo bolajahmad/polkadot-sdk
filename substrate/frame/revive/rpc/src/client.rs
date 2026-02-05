@@ -530,7 +530,7 @@ impl Client {
 			log::debug!(target: LOG_TARGET, "Failed to submit transaction: {err:?}");
 		})?;
 
-		tokio::time::timeout(Duration::from_secs(10), async {
+		tokio::time::timeout(Duration::from_secs(5), async {
 			if let Some(status) = progress.next().await {
 				match status {
 					Ok(

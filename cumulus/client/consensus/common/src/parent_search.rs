@@ -26,7 +26,7 @@ use cumulus_relay_chain_interface::{RelayChainError, RelayChainInterface};
 
 use sc_client_api::{Backend, HeaderBackend};
 
-use sp_blockchain::{Backend as BlockchainBackend, TreeRoute};
+use sp_blockchain::Backend as BlockchainBackend;
 
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
 
@@ -93,9 +93,6 @@ pub async fn find_potential_parents<B: BlockT>(
 		return Ok(Default::default());
 	};
 
-	let only_included =
-		vec![PotentialParent { hash: included_hash, header: included_header.clone(), depth: 0 }];
-
 	// Pending header and hash.
 	let maybe_pending = {
 		// Fetch the most recent pending header from the relay chain. We use
@@ -130,19 +127,12 @@ pub async fn find_potential_parents<B: BlockT>(
 		}
 	};
 
-	let maybe_route_to_last_pending = maybe_pending
-		.as_ref()
-		.map(|(_, pending)| {
-			sp_blockchain::tree_route(backend.blockchain(), included_hash, *pending)
-		})
-		.transpose()?;
-
-	// If we want to ignore alternative branches there is no reason to start
-	// the parent search at the included block. We can add the included block and
-	// the path to the pending block to the potential parents directly.
-	let (frontier, potential_parents) = match (&maybe_pending, &maybe_route_to_last_pending) {
-		(Some((pending_header, pending_hash)), Some(ref route_to_pending)) => {
-			let mut potential_parents = only_included;
+	// Compute the starting point and initial potential parents based on whether there's a
+	// pending block.
+	let (start, potential_parents) = match &maybe_pending {
+		Some((pending_header, pending_hash)) => {
+			let route_to_pending =
+				sp_blockchain::tree_route(backend.blockchain(), included_hash, *pending_hash)?;
 
 			// This is a defensive check, should never happen.
 			if !route_to_pending.retracted().is_empty() {
@@ -150,7 +140,13 @@ pub async fn find_potential_parents<B: BlockT>(
 				return Ok(Default::default());
 			}
 
-			// Add all items on the path included -> pending - 1 to the potential parents.
+			// Add included block and all blocks on the path included -> pending - 1 to
+			// the potential parents.
+			let mut potential_parents = vec![PotentialParent {
+				hash: included_hash,
+				header: included_header.clone(),
+				depth: 0,
+			}];
 			let num_parents_on_path = route_to_pending.enacted().len().saturating_sub(1);
 			for (num, block) in
 				route_to_pending.enacted().iter().take(num_parents_on_path).enumerate()
@@ -164,18 +160,20 @@ pub async fn find_potential_parents<B: BlockT>(
 				});
 			}
 
-			// The search for additional potential parents should now start at the children of
-			// the pending block.
+			// The search for additional potential parents starts at the pending block.
 			(
-				vec![PotentialParent {
+				PotentialParent {
 					hash: *pending_hash,
 					header: pending_header.clone(),
 					depth: route_to_pending.enacted().len(),
-				}],
+				},
 				potential_parents,
 			)
 		},
-		_ => (only_included, Default::default()),
+		None => (
+			PotentialParent { hash: included_hash, header: included_header.clone(), depth: 0 },
+			Default::default(),
+		),
 	};
 
 	// Build up the ancestry record of the relay chain to compare against.
@@ -184,9 +182,8 @@ pub async fn find_potential_parents<B: BlockT>(
 			.await?;
 
 	Ok(search_child_branches_for_parents(
-		frontier,
-		maybe_route_to_last_pending,
-		included_header,
+		start,
+		included_hash,
 		maybe_pending.map(|(_, hash)| hash),
 		backend,
 		rp_ancestry,
@@ -281,38 +278,30 @@ async fn build_relay_parent_ancestry(
 }
 
 /// Start search for child blocks that can be used as parents.
+///
+/// Performs a depth-first search starting from `start`, adding all blocks whose
+/// relay parent is within the allowed ancestry to `potential_parents`.
 pub fn search_child_branches_for_parents<Block: BlockT>(
-	mut frontier: Vec<PotentialParent<Block>>,
-	maybe_route_to_last_pending: Option<TreeRoute<Block>>,
-	included_header: Block::Header,
+	start: PotentialParent<Block>,
+	included_hash: Block::Hash,
 	pending_hash: Option<Block::Hash>,
 	backend: &impl Backend<Block>,
 	rp_ancestry: Vec<(RelayHash, RelayHash)>,
 	mut potential_parents: Vec<PotentialParent<Block>>,
 ) -> Vec<PotentialParent<Block>> {
-	let included_hash = included_header.hash();
 	let is_hash_in_ancestry = |hash| rp_ancestry.iter().any(|x| x.0 == hash);
 	let is_root_in_ancestry = |root| rp_ancestry.iter().any(|x| x.1 == root);
-
-	// The distance between pending and included block. Is later used to check if a child
-	// is aligned with pending when it is between pending and included block.
-	let pending_distance = maybe_route_to_last_pending.as_ref().map(|route| route.enacted().len());
-
-	// If a block is on the path included -> pending, we consider it `aligned_with_pending`.
-	let is_child_pending = |hash| {
-		maybe_route_to_last_pending
-			.as_ref()
-			.map_or(true, |route| route.enacted().iter().any(|x| x.hash == hash))
-	};
 
 	tracing::trace!(
 		target: PARENT_SEARCH_LOG_TARGET,
 		?included_hash,
-		included_num = ?included_header.number(),
-		?pending_hash ,
+		?pending_hash,
 		?rp_ancestry,
 		"Searching relay chain ancestry."
 	);
+
+	let mut frontier = vec![start];
+
 	while let Some(entry) = frontier.pop() {
 		let is_pending = pending_hash.as_ref().map_or(false, |h| &entry.hash == h);
 		let is_included = included_hash == entry.hash;
@@ -352,18 +341,7 @@ pub fn search_child_branches_for_parents<Block: BlockT>(
 
 		// Push children onto search frontier.
 		for child in backend.blockchain().children(hash).ok().into_iter().flatten() {
-			tracing::trace!(target: PARENT_SEARCH_LOG_TARGET, ?child, child_depth, ?pending_distance, "Looking at child.");
-
-			let aligned_with_pending =
-				pending_distance.map_or(true, |dist| child_depth > dist) || is_child_pending(child);
-
-			if !aligned_with_pending {
-				tracing::trace!(target: PARENT_SEARCH_LOG_TARGET, ?child, "Child is not aligned with pending block.");
-				continue;
-			}
-
 			let Ok(Some(header)) = backend.blockchain().header(child) else { continue };
-
 			frontier.push(PotentialParent { hash: child, header, depth: child_depth });
 		}
 	}

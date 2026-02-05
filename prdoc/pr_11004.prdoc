@@ -1,0 +1,7 @@
+title: 'Statementstore: Forward statements to light clients'
+doc:
+- audience: Node Dev
+  description: null
+crates:
+- name: sc-network-statement
+  bump: patch

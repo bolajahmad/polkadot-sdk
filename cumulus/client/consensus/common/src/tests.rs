@@ -997,7 +997,6 @@ fn find_potential_parents_in_allowed_ancestry() {
 	assert_eq!(parent.hash, block.hash());
 	assert_eq!(&parent.header, block.header());
 	assert_eq!(parent.depth, 0);
-	assert!(parent.aligned_with_pending);
 
 	// New block is not pending or included.
 	let block_relay_parent = relay_hash_from_block_num(11);
@@ -1032,7 +1031,6 @@ fn find_potential_parents_in_allowed_ancestry() {
 	assert_eq!(parent.hash, block.hash());
 	assert_eq!(&parent.header, block.header());
 	assert_eq!(parent.depth, 1);
-	assert!(parent.aligned_with_pending);
 
 	// Reduce allowed ancestry.
 	let potential_parents = block_on(find_potential_parents(
@@ -1108,14 +1106,12 @@ fn find_potential_pending_parent() {
 	assert_eq!(included_parent.hash, included_block.hash());
 	assert_eq!(&included_parent.header, included_block.header());
 	assert_eq!(included_parent.depth, 0);
-	assert!(included_parent.aligned_with_pending);
 
 	let pending_parent = &potential_parents[1];
 
 	assert_eq!(pending_parent.hash, pending_block.hash());
 	assert_eq!(&pending_parent.header, pending_block.header());
 	assert_eq!(pending_parent.depth, 1);
-	assert!(pending_parent.aligned_with_pending);
 }
 
 #[test]
@@ -1307,7 +1303,6 @@ fn find_potential_parents_aligned_with_late_pending() {
 		assert_eq!(parent.hash, expected.hash());
 		assert_eq!(&parent.header, expected.header());
 		assert_eq!(parent.depth, i);
-		assert!(parent.aligned_with_pending);
 	}
 }
 
@@ -1394,7 +1389,6 @@ fn find_potential_parents_aligned_with_pending() {
 		assert_eq!(parent.hash, expected.hash());
 		assert_eq!(&parent.header, expected.header());
 		assert_eq!(parent.depth, i);
-		assert!(parent.aligned_with_pending);
 	}
 }
 

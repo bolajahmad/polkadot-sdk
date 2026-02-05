@@ -234,7 +234,14 @@ impl KeyTracker {
 		whitelist.iter().for_each(|key| {
 			let mut whitelisted = TrackedStorageKey::new(key.key.clone());
 			whitelisted.whitelist();
-			self.main_keys.insert(key.key.clone(), whitelisted);
+			if let Some(child_trie_key) = &key.child_trie_key {
+				self.child_keys
+					.entry(child_trie_key.clone())
+					.or_insert_with(LinkedHashMap::new)
+					.insert(key.key.clone(), whitelisted);
+			} else {
+				self.main_keys.insert(key.key.clone(), whitelisted);
+			}
 		});
 	}
 

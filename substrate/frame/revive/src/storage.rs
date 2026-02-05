@@ -255,7 +255,7 @@ impl<T: Config> ContractInfo<T> {
 		if_tracing(|t| {
 			t.storage_read(key, result.data.as_deref());
 		});
-result
+		result
 	}
 
 	/// Returns `Some(len)` (in bytes) if a storage item exists at `key`.
@@ -299,7 +299,8 @@ result
 		new_value: Option<Vec<u8>>,
 		take: bool,
 	) -> Result<WriteOutcome, DispatchError> {
-		self.write_raw(key, new_value.as_deref(), None, take).map(|state_load| state_load.data)
+		self.write_raw(key, new_value.as_deref(), None, take)
+			.map(|state_load| state_load.data)
 	}
 
 	fn write_raw(

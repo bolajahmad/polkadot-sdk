@@ -5034,7 +5034,9 @@ fn get_set_storage_key_works() {
 				.unwrap();
 		assert_eq!(
 			write_result.data,
-			WriteOutcome::Overwritten { len: value_to_write.map(|v| v.len()).unwrap_or_default() as u32 }
+			WriteOutcome::Overwritten {
+				len: value_to_write.map(|v| v.len()).unwrap_or_default() as u32
+			}
 		);
 		let storage_value = Pallet::<Test>::get_storage(addr, contract_key_to_test).unwrap();
 		assert_eq!(storage_value.data, new_value_to_write);
@@ -5080,7 +5082,9 @@ fn get_set_storage_var_key_works() {
 		.unwrap();
 		assert_eq!(
 			write_result.data,
-			WriteOutcome::Overwritten { len: value_to_write.map(|v| v.len()).unwrap_or_default() as u32 }
+			WriteOutcome::Overwritten {
+				len: value_to_write.map(|v| v.len()).unwrap_or_default() as u32
+			}
 		);
 		let storage_value =
 			Pallet::<Test>::get_storage_var_key(addr, contract_key_to_test.clone()).unwrap();

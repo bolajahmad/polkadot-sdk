@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770291729495,
+  "lastUpdate": 1770325587122,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "pgherveou@gmail.com",
-            "name": "PG Herveou",
-            "username": "pgherveou"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "220b5aa6446b3fc0e5accefed96abfc7d45f9a18",
-          "message": "Fix prestate create traces (#8935)\n\nFix an issue on the prestate tracer, for CREATE trace.\nThe tracer was not reporting the created properly in the created trace.\n\nAlso added tests in evm-test-suite\nhttps://github.com/paritytech/evm-test-suite/pull/97\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Alexander Theißen <alex.theissen@me.com>\nCo-authored-by: xermicus <cyrill@parity.io>",
-          "timestamp": "2025-06-29T20:51:48Z",
-          "tree_id": "1e6f2d483f0f3e3fece691fdea354a7b89de0942",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/220b5aa6446b3fc0e5accefed96abfc7d45f9a18"
-        },
-        "date": 1751239791441,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.96199999999999,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.045259332791999965,
-            "unit": "seconds"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.034314631741999994,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.03817001042800002,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexandre.balde@parity.io",
+            "name": "Alexandre R. Baldé",
+            "username": "rockbmb"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "4d53dff25c8028eccd062cea40b24d654f89ccd6",
+          "message": "Fix test for remote externality's selective child key retrieval mechanism (#10866)\n\n# Description\n\nFollow-up to #10766, which was closed in favor of #10779.\nRework remote externality child key test; it was failing since the proxy\npallet has no child storages.\n\n## Integration\n\nN/A\n\n# Checklist\n\n* [x] My PR includes a detailed description as outlined in the\n\"Description\" and its two subsections above.\n* [x] My PR follows the [labeling requirements](\n\nhttps://github.com/paritytech/polkadot-sdk/blob/master/docs/contributor/CONTRIBUTING.md#Process\n) of this project (at minimum one label for `T` required)\n    * External contributors: Use `/cmd label <label-name>` to add labels\n    * Maintainers can also add labels manually\n* [x] I have made corresponding changes to the documentation (if\napplicable)\n* [x] I have added tests that prove my fix is effective or that my\nfeature works (if applicable)",
+          "timestamp": "2026-02-05T19:52:27Z",
+          "tree_id": "29b800d80999ea7878d7fc3455a061a8effb703b",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/4d53dff25c8028eccd062cea40b24d654f89ccd6"
+        },
+        "date": 1770325562676,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.07399999999998,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.038448838634,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06561289717399993,
             "unit": "seconds"
           }
         ]

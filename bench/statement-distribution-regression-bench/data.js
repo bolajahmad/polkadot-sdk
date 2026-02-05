@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770250547307,
+  "lastUpdate": 1770291729495,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "ab81eee9c67e1be6a6bab4cad484786dc653c4db",
-          "message": "contracts-fixtures: Rebuild `core` and `alloc` for MVP (#9014)\n\nWe are using the MVP target of Wasm, which means that newer language\nfeatures are disabled by default. However the build script was failing\nwith the following error:\n```\n  Caused by:\n      Unknown opcode 252\n```\n\nThis is caused by the `core` and `alloc` crate being precompiled, but\nnot for the MVP target. The pull request is fixing this by explicetly\ncompiling these crates for MVP. We are doing the same with the\n`wasm-builder`.",
-          "timestamp": "2025-06-28T09:18:29Z",
-          "tree_id": "e8102af9f5ebc4b5c0d0c34e62bd3950c64b802f",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/ab81eee9c67e1be6a6bab4cad484786dc653c4db"
-        },
-        "date": 1751105871653,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.94799999999992,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04551559454599994,
-            "unit": "seconds"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.034196476792000004,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.038257340904000015,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "davxy@datawok.net",
+            "name": "Davide Galassi",
+            "username": "davxy"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e2597df86c2506780644cef6e447b7c390aa0a0",
+          "message": "Rework experimental EC hostcalls (#10830)\n\n- Change mul param to Affine form (was Projective)\n([Context](https://github.com/paritytech/polkadot-sdk/pull/10147#issuecomment-3458638915))\n    - `msm_g(1/2)(&[Affine], &[Scalar]) -> Projective` \n        - changed to `msm_g(1/2)(&[Affine], &[Scalar]) -> Affine` \n    - `mul_projective_g(1/2)(Projective, Scalar) -> Projective` \n        - changed to `mul_affine_g(1/2)(Affine, Scalar) -> Affine`\n\n- Caller-allocated buffers: Callers pre-allocate output buffers using\n`buffer_for::<T>()` instead of host allocating and returning Vec<u8>\n(introduced by https://github.com/paritytech/polkadot-sdk/pull/10969)\n- New passing strategy: `PassFatPointerAndWrite` allows host to write\ninto guest memory without reading first\n- Typed error codes: Replaces `Result<Vec<u8>, ()>` with HostcallResult\nreturning specific error variants\n- In-place operations: final_exponentiation now operates in-place via\n`PassFatPointerAndReadWrite`\n\n- Prefer panicking on error rather than returning a dummy value that the\nruntime might treat as valid. Since such panics would typically occur\nwithin the runtime, the impact looks acceptable.\n\n- Cleanup/Docs/Tests\n\n---\n\nNOTE1: Hostcalls are experimental and not exposed in production! An\n[RFC](https://github.com/polkadot-fellows/RFCs/pull/163) proposal has\nbeen opened for production usage\n\nNOTE2: The `arkworks-extensions` `Hooks` trait methods remain unchanged;\nno updates are required there. Only the hostcalls are affected.\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
+          "timestamp": "2026-02-05T10:29:03Z",
+          "tree_id": "b309e20e965902b5c93f429e1305d57f4e091102",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/4e2597df86c2506780644cef6e447b7c390aa0a0"
+        },
+        "date": 1770291708178,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.40199999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.07800000000003,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06587879492599992,
+            "unit": "seconds"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03817001042800002,
             "unit": "seconds"
           }
         ]

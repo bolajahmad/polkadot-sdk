@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770245719256,
+  "lastUpdate": 1770250479159,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "44604217+tmpolaczyk@users.noreply.github.com",
-            "name": "tmpolaczyk",
-            "username": "tmpolaczyk"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "d30a5fbbd973035893a1a25e1bcf9d9fb2c24d53",
-          "message": "Fix pallet_migrations benchmark when FailedMigrationHandler emits events (#8694)\n\nWhen FailedMigrationHandler emits events, the `UpgradeFailed` event is\nnot the last one, so `assert_last_event` fails. Fixed by checking that\nthe `UpgradeFailed` event is emitted, even if it is not the last one.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Bastian Köcher <git@kchr.de>",
-          "timestamp": "2025-06-30T07:38:13Z",
-          "tree_id": "55c79a51c2be86abbf231a1611a4ef1332748aed",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/d30a5fbbd973035893a1a25e1bcf9d9fb2c24d53"
-        },
-        "date": 1751273268696,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15668499307333333,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008896860493333426,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012967118953333332,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.02233457990666667,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-store",
             "value": 0.1449791294733334,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@kchr.de",
+            "name": "Bastian Köcher",
+            "username": "bkchr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "cac11f4a5325b217ca74b0c339459597daf03838",
+          "message": "Take the header size into account for the total block size (#10804)",
+          "timestamp": "2026-02-04T22:54:01Z",
+          "tree_id": "927659770ce8eb4baa4881d4a8d4a616d5920db7",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/cac11f4a5325b217ca74b0c339459597daf03838"
+        },
+        "date": 1770250453997,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.023080936260000004,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007397080113333332,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.1461343893333333,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.010420444453333315,
             "unit": "seconds"
           }
         ]

@@ -272,8 +272,7 @@ where
 		ancestry_lookback: scheduling_lookahead(relay_parent, relay_client)
 			.await
 			.unwrap_or(DEFAULT_SCHEDULING_LOOKAHEAD)
-			.saturating_sub(1) as usize,
-		ignore_alternative_branches: true,
+			.saturating_sub(1) as usize
 	};
 
 	let potential_parents = cumulus_client_consensus_common::find_potential_parents::<Block>(

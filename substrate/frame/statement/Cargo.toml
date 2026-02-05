@@ -27,9 +27,6 @@ sp-runtime = { workspace = true }
 sp-statement-store = { workspace = true }
 sp-storage = { workspace = true }
 
-[dev-dependencies]
-pallet-balances = { workspace = true, default-features = true }
-
 [features]
 default = ["std"]
 std = [
@@ -37,7 +34,6 @@ std = [
 	"frame-support/std",
 	"frame-system/std",
 	"log/std",
-	"pallet-balances/std",
 	"scale-info/std",
 	"sp-api/std",
 	"sp-core/std",
@@ -49,6 +45,5 @@ std = [
 try-runtime = [
 	"frame-support/try-runtime",
 	"frame-system/try-runtime",
-	"pallet-balances/try-runtime",
 	"sp-runtime/try-runtime",
 ]

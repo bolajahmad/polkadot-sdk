@@ -19,10 +19,9 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use sc_statement_store::Store;
 use sp_core::Pair;
+use sp_runtime::codec::Encode;
 use sp_statement_store::{
-	runtime_api::{InvalidStatement, ValidStatement, ValidateStatement},
-	DecryptionKey, Proof, SignatureVerificationResult, Statement, StatementSource, StatementStore,
-	SubmitResult, Topic,
+	DecryptionKey, Statement, StatementSource, StatementStore, SubmitResult, Topic,
 };
 use std::sync::Arc;
 
@@ -51,7 +50,7 @@ impl sc_client_api::StorageProvider<Block, TestBackend> for TestClient {
 		_hash: Hash,
 		_key: &sc_client_api::StorageKey,
 	) -> sp_blockchain::Result<Option<sc_client_api::StorageData>> {
-		Ok(sc_client_api::StorageData::new((100_000, 1_000_000).encode()))
+		Ok(Some(sc_client_api::StorageData((100_000, 1_000_000).encode())))
 	}
 
 	fn storage_hash(
@@ -169,9 +168,9 @@ impl sp_blockchain::HeaderBackend<Block> for TestClient {
 }
 
 fn topic(data: u64) -> Topic {
-	let mut topic: Topic = Default::default();
-	topic[0..8].copy_from_slice(&data.to_le_bytes());
-	topic
+	let mut bytes = [0u8; 32];
+	bytes[0..8].copy_from_slice(&data.to_le_bytes());
+	Topic::from(bytes)
 }
 
 fn dec_key(data: u64) -> DecryptionKey {
@@ -215,6 +214,7 @@ fn setup_store(keypair: &sp_core::ed25519::Pair) -> (Store, tempfile::TempDir) {
 		client,
 		keystore,
 		None,
+		Box::new(sp_core::testing::TaskExecutor::new()),
 	)
 	.unwrap();
 

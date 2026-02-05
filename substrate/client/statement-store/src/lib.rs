@@ -787,26 +787,26 @@ impl Store {
 		Ok(result)
 	}
 
-	// Checks for expired statements and marks them as expired in the index.
+	// Checks for expired statements and enforces allowances, marking violating statements
+	// as expired in the index.
 	//
-	// This function performs incremental expiration checking to avoid blocking the store
-	// for too long. It processes accounts in batches and stops when any of these limits
-	// are reached:
-	// - `MAX_EXPIRY_STATEMENTS_PER_ITERATION` statements found to expire
+	// This function performs incremental checking to avoid blocking the store for too long.
+	// It processes accounts in batches and stops when any of these limits are reached:
+	// - `MAX_EXPIRY_STATEMENTS_PER_ITERATION` statements found to expire/evict
 	// - `MAX_EXPIRY_ACCOUNTS_PER_ITERATION` accounts checked
 	// - `MAX_EXPIRY_TIME_MS_PER_ITERATION` milliseconds elapsed
 	//
 	// The function maintains a list of accounts to check (`accounts_to_check_for_expiry_stmts`).
 	// When this list is empty, it repopulates it with all current accounts and returns early,
-	// deferring the actual expiration check to the next call. This ensures the expiration
-	// process eventually covers all accounts across multiple invocations.
+	// deferring the actual check to the next call. This ensures the process eventually covers
+	// all accounts across multiple invocations.
 	//
 	// Statements are considered expired when their priority (which encodes the expiration
 	// timestamp in the upper 32 bits) is less than the current timestamp.
 	fn check_expiration(&self) {
 		let current_time = self.timestamp();
 
-		let (needs_expiry, num_accounts_checked) = {
+		let (to_evict, num_accounts_checked) = {
 			let index = self.index.upgradable_read();
 			if index.accounts_to_check_for_expiry_stmts.is_empty() {
 				let existing_accounts = index.accounts.keys().cloned().collect::<Vec<_>>();
@@ -815,28 +815,83 @@ impl Store {
 				return;
 			}
 
-			let mut needs_expiry = Vec::new();
+			let mut to_evict = Vec::new();
 			let mut num_accounts_checked = 0;
 			let start = Instant::now();
 
 			for account in index.accounts_to_check_for_expiry_stmts.iter().rev() {
 				num_accounts_checked += 1;
 				if let Some(account_rec) = index.accounts.get(account) {
-					needs_expiry.extend(
-						account_rec
-							.by_priority
-							.range(
-								PriorityKey { hash: Hash::default(), expiry: Expiry(0) }..
-									PriorityKey {
-										hash: Hash::default(),
-										expiry: Expiry(current_time << 32),
-									},
-							)
-							.map(|key| key.0.hash),
-					);
+					let mut expired_count = 0usize;
+					let mut expired_size = 0usize;
+					for (key, (_, len)) in account_rec.by_priority.range(
+						PriorityKey { hash: Hash::default(), expiry: Expiry(0) }..PriorityKey {
+							hash: Hash::default(),
+							expiry: Expiry(current_time << 32),
+						},
+					) {
+						to_evict.push(key.hash);
+						expired_count += 1;
+						expired_size += len;
+					}
+
+					// Enforce allowances for remaining (non-expired) statements
+					let allowance = match (self.read_allowance_fn)(account, None) {
+						Ok(Some(allowance)) => allowance,
+						Ok(None) => {
+							log::debug!(
+								target: LOG_TARGET,
+								"No allowance found for account {:?}, treating as zero allowance",
+								HexDisplay::from(account)
+							);
+							StatementAllowance { max_count: 0, max_size: 0 }
+						},
+						Err(e) => {
+							log::error!(target: LOG_TARGET, "Error reading allowance: {:?}", e);
+							// Skip allowance enforcement for this account on error
+							continue;
+						},
+					};
+
+					// Calculate remaining count and size after expiring statements
+					let mut remaining_count = account_rec.by_priority.len() - expired_count;
+					let mut remaining_size = account_rec.data_size - expired_size;
+
+					// Evict lowest priority statements that exceed allowance
+					if remaining_count > allowance.max_count as usize ||
+						remaining_size > allowance.max_size as usize
+					{
+						log::debug!(
+							target: LOG_TARGET,
+							"Account {:?} exceeds allowance: count={}/{}, size={}/{}",
+							HexDisplay::from(account),
+							remaining_count,
+							allowance.max_count,
+							remaining_size,
+							allowance.max_size
+						);
+
+						// Skip expired statements (they're at the beginning due to BTreeMap
+						// ordering)
+						for (key, (_, len)) in account_rec.by_priority.iter().skip(expired_count) {
+							if remaining_count <= allowance.max_count as usize &&
+								remaining_size <= allowance.max_size as usize
+							{
+								break;
+							}
+							to_evict.push(key.hash);
+							remaining_count -= 1;
+							remaining_size -= len;
+							log::debug!(
+								target: LOG_TARGET,
+								"Evicting statement {:?} due to allowance enforcement",
+								HexDisplay::from(&key.hash)
+							);
+						}
+					}
 				}
 
-				if needs_expiry.len() >= MAX_EXPIRY_STATEMENTS_PER_ITERATION ||
+				if to_evict.len() >= MAX_EXPIRY_STATEMENTS_PER_ITERATION ||
 					num_accounts_checked >= MAX_EXPIRY_ACCOUNTS_PER_ITERATION ||
 					start.elapsed() >= MAX_EXPIRY_TIME_PER_ITERATION
 				{
@@ -844,10 +899,10 @@ impl Store {
 				}
 			}
 
-			(needs_expiry, num_accounts_checked)
+			(to_evict, num_accounts_checked)
 		};
 
-		for hash in needs_expiry {
+		for hash in to_evict {
 			if let Err(e) = self.remove(&hash) {
 				log::debug!(
 					target: LOG_TARGET,
@@ -874,116 +929,26 @@ impl Store {
 	/// Perform periodic store maintenance
 	pub fn maintain(&self) {
 		log::trace!(target: LOG_TARGET, "Started store maintenance");
-		let current_time = self.timestamp();
-
-		let deleted = self.index.write().maintain(current_time);
-		let evicted = self.enforce_allowances(current_time);
-
-		let mut commit: Vec<_> =
+		let (deleted, active_count, expired_count): (Vec<_>, usize, usize) = {
+			let mut index = self.index.write();
+			let deleted = index.maintain(self.timestamp());
+			(deleted, index.entries.len(), index.expired.len())
+		};
+		let deleted: Vec<_> =
 			deleted.into_iter().map(|hash| (col::EXPIRED, hash.to_vec(), None)).collect();
-		let deleted_count = commit.len() as u64;
-
-		for hash in &evicted {
-			commit.push((col::STATEMENTS, hash.to_vec(), None));
-			commit.push((col::EXPIRED, hash.to_vec(), Some((*hash, current_time).encode())));
-		}
-		let evicted_count = evicted.len() as u64;
-
-		if let Err(e) = self.db.commit(commit) {
+		let deleted_count = deleted.len() as u64;
+		if let Err(e) = self.db.commit(deleted) {
 			log::warn!(target: LOG_TARGET, "Error writing to the statement database: {:?}", e);
 		} else {
-			self.metrics
-				.report(|metrics| metrics.statements_pruned.inc_by(deleted_count + evicted_count));
+			self.metrics.report(|metrics| metrics.statements_pruned.inc_by(deleted_count));
 		}
-
-		let (active_count, expired_count) = {
-			let index = self.index.read();
-			(index.entries.len(), index.expired.len())
-		};
 		log::trace!(
 			target: LOG_TARGET,
-			"Completed store maintenance. Purged: {}, Evicted: {}, Active: {}, Expired: {}",
+			"Completed store maintenance. Purged: {}, Active: {}, Expired: {}",
 			deleted_count,
-			evicted_count,
 			active_count,
 			expired_count
 		);
-	}
-
-	/// Enforces storage allowances for all accounts.
-	/// Returns the list of hashes that must be evicted.
-	fn enforce_allowances(&self, current_time: u64) -> Vec<Hash> {
-		let index = self.index.read();
-
-		// Collect all hashes to evict across all accounts
-		let evicted: Vec<Hash> = index
-			.accounts
-			.iter()
-			.flat_map(|(account, account_rec)| {
-				let allowance = match (self.read_allowance_fn)(account, None) {
-					Ok(Some(allowance)) => allowance,
-					Ok(None) => {
-						log::debug!(
-							target: LOG_TARGET,
-							"No allowance found for account {:?}, treating as zero allowance",
-							HexDisplay::from(account)
-						);
-						StatementAllowance { max_count: 0, max_size: 0 }
-					},
-					Err(e) => {
-						log::error!(target: LOG_TARGET, "Error reading allowance: {:?}", e);
-						return vec![];
-					},
-				};
-
-				let mut count = account_rec.by_priority.len();
-				let mut size = account_rec.data_size;
-
-				if count <= allowance.max_count as usize && size <= allowance.max_size as usize {
-					return vec![];
-				}
-
-				log::debug!(
-					target: LOG_TARGET,
-					"Account {:?} exceeds allowance: count={}/{}, size={}/{}",
-					HexDisplay::from(account),
-					count,
-					allowance.max_count,
-					size,
-					allowance.max_size
-				);
-
-				account_rec
-					.by_priority
-					.iter()
-					.take_while(|(_, (_, len))| {
-						if count <= allowance.max_count as usize &&
-							size <= allowance.max_size as usize
-						{
-							return false;
-						}
-						count -= 1;
-						size -= len;
-						true
-					})
-					.map(|(key, _)| key.hash)
-					.collect::<Vec<_>>()
-			})
-			.collect();
-
-		drop(index);
-		let mut index = self.index.write();
-		// Evict all collected hashes
-		for hash in &evicted {
-			index.make_expired(hash, current_time);
-			log::debug!(
-				target: LOG_TARGET,
-				"Evicted statement {:?} due to allowance enforcement",
-				HexDisplay::from(hash)
-			);
-		}
-
-		evicted
 	}
 
 	fn timestamp(&self) -> u64 {
@@ -1477,6 +1442,8 @@ mod tests {
 			let account_bytes = &key.0[21..53];
 			let account_id: u64 = u64::from_le_bytes(account_bytes[0..8].try_into().unwrap());
 			let allowance = match account_id {
+				// Account 0 has no allowance (used to test eviction of all statements)
+				0 => return Ok(None),
 				1 => StatementAllowance::new(1, 1000),
 				2 => StatementAllowance::new(2, 1000),
 				3 => StatementAllowance::new(3, 1000),
@@ -2695,7 +2662,7 @@ mod tests {
 
 	#[test]
 	fn enforce_allowances_evicts_excess_statements() {
-		// This test verifies that enforce_allowances correctly evicts statements
+		// This test verifies that check_expiration correctly evicts statements
 		// when statements exceed the current allowance. We directly insert into
 		// the index (bypassing submit's validation) to simulate statements that
 		// existed before allowances were reduced.
@@ -2724,9 +2691,11 @@ mod tests {
 		assert_eq!(store.index.read().entries.len(), 5);
 		assert_eq!(store.index.read().total_size, 500);
 
-		// Run maintenance which calls enforce_allowances
+		// Run check_expiration which handles both expiration and allowance enforcement
+		// First call populates the accounts list, second call processes them
 		// Since account 4 has max_count=4, one statement should be evicted
-		store.maintain();
+		store.check_expiration();
+		store.check_expiration();
 
 		// Should evict the lowest priority statement (s1)
 		let index = store.index.read();
@@ -2760,8 +2729,10 @@ mod tests {
 
 		assert_eq!(store.index.read().entries.len(), 2);
 
-		// Run maintenance - should evict ALL statements since no allowance exists
-		store.maintain();
+		// Run check_expiration - should evict ALL statements since no allowance exists
+		// First call populates the accounts list, second call processes them
+		store.check_expiration();
+		store.check_expiration();
 
 		let index = store.index.read();
 		assert_eq!(index.entries.len(), 0, "All statements should be evicted");
@@ -2772,7 +2743,7 @@ mod tests {
 
 	#[test]
 	fn enforce_allowances_based_on_size() {
-		// This test verifies that enforce_allowances evicts based on size limits.
+		// This test verifies that check_expiration evicts based on size limits.
 		let (mut store, _temp) = test_store();
 		store.set_time(0);
 
@@ -2793,8 +2764,10 @@ mod tests {
 
 		assert_eq!(store.index.read().total_size, 1200);
 
-		// Run maintenance - should evict s1 to get under 1000 bytes
-		store.maintain();
+		// Run check_expiration - should evict s1 to get under 1000 bytes
+		// First call populates the accounts list, second call processes them
+		store.check_expiration();
+		store.check_expiration();
 
 		let index = store.index.read();
 		assert_eq!(index.entries.len(), 1);

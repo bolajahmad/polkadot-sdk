@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770245818439,
+  "lastUpdate": 1770250582047,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23470,6 +23470,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.006640721569999999,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@kchr.de",
+            "name": "Bastian Köcher",
+            "username": "bkchr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "cac11f4a5325b217ca74b0c339459597daf03838",
+          "message": "Take the header size into account for the total block size (#10804)",
+          "timestamp": "2026-02-04T22:54:01Z",
+          "tree_id": "927659770ce8eb4baa4881d4a8d4a616d5920db7",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/cac11f4a5325b217ca74b0c339459597daf03838"
+        },
+        "date": 1770250557021,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0027336980100000005,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006958295609999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009564560059999973,
             "unit": "seconds"
           }
         ]

@@ -58,11 +58,13 @@ use sp_api::ProvideRuntimeApi;
 use sp_application_crypto::AppPublic;
 use sp_blockchain::HeaderBackend;
 use sp_consensus_aura::{AuraApi, Slot};
-use sp_runtime::Saturating;
 use sp_core::crypto::Pair;
 use sp_inherents::CreateInherentDataProviders;
 use sp_keystore::KeystorePtr;
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT, Member};
+use sp_runtime::{
+	traits::{Block as BlockT, Header as HeaderT, Member},
+	Saturating,
+};
 use sp_timestamp::Timestamp;
 use std::{path::PathBuf, sync::Arc, time::Duration};
 

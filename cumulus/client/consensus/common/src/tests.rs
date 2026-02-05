@@ -984,11 +984,7 @@ fn find_best_parent_in_allowed_ancestry() {
 
 	// When there's only the included block, it should be the best parent.
 	let result = block_on(find_parent_for_building(
-		ParentSearchParams {
-			relay_parent,
-			para_id: ParaId::from(100),
-			ancestry_lookback: 0,
-		},
+		ParentSearchParams { relay_parent, para_id: ParaId::from(100), ancestry_lookback: 0 },
 		&*backend,
 		&relay_chain,
 	))

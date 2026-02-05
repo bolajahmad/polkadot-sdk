@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770291673400,
+  "lastUpdate": 1770325520024,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "Sajjon@users.noreply.github.com",
-            "name": "Alexander Cyon",
-            "username": "Sajjon"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "0447d26148ef5b97f40fc01bce2d5156ab335eca",
-          "message": "Always send full parent header, not only hash, part of collation response (#8939)\n\nImplementation of https://github.com/paritytech/polkadot-sdk/issues/7733\n\n# Description\nInstead of **conditionally** sending the full parent header in the\ncollation response we now **always** send it (never the hash of it).\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-30T12:55:05Z",
-          "tree_id": "5dd8260c081bcdeac6c260c80aea6e5d93f81d63",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/0447d26148ef5b97f40fc01bce2d5156ab335eca"
-        },
-        "date": 1751294301972,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012779273186666669,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008874011386666748,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022389072653333324,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15647874782666668,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.010106857759999978,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexandre.balde@parity.io",
+            "name": "Alexandre R. Baldé",
+            "username": "rockbmb"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "4d53dff25c8028eccd062cea40b24d654f89ccd6",
+          "message": "Fix test for remote externality's selective child key retrieval mechanism (#10866)\n\n# Description\n\nFollow-up to #10766, which was closed in favor of #10779.\nRework remote externality child key test; it was failing since the proxy\npallet has no child storages.\n\n## Integration\n\nN/A\n\n# Checklist\n\n* [x] My PR includes a detailed description as outlined in the\n\"Description\" and its two subsections above.\n* [x] My PR follows the [labeling requirements](\n\nhttps://github.com/paritytech/polkadot-sdk/blob/master/docs/contributor/CONTRIBUTING.md#Process\n) of this project (at minimum one label for `T` required)\n    * External contributors: Use `/cmd label <label-name>` to add labels\n    * Maintainers can also add labels manually\n* [x] I have made corresponding changes to the documentation (if\napplicable)\n* [x] I have added tests that prove my fix is effective or that my\nfeature works (if applicable)",
+          "timestamp": "2026-02-05T19:52:27Z",
+          "tree_id": "29b800d80999ea7878d7fc3455a061a8effb703b",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/4d53dff25c8028eccd062cea40b24d654f89ccd6"
+        },
+        "date": 1770325495558,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.1446181010933334,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007185458753333334,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.022872185899999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.010089918420000009,
             "unit": "seconds"
           }
         ]

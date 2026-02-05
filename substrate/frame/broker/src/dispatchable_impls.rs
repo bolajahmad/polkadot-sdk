@@ -228,6 +228,8 @@ impl<T: Config> Pallet<T> {
 				let end_price = sale.end_price;
 				// Renewals should never be priced lower than the current `end_price`:
 				let price_cap = cmp::max(price + config.renewal_bump * price, end_price);
+				// TODO: `price` may've changed in the Self::purchase_core call so this price needs
+				// recomputation.
 				let price = price.min(price_cap);
 				log::debug!(
 					"Renew with: sale price: {:?}, price cap: {:?}, old price: {:?}",

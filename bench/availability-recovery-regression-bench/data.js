@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770250444326,
+  "lastUpdate": 1770291645824,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "Sajjon@users.noreply.github.com",
-            "name": "Alexander Cyon",
-            "username": "Sajjon"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "0447d26148ef5b97f40fc01bce2d5156ab335eca",
-          "message": "Always send full parent header, not only hash, part of collation response (#8939)\n\nImplementation of https://github.com/paritytech/polkadot-sdk/issues/7733\n\n# Description\nInstead of **conditionally** sending the full parent header in the\ncollation response we now **always** send it (never the hash of it).\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-30T12:55:05Z",
-          "tree_id": "5dd8260c081bcdeac6c260c80aea6e5d93f81d63",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/0447d26148ef5b97f40fc01bce2d5156ab335eca"
-        },
-        "date": 1751294276853,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.2009251229666667,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.220836393966664,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-recovery",
             "value": 11.126116245066665,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "davxy@datawok.net",
+            "name": "Davide Galassi",
+            "username": "davxy"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e2597df86c2506780644cef6e447b7c390aa0a0",
+          "message": "Rework experimental EC hostcalls (#10830)\n\n- Change mul param to Affine form (was Projective)\n([Context](https://github.com/paritytech/polkadot-sdk/pull/10147#issuecomment-3458638915))\n    - `msm_g(1/2)(&[Affine], &[Scalar]) -> Projective` \n        - changed to `msm_g(1/2)(&[Affine], &[Scalar]) -> Affine` \n    - `mul_projective_g(1/2)(Projective, Scalar) -> Projective` \n        - changed to `mul_affine_g(1/2)(Affine, Scalar) -> Affine`\n\n- Caller-allocated buffers: Callers pre-allocate output buffers using\n`buffer_for::<T>()` instead of host allocating and returning Vec<u8>\n(introduced by https://github.com/paritytech/polkadot-sdk/pull/10969)\n- New passing strategy: `PassFatPointerAndWrite` allows host to write\ninto guest memory without reading first\n- Typed error codes: Replaces `Result<Vec<u8>, ()>` with HostcallResult\nreturning specific error variants\n- In-place operations: final_exponentiation now operates in-place via\n`PassFatPointerAndReadWrite`\n\n- Prefer panicking on error rather than returning a dummy value that the\nruntime might treat as valid. Since such panics would typically occur\nwithin the runtime, the impact looks acceptable.\n\n- Cleanup/Docs/Tests\n\n---\n\nNOTE1: Hostcalls are experimental and not exposed in production! An\n[RFC](https://github.com/polkadot-fellows/RFCs/pull/163) proposal has\nbeen opened for production usage\n\nNOTE2: The `arkworks-extensions` `Hooks` trait methods remain unchanged;\nno updates are required there. Only the hostcalls are affected.\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
+          "timestamp": "2026-02-05T10:29:03Z",
+          "tree_id": "b309e20e965902b5c93f429e1305d57f4e091102",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/4e2597df86c2506780644cef6e447b7c390aa0a0"
+        },
+        "date": 1770291624313,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12332941136666667,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.317521444033328,
             "unit": "seconds"
           }
         ]

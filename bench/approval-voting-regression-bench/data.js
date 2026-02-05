@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770250513615,
+  "lastUpdate": 1770291702009,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "pgherveou@gmail.com",
-            "name": "PG Herveou",
-            "username": "pgherveou"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "0511431bf95ae81b284887100444bd1c560188e0",
-          "message": "Add address revive runtime API (#8851)\n\nThis gives an easy way for substrate user to convert an Account ID into\nthe mapped H160 address, by calling a new `address` runtime API\nfunction.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-30T04:07:31Z",
-          "tree_id": "6edc783272386590f5912f28df95c8afc764d3e5",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/0511431bf95ae81b284887100444bd1c560188e0"
-        },
-        "date": 1751260182028,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 52945.2,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 63623.32000000001,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.319524096742595,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.000022681889999999996,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.000022681889999999996,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.4146720944899993,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.3878432670699987,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.00002134109,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.00002134109,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005604060820000004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.381174553830001,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.8793981325400029,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.892163580480013,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.45584695018000837,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.3676245215500007,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-distribution/test-environment",
             "value": 0.000021742359999999998,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "davxy@datawok.net",
+            "name": "Davide Galassi",
+            "username": "davxy"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e2597df86c2506780644cef6e447b7c390aa0a0",
+          "message": "Rework experimental EC hostcalls (#10830)\n\n- Change mul param to Affine form (was Projective)\n([Context](https://github.com/paritytech/polkadot-sdk/pull/10147#issuecomment-3458638915))\n    - `msm_g(1/2)(&[Affine], &[Scalar]) -> Projective` \n        - changed to `msm_g(1/2)(&[Affine], &[Scalar]) -> Affine` \n    - `mul_projective_g(1/2)(Projective, Scalar) -> Projective` \n        - changed to `mul_affine_g(1/2)(Affine, Scalar) -> Affine`\n\n- Caller-allocated buffers: Callers pre-allocate output buffers using\n`buffer_for::<T>()` instead of host allocating and returning Vec<u8>\n(introduced by https://github.com/paritytech/polkadot-sdk/pull/10969)\n- New passing strategy: `PassFatPointerAndWrite` allows host to write\ninto guest memory without reading first\n- Typed error codes: Replaces `Result<Vec<u8>, ()>` with HostcallResult\nreturning specific error variants\n- In-place operations: final_exponentiation now operates in-place via\n`PassFatPointerAndReadWrite`\n\n- Prefer panicking on error rather than returning a dummy value that the\nruntime might treat as valid. Since such panics would typically occur\nwithin the runtime, the impact looks acceptable.\n\n- Cleanup/Docs/Tests\n\n---\n\nNOTE1: Hostcalls are experimental and not exposed in production! An\n[RFC](https://github.com/polkadot-fellows/RFCs/pull/163) proposal has\nbeen opened for production usage\n\nNOTE2: The `arkworks-extensions` `Hooks` trait methods remain unchanged;\nno updates are required there. Only the hostcalls are affected.\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
+          "timestamp": "2026-02-05T10:29:03Z",
+          "tree_id": "b309e20e965902b5c93f429e1305d57f4e091102",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/4e2597df86c2506780644cef6e447b7c390aa0a0"
+        },
+        "date": 1770291680104,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 52939.3,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 63616.31000000001,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3750393767699967,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.639061241763189,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.00004044925000000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.005874099329999996,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.7662572975099993,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.00004044925000000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.000028222919999999995,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.000028222919999999995,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8061378866700026,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.7636765822799996,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.6885948631900005,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 14.11203427367,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.706454167920002,
             "unit": "seconds"
           }
         ]

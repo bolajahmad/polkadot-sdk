@@ -74,7 +74,7 @@ impl SharedResources {
 			if let Err(e) = revive_dev_node::command::run_with_args(vec![
 				"--dev".to_string(),
 				"--rpc-port=45789".to_string(),
-				"-lerror,sc_rpc_server=info,runtime::revive=trace".to_string(),
+				"-lerror,sc_rpc_server=info,runtime::revive=debug".to_string(),
 			]) {
 				panic!("Node exited with error: {e:?}");
 			}

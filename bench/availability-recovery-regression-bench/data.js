@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770383294390,
+  "lastUpdate": 1770389575908,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "10196091+Ank4n@users.noreply.github.com",
-            "name": "Ankan",
-            "username": "Ank4n"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "8546b7ab14b469cdc66bfb596f8dd899aced26b7",
-          "message": "[Staking] [AHM] Fixes insufficient slashing of nominators (and some other small issues). (#8937)\n\nChanges to pallet-staking-async\n\n## Removed\n- Config constant `MaxDisabledValidators`: This constant was removed\nsince validator disabling logic has been moved to pallet-session, making\nit redundant in staking-async.\n- Storage DoubleMap `NominatorSlashInEra`: This was used to track\nper-era maximum slashes for nominators. It’s no longer required — we now\nonly track the highest slash per validator per era.\n- Call `withdraw_overstake`: This was a temporary extrinsic meant to fix\noverstake issues, but with fungible migration of staking funds, this is\nno longer possible and the extrinsic is obsolete.\n\n## Changed\n- Nominator slashing logic: The logic now aggregates slashes from\ndistinct offending validators nominated by a nominator within the same\nera. For repeated offences by the same validator, only the highest slash\nfraction is applied. Previously, the pallet applied only the highest\nslash across all validators, regardless of how many were slashed.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-01T14:17:55Z",
-          "tree_id": "eab2686cd5968c2ae624a59303bc754c3bebe353",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/8546b7ab14b469cdc66bfb596f8dd899aced26b7"
-        },
-        "date": 1751386093037,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.241114474633335,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.20042257666666666,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12665748243333333,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "14218860+iulianbarbu@users.noreply.github.com",
+            "name": "Iulian Barbu",
+            "username": "iulianbarbu"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "9972470602d118fb07d968460b8a6dd5d4523141",
+          "message": "sync-templates: consider workspace lints (#11007)\n\n# Description\n\nTrying to sync temaplates with their dedicated repos. The job fails at\nsome point because the templates' crates (runtime/node) use:\n```toml\n[lints]\nworkspace = true\n```\nbut there is no lint directive in the worskpace's Cargo.toml.\n\nThis takes the workspace lints existing in polkadot-sdk workspace's\nCargo.toml and carries them to each template, in their workspace's\nCargo.toml.\n\n## Integration\n\nN/A\n\n## Review Notes\n\nError started here:\nhttps://github.com/paritytech/polkadot-sdk/actions/runs/21747118215/job/62737549819.\nTesting the sync job based on this branch here:\nhttps://github.com/paritytech/polkadot-sdk/actions/runs/21748717584 - it\nfails, it appears there are some env protection rules (reasonable as\nwell, we shouldn't be able to publish anything to the templates repo)\n\nSigned-off-by: Iulian Barbu <iulian.barbu@parity.io>",
+          "timestamp": "2026-02-06T13:44:46Z",
+          "tree_id": "0e327db6e5f86c10ac9428fcc70c4cedbf5312ec",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/9972470602d118fb07d968460b8a6dd5d4523141"
+        },
+        "date": 1770389551217,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.261354541566668,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12301843213333333,
             "unit": "seconds"
           }
         ]

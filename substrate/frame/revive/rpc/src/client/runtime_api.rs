@@ -74,8 +74,9 @@ impl RuntimeApi {
 		block: BlockNumberOrTagOrHash,
 	) -> Result<U256, ClientError> {
 		let timestamp_override = match block {
-			BlockNumberOrTagOrHash::BlockTag(BlockTag::Pending) =>
-				Some(Timestamp::current().as_millis()),
+			BlockNumberOrTagOrHash::BlockTag(BlockTag::Pending) => {
+				Some(Timestamp::current().as_millis())
+			},
 			_ => None,
 		};
 
@@ -109,8 +110,9 @@ impl RuntimeApi {
 
 		while let Some(result) = stream.next().await {
 			match result {
-				Ok(estimation) =>
-					return estimation.map_err(|err| ClientError::TransactError(err.0)),
+				Ok(estimation) => {
+					return estimation.map_err(|err| ClientError::TransactError(err.0))
+				},
 				Err(Metadata(MetadataError::RuntimeMethodNotFound(name))) => {
 					log::debug!(target: LOG_TARGET, "Method {name:?} not found falling back");
 				},

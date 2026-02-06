@@ -347,7 +347,7 @@ where
 
 			// Build in a loop until not allowed. Note that the authorities can change
 			// at any block, so we need to re-claim our slot every time.
-			let mut parent_hash = parent_search_result.best_parent_hash;
+			let mut parent_hash = parent_search_result.best_parent_header.hash();
 			let mut parent_header = parent_search_result.best_parent_header;
 			// Distance from included block to best parent.
 			let initial_parent_depth: u32 = (*parent_header.number())

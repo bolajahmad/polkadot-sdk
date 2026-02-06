@@ -245,8 +245,8 @@ where
 				continue;
 			};
 
+			let parent_hash = parent_search_result.best_parent_header.hash();
 			let included_header = parent_search_result.included_header;
-			let parent_hash = parent_search_result.best_parent_hash;
 			let parent_header = &parent_search_result.best_parent_header;
 			// Distance from included block to best parent (unincluded segment length).
 			let unincluded_segment_len =

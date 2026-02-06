@@ -48,8 +48,6 @@ pub struct ParentSearchParams {
 pub struct ParentSearchResult<B: BlockT> {
 	/// The header of the included block (confirmed on relay chain).
 	pub included_header: B::Header,
-	/// The hash of the best parent block to build on.
-	pub best_parent_hash: B::Hash,
 	/// The header of the best parent block to build on.
 	pub best_parent_header: B::Header,
 }
@@ -58,7 +56,7 @@ impl<B: BlockT> std::fmt::Debug for ParentSearchResult<B> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("ParentSearchResult")
 			.field("included_number", &self.included_header.number())
-			.field("best_parent_hash", &self.best_parent_hash)
+			.field("best_parent_hash", &self.best_parent_header.hash())
 			.field("best_parent_number", &self.best_parent_header.number())
 			.finish()
 	}
@@ -144,14 +142,10 @@ pub async fn find_parent_for_building<B: BlockT>(
 			.await?;
 
 	// Search for the deepest valid parent starting from the pending/included block.
-	let (best_hash, best_header) =
+	let best_parent_header =
 		find_deepest_valid_parent(start_hash, start_header, backend, &rp_ancestry);
 
-	Ok(Some(ParentSearchResult {
-		included_header,
-		best_parent_hash: best_hash,
-		best_parent_header: best_header,
-	}))
+	Ok(Some(ParentSearchResult { included_header, best_parent_header }))
 }
 
 /// Fetch the included block from the relay chain.
@@ -241,11 +235,9 @@ fn find_deepest_valid_parent<Block: BlockT>(
 	start_header: Block::Header,
 	backend: &impl Backend<Block>,
 	rp_ancestry: &[(RelayHash, RelayHash)],
-) -> (Block::Hash, Block::Header) {
-	// The start block is always valid (it's either pending or included).
-	let mut best = (start_hash, start_header);
+) -> Block::Header {
+	let mut best = start_header;
 
-	// Collect children of start to begin the search.
 	let mut frontier: Vec<Block::Hash> =
 		backend.blockchain().children(start_hash).ok().into_iter().flatten().collect();
 
@@ -259,17 +251,15 @@ fn find_deepest_valid_parent<Block: BlockT>(
 	while let Some(hash) = frontier.pop() {
 		let Ok(Some(header)) = backend.blockchain().header(hash) else { continue };
 
-		// Check if this block's relay parent is within allowed ancestry.
 		if !is_relay_parent_in_ancestry::<Block>(&header, rp_ancestry) {
 			continue;
 		}
 
 		// This block is valid - update best if it's deeper.
-		if header.number() > best.1.number() {
-			best = (hash, header.clone());
+		if header.number() > best.number() {
+			best = header.clone();
 		}
 
-		// Add children to frontier.
 		frontier.extend(backend.blockchain().children(hash).ok().into_iter().flatten());
 	}
 
@@ -282,22 +272,13 @@ fn is_relay_parent_in_ancestry<Block: BlockT>(
 	rp_ancestry: &[(RelayHash, RelayHash)],
 ) -> bool {
 	let digest = header.digest();
-
-	// Check relay parent hash.
-	if let Some(relay_parent) = cumulus_primitives_core::extract_relay_parent(digest) {
-		if rp_ancestry.iter().any(|(h, _)| *h == relay_parent) {
-			return true;
-		}
-	}
-
-	// Check relay parent storage root (for blocks that don't have the hash in digest).
-	if let Some((storage_root, _)) =
+	let relay_parent = cumulus_primitives_core::extract_relay_parent(digest);
+	let storage_root =
 		cumulus_primitives_core::rpsr_digest::extract_relay_parent_storage_root(digest)
-	{
-		if rp_ancestry.iter().any(|(_, r)| *r == storage_root) {
-			return true;
-		}
-	}
+			.map(|(r, _)| r);
 
-	false
+	rp_ancestry.iter().any(|(rp_hash, rp_storage_root)| {
+		relay_parent.map_or(false, |rp| *rp_hash == rp) ||
+			storage_root.map_or(false, |sr| *rp_storage_root == sr)
+	})
 }

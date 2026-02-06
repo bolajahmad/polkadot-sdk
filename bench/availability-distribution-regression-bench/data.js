@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770389610189,
+  "lastUpdate": 1770405270815,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "10196091+Ank4n@users.noreply.github.com",
-            "name": "Ankan",
-            "username": "Ank4n"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "8546b7ab14b469cdc66bfb596f8dd899aced26b7",
-          "message": "[Staking] [AHM] Fixes insufficient slashing of nominators (and some other small issues). (#8937)\n\nChanges to pallet-staking-async\n\n## Removed\n- Config constant `MaxDisabledValidators`: This constant was removed\nsince validator disabling logic has been moved to pallet-session, making\nit redundant in staking-async.\n- Storage DoubleMap `NominatorSlashInEra`: This was used to track\nper-era maximum slashes for nominators. It’s no longer required — we now\nonly track the highest slash per validator per era.\n- Call `withdraw_overstake`: This was a temporary extrinsic meant to fix\noverstake issues, but with fungible migration of staking funds, this is\nno longer possible and the extrinsic is obsolete.\n\n## Changed\n- Nominator slashing logic: The logic now aggregates slashes from\ndistinct offending validators nominated by a nominator within the same\nera. For repeated offences by the same validator, only the highest slash\nfraction is applied. Previously, the pallet applied only the highest\nslash across all validators, regardless of how many were slashed.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-01T14:17:55Z",
-          "tree_id": "eab2686cd5968c2ae624a59303bc754c3bebe353",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/8546b7ab14b469cdc66bfb596f8dd899aced26b7"
-        },
-        "date": 1751386118835,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008754445060000086,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15752768726,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012868596473333334,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022494970073333332,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-distribution",
             "value": 0.0071550309466666675,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "60601340+lexnv@users.noreply.github.com",
+            "name": "Alexandru Vasile",
+            "username": "lexnv"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3ecda3ceccd7a43f38d1553d3d6c5566c692a4b1",
+          "message": "slot_timer: Downgrade spammy log to debug (#10974)\n\nThe log is quite spammy with 12core setup since the last ~2 blocks will\nbe skipped in the last second of block production.\n\n---------\n\nSigned-off-by: Alexandru Vasile <alexandru.vasile@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-06T17:42:33Z",
+          "tree_id": "b09c05869ff4bbe87df81d0b77ba581b09c39ff0",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3ecda3ceccd7a43f38d1553d3d6c5566c692a4b1"
+        },
+        "date": 1770405246883,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14540287744666672,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.006992876100000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.00985397576666665,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.022911126093333328,
             "unit": "seconds"
           }
         ]

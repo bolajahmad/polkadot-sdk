@@ -22,7 +22,7 @@ use jsonrpsee::{
 	core::{async_trait, RpcResult},
 	types::{ErrorCode, ErrorObjectOwned},
 };
-use pallet_revive::{evm::*, EthTransactInfo};
+use pallet_revive::evm::*;
 use sp_core::{keccak_256, H160, H256, U256};
 use thiserror::Error;
 use tokio::time::Duration;

@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770366908821,
+  "lastUpdate": 1770383397265,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "44604217+tmpolaczyk@users.noreply.github.com",
-            "name": "tmpolaczyk",
-            "username": "tmpolaczyk"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "d30a5fbbd973035893a1a25e1bcf9d9fb2c24d53",
-          "message": "Fix pallet_migrations benchmark when FailedMigrationHandler emits events (#8694)\n\nWhen FailedMigrationHandler emits events, the `UpgradeFailed` event is\nnot the last one, so `assert_last_event` fails. Fixed by checking that\nthe `UpgradeFailed` event is emitted, even if it is not the last one.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Bastian Köcher <git@kchr.de>",
-          "timestamp": "2025-06-30T07:38:13Z",
-          "tree_id": "55c79a51c2be86abbf231a1611a4ef1332748aed",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/d30a5fbbd973035893a1a25e1bcf9d9fb2c24d53"
-        },
-        "date": 1751273321578,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 127.95199999999997,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.03408048640200002,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04549567536999993,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.03780175017800001,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "marian@parity.io",
+            "name": "Marian Radu",
+            "username": "marian-radu"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b4a1f75c4f26109c76f1e4b90eb93a2f44d0b0e7",
+          "message": "revive-eth-rpc: Use pending block for estimate_gas in dev mode (#10963)\n\nUse Pending as the default block for eth_estimateGas in dev mode,\nmatching Anvil/EDR behavior. Non-dev mode continues to use Latest\n(go-ethereum behavior).\n\nRefs https://github.com/paritytech/contract-issues/issues/261\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-06T11:55:08Z",
+          "tree_id": "3111445c469f16231e3b8e0028ad88c87824f5f5",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b4a1f75c4f26109c76f1e4b90eb93a2f44d0b0e7"
+        },
+        "date": 1770383372555,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 128.06400000000002,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.038291495004,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.0662350554579999,
             "unit": "seconds"
           }
         ]

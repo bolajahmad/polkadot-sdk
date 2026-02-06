@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770325621144,
+  "lastUpdate": 1770366941713,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23617,6 +23617,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "dispute-distribution",
             "value": 0.009247526429999983,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pgherveou@gmail.com",
+            "name": "PG Herveou",
+            "username": "pgherveou"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "298bf2cb182b6fe3530568060a47853e630f52cb",
+          "message": "Enforce match_arm_blocks = true for consistent formatting (#10958)\n\n## Summary\n\nFlips `match_arm_blocks` from `false` to `true` to ensure all multi-line\nmatch arm bodies are wrapped in braces consistently.\n\n## Problem\n\nWith `match_arm_blocks = false`, rustfmt doesn't *add* braces to\nmulti-line match arms, but it also doesn't *remove* existing braces.\nThis means both styles are valid:\n\n```rust\n// Style A (no braces)\nAccountIdOrAddress::AccountId(id) =>\n    <T::AddressMapper as AddressMapper<T>>::to_address(id),\n\n// Style B (with braces) - also valid, rustfmt won't change it\nAccountIdOrAddress::AccountId(id) => {\n    <T::AddressMapper as AddressMapper<T>>::to_address(id)\n},\n```\n\nLLMs tend to produce Style B, which creates unnecessary diff noise in\nPRs.\n\n## Solution\n\nSet `match_arm_blocks = true` to enforce Style B everywhere. Now there's\nexactly one valid style, eliminating the ambiguity.\n\n## Impact\n\n556 files changed — this is a one-time formatting update. All future\ncode will be consistently formatted.\n\nFollow-up to #10939.\n\n---------\n\nCo-authored-by: PG <pg@parity.io>\nCo-authored-by: PG Herveou <pg@pgherveou.com>",
+          "timestamp": "2026-02-06T07:25:57Z",
+          "tree_id": "b9543d172b17bc251288c321811b843ef4fc6cbd",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/298bf2cb182b6fe3530568060a47853e630f52cb"
+        },
+        "date": 1770366917569,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006646195400000002,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.002696177209999999,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.00930903258999998,
             "unit": "seconds"
           }
         ]

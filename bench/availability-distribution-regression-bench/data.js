@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770383328664,
+  "lastUpdate": 1770389610189,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "diego2737@gmail.com",
-            "name": "Diego",
-            "username": "dimartiro"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "20510c488198e8ee72b241fd2d0f6d1784982734",
-          "message": "chore: Bump bounded-collections dep (#9004)\n\n# Description\n\nBump bounded-collections dep from `0.2.3` to `0.3.2` based on the latest\n[release](https://crates.io/crates/bounded-collections/0.3.2)\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Bastian Köcher <git@kchr.de>",
-          "timestamp": "2025-07-01T08:03:09Z",
-          "tree_id": "44744a795008b71ae5174e1747ef796272b08505",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/20510c488198e8ee72b241fd2d0f6d1784982734"
-        },
-        "date": 1751361566186,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15745942507333335,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022501387546666658,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008998027920000073,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013224846533333336,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-store",
             "value": 0.14455502298000003,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "14218860+iulianbarbu@users.noreply.github.com",
+            "name": "Iulian Barbu",
+            "username": "iulianbarbu"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "9972470602d118fb07d968460b8a6dd5d4523141",
+          "message": "sync-templates: consider workspace lints (#11007)\n\n# Description\n\nTrying to sync temaplates with their dedicated repos. The job fails at\nsome point because the templates' crates (runtime/node) use:\n```toml\n[lints]\nworkspace = true\n```\nbut there is no lint directive in the worskpace's Cargo.toml.\n\nThis takes the workspace lints existing in polkadot-sdk workspace's\nCargo.toml and carries them to each template, in their workspace's\nCargo.toml.\n\n## Integration\n\nN/A\n\n## Review Notes\n\nError started here:\nhttps://github.com/paritytech/polkadot-sdk/actions/runs/21747118215/job/62737549819.\nTesting the sync job based on this branch here:\nhttps://github.com/paritytech/polkadot-sdk/actions/runs/21748717584 - it\nfails, it appears there are some env protection rules (reasonable as\nwell, we shouldn't be able to publish anything to the templates repo)\n\nSigned-off-by: Iulian Barbu <iulian.barbu@parity.io>",
+          "timestamp": "2026-02-06T13:44:46Z",
+          "tree_id": "0e327db6e5f86c10ac9428fcc70c4cedbf5312ec",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/9972470602d118fb07d968460b8a6dd5d4523141"
+        },
+        "date": 1770389585005,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.010016303193333345,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.022972286853333333,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14556025679333331,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.0071550309466666675,
             "unit": "seconds"
           }
         ]

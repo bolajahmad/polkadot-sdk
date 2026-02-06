@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770366941713,
+  "lastUpdate": 1770383431251,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23666,6 +23666,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "dispute-distribution",
             "value": 0.00930903258999998,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "marian@parity.io",
+            "name": "Marian Radu",
+            "username": "marian-radu"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b4a1f75c4f26109c76f1e4b90eb93a2f44d0b0e7",
+          "message": "revive-eth-rpc: Use pending block for estimate_gas in dev mode (#10963)\n\nUse Pending as the default block for eth_estimateGas in dev mode,\nmatching Anvil/EDR behavior. Non-dev mode continues to use Latest\n(go-ethereum behavior).\n\nRefs https://github.com/paritytech/contract-issues/issues/261\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-06T11:55:08Z",
+          "tree_id": "3111445c469f16231e3b8e0028ad88c87824f5f5",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b4a1f75c4f26109c76f1e4b90eb93a2f44d0b0e7"
+        },
+        "date": 1770383406617,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0027236778699999986,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006593465140000002,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009273773189999984,
             "unit": "seconds"
           }
         ]

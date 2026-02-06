@@ -113,7 +113,7 @@ use sp_runtime::{
 	generic, impl_opaque_keys,
 	traits::{
 		AccountIdConversion, BlakeTwo256, Block as BlockT, ConstU32, ConvertInto, IdentityLookup,
-		Keccak256, OpaqueKeys, SaturatedConversion, Verify,
+		Keccak256, SaturatedConversion, Verify,
 	},
 	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, FixedU128, KeyTypeId, Perbill, Percent, Permill, RuntimeDebug,
@@ -457,12 +457,22 @@ impl_opaque_keys! {
 	pub struct SessionKeys {
 		pub grandpa: Grandpa,
 		pub babe: Babe,
-		pub authority_discovery: AuthorityDiscovery,
-		pub para_assignment: ParaSessionInfo,
 		pub para_validator: Initializer,
+		pub para_assignment: ParaSessionInfo,
+		pub authority_discovery: AuthorityDiscovery,
 		pub beefy: Beefy,
 	}
 }
+
+/// AuthorityDiscovery must be before Initializer because Initializer reads its storage.
+pub type SessionHandlers = (
+	Grandpa,
+	Babe,
+	AuthorityDiscovery,
+	ParaSessionInfo,
+	Initializer,
+	Beefy,
+);
 
 /// Special `ValidatorIdOf` implementation that is just returning the input as result.
 pub struct ValidatorIdOf;
@@ -479,7 +489,7 @@ impl pallet_session::Config for Runtime {
 	type ShouldEndSession = Babe;
 	type NextSessionRotation = Babe;
 	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Self, ValidatorManager>;
-	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
+	type SessionHandler = SessionHandlers;
 	type Keys = SessionKeys;
 	type DisablingStrategy = ();
 	type WeightInfo = weights::pallet_session::WeightInfo<Runtime>;

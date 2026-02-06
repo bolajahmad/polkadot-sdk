@@ -118,7 +118,7 @@ pub mod weights;
 
 extern crate alloc;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, collections::btree_set::BTreeSet, vec::Vec};
 use codec::{Decode, MaxEncodedLen};
 use core::{
 	marker::PhantomData,
@@ -473,22 +473,18 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
-			if T::SessionHandler::KEY_TYPE_IDS.len() != T::Keys::key_ids().len() {
-				panic!("Number of keys in session handler and session keys does not match");
+			// Verify that session handlers and session keys have the same key types.
+			// Note: The order may differ - handlers extract keys by KeyTypeId, not position.
+			let handler_keys: BTreeSet<_> = T::SessionHandler::KEY_TYPE_IDS.iter().collect();
+			let session_keys: BTreeSet<_> = T::Keys::key_ids().iter().collect();
+			if handler_keys != session_keys {
+				panic!(
+					"Session handler key types do not match session key types. \
+					 Handler: {:?}, Keys: {:?}",
+					T::SessionHandler::KEY_TYPE_IDS,
+					T::Keys::key_ids(),
+				);
 			}
-
-			T::SessionHandler::KEY_TYPE_IDS
-				.iter()
-				.zip(T::Keys::key_ids())
-				.enumerate()
-				.for_each(|(i, (sk, kk))| {
-					if sk != kk {
-						panic!(
-							"Session handler and session key expect different key type at index: {}",
-							i,
-						);
-					}
-				});
 
 			for (account, val, keys) in
 				self.keys.iter().chain(self.non_authority_keys.iter()).cloned()

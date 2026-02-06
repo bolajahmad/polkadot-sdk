@@ -78,15 +78,13 @@ pub const INACTIVITY_DECAY: u16 = 0;
 
 /// Slashing value for a failed fetch that we can be fairly sure does not happen by accident. In
 /// this case we clear the reputation of the collator.
-pub const FAILED_FETCH_SLASH: Score = Score::new(MAX_SCORE).expect("MAX_SCORE is valid value");
+pub const FAILED_FETCH_SLASH: Score = Score::new(MAX_SCORE);
 
 /// Slashing value for an invalid collation (half of the max).
-pub const INVALID_COLLATION_SLASH: Score =
-	Score::new(MAX_SCORE / 2).expect("1/2 MAX_SCORE is less than MAX_SCORE");
+pub const INVALID_COLLATION_SLASH: Score = Score::new(MAX_SCORE / 2);
 
 /// Minimum reputation threshold that warrants an instant fetch.
-pub const INSTANT_FETCH_REP_THRESHOLD: Score = Score::new(VALID_INCLUDED_CANDIDATE_BUMP)
-	.expect("VALID_INCLUDED_CANDIDATE_BUMP is less than MAX_SCORE");
+pub const INSTANT_FETCH_REP_THRESHOLD: Score = Score::new(VALID_INCLUDED_CANDIDATE_BUMP);
 
 /// Limit for the total number connected peers.
 pub const CONNECTED_PEERS_LIMIT: NonZeroU16 = NonZeroU16::new(300).expect("300 is greater than 0");
@@ -120,12 +118,8 @@ pub struct Score(u16);
 
 impl Score {
 	/// Create a new instance. Fail if over the `MAX_SCORE`.
-	pub const fn new(val: u16) -> Option<Self> {
-		if val > MAX_SCORE {
-			return None;
-		}
-
-		Some(Self(val))
+	pub const fn new(val: u16) -> Self {
+		Self(val)
 	}
 
 	/// Add `val` to the inner value, saturating at `MAX_SCORE`.
@@ -291,7 +285,7 @@ mod tests {
 		assert!(MAX_SCORE > 50);
 
 		// Test saturating arithmetic functions.
-		let score = Score::new(50).unwrap();
+		let score = Score::new(50);
 
 		// Test addition with value that does not go over the limit.
 		for other_score in (0..(MAX_SCORE - 50)).step_by(10) {

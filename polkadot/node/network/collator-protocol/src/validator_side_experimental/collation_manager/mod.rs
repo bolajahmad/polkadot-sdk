@@ -1193,7 +1193,7 @@ mod tests {
 
 	#[test]
 	fn calculate_delay_works() {
-		let score = |val: u16| Score::new(val).unwrap();
+		let score = |val: u16| Score::new(val);
 
 		// collator score == INSTANT_FETCH_REP_THRESHOLD => zero delay
 		assert_eq!(CollationManager::calculate_delay(INSTANT_FETCH_REP_THRESHOLD), Duration::ZERO);
@@ -1211,7 +1211,7 @@ mod tests {
 	fn accepted_advertisement_ordering() {
 		use std::cmp::Ordering;
 
-		let score = |val: u16| Score::new(val).unwrap();
+		let score = |val: u16| Score::new(val);
 		let now = Instant::now();
 		let later = now + Duration::from_secs(1);
 
@@ -1310,7 +1310,7 @@ mod tests {
 	fn pick_best_advertisement_works() {
 		let relay_parent = Hash::random();
 		let para_id = ParaId::new(1);
-		let score = |val: u16| Score::new(val).unwrap();
+		let score = |val: u16| Score::new(val);
 
 		let now = Instant::now();
 		// Timestamp far enough in the past that any delay has passed.

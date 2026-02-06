@@ -159,147 +159,14 @@ impl EthRpcServer for EthRpcServerImpl {
 	) -> RpcResult<U256> {
 		log::trace!(target: LOG_TARGET, "estimate_gas transaction={transaction:?} block={block:?}");
 
-		let runtime_api = {
-			let block = block.unwrap_or_default();
-			let hash = self.client.block_hash_for_tag(block.into()).await?;
-			self.client.runtime_api(hash)
-		};
-
-		let mut low = U256::zero();
-		let mut high = runtime_api.block_gas_limit().await?;
-		log::trace!(target: LOG_TARGET, "estimate_gas low={low} high={high}");
-
-		// Cap the high at transaction's gas limit if it's been specified by the user.
-		if let Some(gas_limit) = transaction.gas {
-			high = gas_limit;
-			log::trace!(target: LOG_TARGET, "estimate_gas high=transaction.gas={high}");
-		}
-
-		// Cap the high based on the account's balance.
-		let fee_cap = transaction.max_fee_per_gas.or(transaction.gas_price);
-		if let (Some(fee_cap), Some(from)) = (fee_cap, transaction.from) {
-			let mut available = self.get_balance(from, block.unwrap_or_default().into()).await?;
-			if let Some(value) = transaction.value {
-				available = available.checked_sub(value).ok_or_else(|| {
-					ErrorObjectOwned::owned(-32000, "insufficient funds for transfer", None::<()>)
-				})?;
-			}
-			if let Some(allowance) = available.checked_div(fee_cap) {
-				if high > allowance {
-					high = allowance;
-					log::trace!(target: LOG_TARGET, "estimate_gas high=allowance={high}");
-				}
-			}
-		}
-
-		// TODO: Implement a short circuit for simple transfers. We just need to determine the gas
-		// needed for it.
-
-		// Performing the dry-run with the maximum gas limit. If it fails, then there's no need to
-		// perform the binary search.
-		let first_dry_run_result = match self
-			.dry_run_with_gas_limit(transaction.clone(), block, high)
-			.await
-		{
-			Ok(result) => result,
-			Err(error) if error.message().contains("OutOfGas") => {
-				let max_extrinsic_weight_in_gas = runtime_api.max_extrinsic_weight_in_gas().await?;
-				log::trace!(
-					target: LOG_TARGET,
-					"estimate_gas Going through the max_extrinsic_weight_in_gas route. max_extrinsic_weight_in_gas={}",
-					max_extrinsic_weight_in_gas
-				);
-				let dry_run_result = self
-					.dry_run_with_gas_limit(transaction.clone(), block, max_extrinsic_weight_in_gas)
-					.await
-					.inspect(
-						|_| log::trace!(target: LOG_TARGET, "estimate_gas max_extrinsic_weight_in_gas route succeeded"),
-					)
-					.inspect_err(
-						|_| log::trace!(target: LOG_TARGET, "estimate_gas max_extrinsic_weight_in_gas route failed"),
-					)?;
-				high = max_extrinsic_weight_in_gas;
-				dry_run_result
-			},
-			Err(err) => return Err(err),
-		};
-		low = first_dry_run_result.eth_gas - U256::one();
-
-		// Performing the binary search for the lowest gas limit.
-		while low + U256::one() < high {
-			// Early return if the range has gotten small enough (1.5%)
-			let error_ratio = high
-				.checked_sub(low)
-				.and_then(|value| value.checked_mul(U256::from(1000)))
-				.and_then(|value| value.checked_div(high))
-				.ok_or_else(|| {
-					ErrorObjectOwned::owned(
-						-32000,
-						"failed to calculate error ratio in gas estimation",
-						None::<()>,
-					)
-				})?;
-			if error_ratio <= U256::from(15) {
-				break;
-			}
-
-			let midpoint = high
-				.checked_sub(low)
-				.and_then(|value| value.checked_div(U256::from(2)))
-				.and_then(|value| value.checked_add(low))
-				.ok_or_else(|| {
-					ErrorObjectOwned::owned(
-						-32000,
-						"failed to calculate midpoint in gas estimation",
-						None::<()>,
-					)
-				})?
-				.min(low.checked_mul(U256::from(2)).ok_or_else(|| {
-					ErrorObjectOwned::owned(
-						-32000,
-						"failed to calculate midpoint in gas estimation",
-						None::<()>,
-					)
-				})?);
-
-			let dry_run_result =
-				self.dry_run_with_gas_limit(transaction.clone(), block, midpoint).await;
-			match dry_run_result {
-				Ok(eth_transact_info) => {
-					high = midpoint;
-					log::trace!(
-						target: LOG_TARGET,
-						"estimate_gas dry run succeeded, low={} mid={} high={} return_value={}",
-						low,
-						midpoint,
-						high,
-						String::from_utf8_lossy(eth_transact_info.data.as_slice())
-					);
-				},
-				Err(_) => {
-					low = midpoint;
-					log::trace!(target: LOG_TARGET, "estimate_gas dry run failed, low={low} mid={midpoint} high={high}");
-				},
-			}
-		}
-
-		// Adding a 2% margin to the gas estimate. We're forced to do this for PolkaVM due to the
-		// round downs that take place when converting the weight to fuel.
-		let gas_estimate = high
-			.checked_div(U256::from(50))
-			.and_then(|margin| high.checked_add(margin))
-			.ok_or_else(|| {
-				ErrorObjectOwned::owned(
-					-32000,
-					"failed to add a margin to the gas estimate",
-					None::<()>,
-				)
-			})?;
+		let block = block.unwrap_or_default();
+		let hash = self.client.block_hash_for_tag(block.into()).await?;
+		let gas_estimate =
+			self.client.runtime_api(hash).estimate_gas(transaction, block.into()).await?;
 
 		log::trace!(
 			target: LOG_TARGET,
-			"estimate_gas result={gas_estimate:?} - first_dry_run_result={}",
-			first_dry_run_result.eth_gas
+			"estimate_gas result={gas_estimate:?}",
 		);
 		Ok(gas_estimate)
 	}
@@ -625,26 +492,5 @@ impl EthRpcServerImpl {
 		};
 
 		Ok(Some(TransactionInfo::new(&receipt, signed_tx)))
-	}
-
-	async fn dry_run_with_gas_limit(
-		&self,
-		mut transaction: GenericTransaction,
-		block: Option<BlockNumberOrTag>,
-		gas_limit: U256,
-	) -> RpcResult<EthTransactInfo<u128>> {
-		transaction.gas = Some(gas_limit);
-		self.dry_run(transaction, block).await
-	}
-
-	async fn dry_run(
-		&self,
-		transaction: GenericTransaction,
-		block: Option<BlockNumberOrTag>,
-	) -> RpcResult<EthTransactInfo<u128>> {
-		let block = block.unwrap_or_default();
-		let hash = self.client.block_hash_for_tag(block.clone().into()).await?;
-		let runtime_api = self.client.runtime_api(hash);
-		runtime_api.dry_run(transaction, block.into()).await.map_err(Into::into)
 	}
 }

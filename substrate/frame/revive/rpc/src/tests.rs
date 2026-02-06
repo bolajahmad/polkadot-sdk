@@ -74,7 +74,7 @@ impl SharedResources {
 			if let Err(e) = revive_dev_node::command::run_with_args(vec![
 				"--dev".to_string(),
 				"--rpc-port=45789".to_string(),
-				"-lerror,sc_rpc_server=info,runtime::revive=debug".to_string(),
+				"-lerror,sc_rpc_server=info,runtime::revive=trace".to_string(),
 			]) {
 				panic!("Node exited with error: {e:?}");
 			}
@@ -302,20 +302,20 @@ async fn run_all_eth_rpc_tests_inner() -> anyhow::Result<()> {
 	}
 
 	run_tests!(
-		// test_transfer,
-		// test_deploy_and_call,
-		// test_runtime_api_dry_run_addr_works,
-		// test_invalid_transaction,
-		// test_evm_blocks_should_match,
-		// test_evm_blocks_hydrated_should_match,
-		// test_block_hash_for_tag_with_proper_ethereum_block_hash_works,
-		// test_block_hash_for_tag_with_invalid_ethereum_block_hash_fails,
-		// test_block_hash_for_tag_with_block_number_works,
-		// test_block_hash_for_tag_with_block_tags_works,
-		// test_multiple_transactions_in_block,
-		// test_mixed_evm_substrate_transactions,
-		// test_runtime_pallets_address_upload_code,
-		// test_dry_run_of_contract_with_consume_all_gas,
+		test_transfer,
+		test_deploy_and_call,
+		test_runtime_api_dry_run_addr_works,
+		test_invalid_transaction,
+		test_evm_blocks_should_match,
+		test_evm_blocks_hydrated_should_match,
+		test_block_hash_for_tag_with_proper_ethereum_block_hash_works,
+		test_block_hash_for_tag_with_invalid_ethereum_block_hash_fails,
+		test_block_hash_for_tag_with_block_number_works,
+		test_block_hash_for_tag_with_block_tags_works,
+		test_multiple_transactions_in_block,
+		test_mixed_evm_substrate_transactions,
+		test_runtime_pallets_address_upload_code,
+		test_dry_run_of_contract_with_consume_all_gas,
 		test_gas_estimation_for_contract_requiring_binary_search
 	);
 
@@ -422,7 +422,12 @@ async fn test_deploy_and_call() -> anyhow::Result<()> {
 	);
 
 	let balance = client.get_balance(contract_address, BlockTag::Latest.into()).await?;
-	assert_eq!(Some(value), balance.checked_sub(initial_balance), "Contract {contract_address:?} Balance {balance} should have increased from {initial_balance} by {value}.");
+	assert_eq!(
+		Some(value),
+		balance.checked_sub(initial_balance),
+		"Contract {contract_address:?}
+	Balance {balance} should have increased from {initial_balance} by {value}."
+	);
 
 	// Balance transfer to contract
 	let initial_balance = client.get_balance(contract_address, BlockTag::Latest.into()).await?;

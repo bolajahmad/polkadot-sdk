@@ -242,11 +242,6 @@ impl PerLeafClaimQueueState {
 		self.leaves.get(leaf).map(|state| state.free_slots()).unwrap_or_default()
 	}
 
-	/// Returns the corresponding para ids for all unclaimed slots in the claim queue for all
-	/// leaves.
-	pub fn all_free_slots(&self) -> BTreeSet<ParaId> {
-		self.leaves.values().flat_map(|state| state.free_slots()).collect()
-	}
 }
 
 #[cfg(test)]

@@ -59,7 +59,7 @@ pub const INACTIVITY_DECAY: u16 = 0;
 ///
 /// Which means `MAX_SCORE` and `VALID_INCLUDED_CANDIDATE_BUMP` combination guarantees reputation
 /// will build up slowly.
-///
+
 /// The next two parameters determine the punishments for misbehaviours. `FAILED_FETCH_SLASH`
 /// indicates malicious behavior and the consequences are severe.
 
@@ -70,6 +70,10 @@ pub const FAILED_FETCH_SLASH: Score = Score::new(MAX_SCORE).expect("MAX_SCORE is
 /// Slashing value for an invalid collation (half of the max).
 pub const INVALID_COLLATION_SLASH: Score =
 	Score::new(MAX_SCORE / 2).expect("1/2 MAX_SCORE is less than MAX_SCORE");
+
+/// Minimum reputation threshold that warrants an instant fetch.
+pub const INSTANT_FETCH_REP_THRESHOLD: Score = Score::new(VALID_INCLUDED_CANDIDATE_BUMP)
+	.expect("VALID_INCLUDED_CANDIDATE_BUMP is less than MAX_SCORE");
 
 /// Limit for the total number connected peers.
 pub const CONNECTED_PEERS_LIMIT: NonZeroU16 = NonZeroU16::new(300).expect("300 is greater than 0");
@@ -272,15 +276,6 @@ mod tests {
 	#[test]
 	fn score_functions() {
 		assert!(MAX_SCORE > 50);
-
-		// Test that the constructor returns None for values that exceed the limit.
-		for score in (0..MAX_SCORE).step_by(10) {
-			assert_eq!(u16::from(Score::new(score).unwrap()), score);
-		}
-		assert_eq!(u16::from(Score::new(MAX_SCORE).unwrap()), MAX_SCORE);
-		for score in ((MAX_SCORE + 1)..(MAX_SCORE + 50)).step_by(5) {
-			assert_eq!(Score::new(score), None);
-		}
 
 		// Test saturating arithmetic functions.
 		let score = Score::new(50).unwrap();

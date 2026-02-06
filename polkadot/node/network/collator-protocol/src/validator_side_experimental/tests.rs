@@ -969,14 +969,11 @@ struct MockDb {
 }
 
 impl Default for MockDb {
+	/// Create an instance where all peers have a score that allows instant fetching.
 	fn default() -> Self {
-		let query_fn = |_peer_id, _para_id| None;
-		Self {
-			finalized: Default::default(),
-			witnessed_bumps: Default::default(),
-			witnessed_slash: Default::default(),
-			query_fn: Arc::new(Mutex::new(query_fn)),
-		}
+		let query_fn =
+			|_peer_id, _para_id| Some(Score::new(VALID_INCLUDED_CANDIDATE_BUMP).unwrap());
+		Self::new(Arc::new(Mutex::new(query_fn)))
 	}
 }
 
@@ -1038,10 +1035,6 @@ impl Backend for MockDb {
 		*(self.finalized.lock().unwrap()) = leaf_number;
 
 		vec![]
-	}
-
-	async fn max_scores_for_paras(&self, _paras: BTreeSet<ParaId>) -> HashMap<ParaId, Score> {
-		HashMap::new()
 	}
 }
 

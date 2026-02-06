@@ -20,7 +20,9 @@ use super::{trie_cache, trie_recorder, MemoryOptimizedValidationParams};
 use alloc::vec::Vec;
 use codec::{Decode, Encode};
 use cumulus_primitives_core::{
-	relay_chain::{BlockNumber as RNumber, Hash as RHash, UMPSignal, UMP_SEPARATOR},
+	relay_chain::{
+		BlockNumber as RNumber, Hash as RHash, UMPSignal, MAX_HEAD_DATA_SIZE, UMP_SEPARATOR,
+	},
 	ClaimQueueOffset, CoreSelector, CumulusDigestItem, ParachainBlockData, PersistedValidationData,
 };
 use frame_support::{
@@ -124,6 +126,10 @@ where
 		sp_io::offchain_index::host_clear.replace_implementation(host_offchain_index_clear),
 		cumulus_primitives_proof_size_hostfunction::storage_proof_size::host_storage_proof_size
 			.replace_implementation(host_storage_proof_size),
+		#[cfg(feature = "transaction-index")]
+		sp_io::transaction_index::host_index.replace_implementation(host_transaction_index_index),
+		#[cfg(feature = "transaction-index")]
+		sp_io::transaction_index::host_renew.replace_implementation(host_transaction_index_renew),
 	);
 
 	let block_data = codec::decode_from_bytes::<ParachainBlockData<B::LazyBlock>>(block_data)
@@ -213,7 +219,6 @@ where
 		if overlay.storage(well_known_keys::CODE).is_some() && num_blocks > 1 {
 			panic!("When applying a runtime upgrade, only one block per PoV is allowed. Received {num_blocks}.")
 		}
-
 		run_with_externalities_and_recorder::<B, _, _>(
 			&backend,
 			&mut Default::default(),
@@ -390,6 +395,12 @@ fn validate_blocks<B: BlockT>(blocks: &[B::LazyBlock], parent_header: &B::Header
 			"Not a valid chain of blocks :(; {:?} not a parent of {:?}?",
 			array_bytes::bytes2hex("0x", expected_parent.as_ref()),
 			array_bytes::bytes2hex("0x", block.header().parent_hash().as_ref()),
+		);
+
+		let encoded_header_size = block.header().encoded_size();
+		assert!(
+			encoded_header_size <= MAX_HEAD_DATA_SIZE as usize,
+			"Header size {encoded_header_size} exceeds MAX_HEAD_DATA_SIZE {MAX_HEAD_DATA_SIZE}",
 		);
 
 		// Validate BlockBundleInfo consistency
@@ -594,3 +605,21 @@ fn host_default_child_storage_next_key(storage_key: &[u8], key: &[u8]) -> Option
 fn host_offchain_index_set(_key: &[u8], _value: &[u8]) {}
 
 fn host_offchain_index_clear(_key: &[u8]) {}
+
+/// Parachain validation does not require maintaining a transaction index,
+/// and indexing transactions does **not** contribute to the parachain state.
+/// However, the host environment still expects this function to exist,
+/// so we provide a no-op implementation.
+#[cfg(feature = "transaction-index")]
+fn host_transaction_index_index(_extrinsic: u32, _size: u32, _context_hash: [u8; 32]) {
+	// No-op host function used during parachain validation.
+}
+
+/// Parachain validation does not require maintaining a transaction index,
+/// and indexing transactions does **not** contribute to the parachain state.
+/// However, the host environment still expects this function to exist,
+/// so we provide a no-op implementation.
+#[cfg(feature = "transaction-index")]
+fn host_transaction_index_renew(_extrinsic: u32, _context_hash: [u8; 32]) {
+	// No-op host function used during parachain validation.
+}

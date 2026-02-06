@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770366806347,
+  "lastUpdate": 1770383294390,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "diego2737@gmail.com",
-            "name": "Diego",
-            "username": "dimartiro"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "20510c488198e8ee72b241fd2d0f6d1784982734",
-          "message": "chore: Bump bounded-collections dep (#9004)\n\n# Description\n\nBump bounded-collections dep from `0.2.3` to `0.3.2` based on the latest\n[release](https://crates.io/crates/bounded-collections/0.3.2)\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Bastian Köcher <git@kchr.de>",
-          "timestamp": "2025-07-01T08:03:09Z",
-          "tree_id": "44744a795008b71ae5174e1747ef796272b08505",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/20510c488198e8ee72b241fd2d0f6d1784982734"
-        },
-        "date": 1751361541675,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.2111212293,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19996352413333338,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.11870397589999995,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "marian@parity.io",
+            "name": "Marian Radu",
+            "username": "marian-radu"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b4a1f75c4f26109c76f1e4b90eb93a2f44d0b0e7",
+          "message": "revive-eth-rpc: Use pending block for estimate_gas in dev mode (#10963)\n\nUse Pending as the default block for eth_estimateGas in dev mode,\nmatching Anvil/EDR behavior. Non-dev mode continues to use Latest\n(go-ethereum behavior).\n\nRefs https://github.com/paritytech/contract-issues/issues/261\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-06T11:55:08Z",
+          "tree_id": "3111445c469f16231e3b8e0028ad88c87824f5f5",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b4a1f75c4f26109c76f1e4b90eb93a2f44d0b0e7"
+        },
+        "date": 1770383269526,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.135818935266666,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12665748243333333,
             "unit": "seconds"
           }
         ]

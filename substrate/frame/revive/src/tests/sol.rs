@@ -27,7 +27,8 @@ use crate::{
 		AllowEvmBytecode, DebugFlag, ExtBuilder, RuntimeOrigin, Test,
 	},
 	tracing::trace,
-	Code, Config, Error, EthBlockBuilderFirstValues, GenesisConfig, Origin, Pallet, PristineCode,
+	BalanceOf, Code, Config, Error, EthBlockBuilderFirstValues, GenesisConfig, Origin, Pallet,
+	PristineCode,
 };
 use alloy_core::sol_types::{SolCall, SolInterface};
 use frame_support::{
@@ -35,8 +36,10 @@ use frame_support::{
 };
 use pallet_revive_fixtures::{compile_module_with_type, Fibonacci, FixtureType, NestedCounter};
 use pretty_assertions::assert_eq;
-use revm::bytecode::opcode::*;
+use sp_runtime::Weight;
 use test_case::test_case;
+
+use revm::bytecode::opcode::*;
 
 mod arithmetic;
 mod bitwise;
@@ -114,7 +117,7 @@ fn basic_evm_flow_tracing_works() {
 	let (code, _) = compile_module_with_type("Fibonacci", FixtureType::Solc).unwrap();
 
 	ExtBuilder::default().build().execute_with(|| {
-		let mut tracer = CallTracer::new(Default::default(), |_| crate::U256::zero());
+		let mut tracer = CallTracer::new(Default::default());
 		let _ = <Test as Config>::Currency::set_balance(&ALICE, 100_000_000_000);
 
 		let Contract { addr, .. } = trace(&mut tracer, || {
@@ -126,8 +129,9 @@ fn basic_evm_flow_tracing_works() {
 		let contract = get_contract(&addr);
 		let runtime_code = PristineCode::<Test>::get(contract.code_hash).unwrap();
 
+		let call_trace = tracer.collect_trace().unwrap();
 		assert_eq!(
-			tracer.collect_trace().unwrap(),
+			call_trace,
 			CallTrace {
 				from: ALICE_ADDR,
 				call_type: CallType::Create,
@@ -135,11 +139,13 @@ fn basic_evm_flow_tracing_works() {
 				input: code.into(),
 				output: runtime_code.into(),
 				value: Some(crate::U256::zero()),
+				gas: call_trace.gas,
+				gas_used: call_trace.gas_used,
 				..Default::default()
 			}
 		);
 
-		let mut call_tracer = CallTracer::new(Default::default(), |_| crate::U256::zero());
+		let mut call_tracer = CallTracer::new(Default::default());
 		let result = trace(&mut call_tracer, || {
 			builder::bare_call(addr)
 				.data(Fibonacci::FibonacciCalls::fib(Fibonacci::fibCall { n: 10u64 }).abi_encode())
@@ -149,8 +155,9 @@ fn basic_evm_flow_tracing_works() {
 		let decoded = Fibonacci::fibCall::abi_decode_returns(&result.data).unwrap();
 		assert_eq!(55u64, decoded);
 
+		let call_trace = call_tracer.collect_trace().unwrap();
 		assert_eq!(
-			call_tracer.collect_trace().unwrap(),
+			call_trace,
 			CallTrace {
 				call_type: CallType::Call,
 				from: ALICE_ADDR,
@@ -160,6 +167,8 @@ fn basic_evm_flow_tracing_works() {
 					.into(),
 				output: result.data.into(),
 				value: Some(crate::U256::zero()),
+				gas: call_trace.gas,
+				gas_used: call_trace.gas_used,
 				..Default::default()
 			},
 		);
@@ -181,7 +190,10 @@ fn eth_contract_too_large() {
 
 		// Initialize genesis config with allow_unlimited_contract_size
 		let genesis_config = GenesisConfig::<Test> {
-			debug_settings: Some(DebugSettings::new(allow_unlimited_contract_size, false, false)),
+			debug_settings: Some(
+				DebugSettings::default()
+					.set_allow_unlimited_contract_size(allow_unlimited_contract_size),
+			),
 			..Default::default()
 		};
 
@@ -212,6 +224,7 @@ fn upload_evm_runtime_code_works() {
 		exec::Executable,
 		primitives::ExecConfig,
 		storage::{AccountInfo, ContractInfo},
+		Pallet, TransactionMeter,
 	};
 
 	let (runtime_code, _runtime_hash) =
@@ -222,11 +235,11 @@ fn upload_evm_runtime_code_works() {
 		let deployer_addr = ALICE_ADDR;
 		let _ = Pallet::<Test>::set_evm_balance(&deployer_addr, 1_000_000_000.into());
 
-		let (uploaded_blob, _) = Pallet::<Test>::try_upload_code(
+		let uploaded_blob = Pallet::<Test>::try_upload_code(
 			deployer,
 			runtime_code.clone(),
 			crate::vm::BytecodeType::Evm,
-			u64::MAX,
+			&mut TransactionMeter::new_from_limits(Weight::MAX, BalanceOf::<Test>::MAX).unwrap(),
 			&ExecConfig::new_substrate_tx(),
 		)
 		.unwrap();
@@ -582,4 +595,234 @@ fn eth_substrate_call_tracks_weight_correctly() {
 			post_info.actual_weight.unwrap(),
 		);
 	});
+}
+
+/// Tests execution tracing for both EVM and PVM.
+///
+/// Each test case runs for both Solc (EVM) and Resolc (PVM) with separate expected traces.
+/// Expected traces are stored in `src/tests/json_trace/` directory.
+///
+/// Gas consistency is verified for consecutive steps:
+/// - For EVM: gas - gas_cost == next_step.gas (exact, every opcode is traced)
+/// - For PVM: gas - gas_cost >= next_step.gas (inequality, PVM instructions between syscalls
+///   consume additional gas that isn't individually traced)
+#[test]
+fn execution_tracing_works() {
+	use crate::{
+		evm::{Bytes, ExecutionStepKind, ExecutionTrace, ExecutionTracer, ExecutionTracerConfig},
+		tracing::trace,
+	};
+	use pallet_revive_fixtures::{Callee, Caller};
+
+	struct TestCase {
+		name: &'static str,
+		setup: Box<dyn Fn(FixtureType) -> ExecutionTrace>,
+		expected_evm_trace: &'static str,
+		expected_pvm_trace: &'static str,
+	}
+
+	let test_cases: Vec<TestCase> = vec![
+		TestCase {
+			name: "Fibonacci",
+			setup: Box::new(|fixture_type| {
+				let (code, _) = compile_module_with_type("Fibonacci", fixture_type).unwrap();
+				let Contract { addr, .. } =
+					builder::bare_instantiate(Code::Upload(code)).build_and_unwrap_contract();
+
+				let config = ExecutionTracerConfig {
+					enable_return_data: true,
+					limit: Some(5),
+					..Default::default()
+				};
+				let mut tracer = ExecutionTracer::new(config);
+				trace(&mut tracer, || {
+					builder::bare_call(addr)
+						.data(Fibonacci::fibCall { n: 3 }.abi_encode())
+						.build_and_unwrap_result()
+				});
+				tracer.collect_trace()
+			}),
+			expected_evm_trace: include_str!("json_trace/fibonacci_evm.json"),
+			expected_pvm_trace: include_str!("json_trace/fibonacci_pvm.json"),
+		},
+		TestCase {
+			name: "CALL",
+			setup: Box::new(|fixture_type| {
+				let (callee_code, _) = compile_module_with_type("Callee", fixture_type).unwrap();
+				let Contract { addr: callee, .. } =
+					builder::bare_instantiate(Code::Upload(callee_code))
+						.build_and_unwrap_contract();
+
+				let (caller_code, _) = compile_module_with_type("Caller", fixture_type).unwrap();
+				let Contract { addr: caller, .. } =
+					builder::bare_instantiate(Code::Upload(caller_code))
+						.build_and_unwrap_contract();
+
+				let config =
+					ExecutionTracerConfig { enable_return_data: true, ..Default::default() };
+				let mut tracer = ExecutionTracer::new(config);
+				trace(&mut tracer, || {
+					builder::bare_call(caller)
+						.data(
+							Caller::normalCall {
+								_callee: callee.0.into(),
+								_value: 0,
+								_data: Callee::echoCall { _data: 42u64 }.abi_encode().into(),
+								_gas: u64::MAX,
+							}
+							.abi_encode(),
+						)
+						.build_and_unwrap_result()
+				});
+				tracer.collect_trace()
+			}),
+			expected_evm_trace: include_str!("json_trace/call_evm.json"),
+			expected_pvm_trace: include_str!("json_trace/call_pvm.json"),
+		},
+		TestCase {
+			name: "DELEGATECALL",
+			setup: Box::new(|fixture_type| {
+				let (callee_code, _) = compile_module_with_type("Callee", fixture_type).unwrap();
+				let Contract { addr: callee, .. } =
+					builder::bare_instantiate(Code::Upload(callee_code))
+						.build_and_unwrap_contract();
+
+				let (caller_code, _) = compile_module_with_type("Caller", fixture_type).unwrap();
+				let Contract { addr: caller, .. } =
+					builder::bare_instantiate(Code::Upload(caller_code))
+						.build_and_unwrap_contract();
+
+				let config =
+					ExecutionTracerConfig { enable_return_data: true, ..Default::default() };
+				let mut tracer = ExecutionTracer::new(config);
+				trace(&mut tracer, || {
+					builder::bare_call(caller)
+						.data(
+							Caller::delegateCall {
+								_callee: callee.0.into(),
+								_data: Callee::echoCall { _data: 42u64 }.abi_encode().into(),
+								_gas: u64::MAX,
+							}
+							.abi_encode(),
+						)
+						.build_and_unwrap_result()
+				});
+				tracer.collect_trace()
+			}),
+			expected_evm_trace: include_str!("json_trace/delegatecall_evm.json"),
+			expected_pvm_trace: include_str!("json_trace/delegatecall_pvm.json"),
+		},
+	];
+
+	/// Normalizes trace by zeroing out all dynamic values for stable comparisons.
+	fn normalize_trace(trace: &ExecutionTrace) -> ExecutionTrace {
+		use frame_support::weights::Weight;
+
+		let mut normalized = trace.clone();
+		normalized.gas = 0;
+		normalized.weight_consumed = Weight::zero();
+		normalized.base_call_weight = Weight::zero();
+
+		for step in &mut normalized.struct_logs {
+			step.gas = 0;
+			step.gas_cost = 0;
+			step.weight_cost = Weight::zero();
+
+			match &mut step.kind {
+				ExecutionStepKind::EVMOpcode { stack, .. } => {
+					for val in stack.iter_mut() {
+						*val = Bytes::from(vec![0u8]);
+					}
+				},
+				ExecutionStepKind::PVMSyscall { op, args, returned, .. } => {
+					// Normalize call/delegate_call to their _evm variants so
+					// the test passes regardless of which resolc version
+					// compiled the fixtures (older emits call/delegate_call,
+					// newer emits call_evm/delegate_call_evm).
+					use crate::vm::pvm::env::lookup_syscall_index;
+					let call_idx = lookup_syscall_index("call").unwrap();
+					let call_evm_idx = lookup_syscall_index("call_evm").unwrap();
+					let delegate_idx = lookup_syscall_index("delegate_call").unwrap();
+					let delegate_evm_idx = lookup_syscall_index("delegate_call_evm").unwrap();
+					if *op == call_idx || *op == call_evm_idx {
+						*op = call_evm_idx;
+						// Clear args since the two variants have compatible
+						// behavior but different argument layouts.
+						args.clear();
+					} else if *op == delegate_idx || *op == delegate_evm_idx {
+						*op = delegate_evm_idx;
+						args.clear();
+					} else {
+						for val in args.iter_mut() {
+							*val = 0;
+						}
+					}
+					if returned.is_some() {
+						*returned = Some(0);
+					}
+				},
+			}
+		}
+		normalized
+	}
+
+	/// Verifies gas consistency for execution traces.
+	///
+	/// Gas equations:
+	/// - gasCost = opcode_cost only (excluding forwarded gas for call/create opcodes)
+	/// - For consecutive steps at the same depth:
+	///   - EVM: gas - gas_cost == next_step.gas (exact)
+	///   - PVM: gas - gas_cost >= next_step.gas (inequality, PVM instructions consume extra gas)
+	fn verify_gas_consistency(trace: &ExecutionTrace, is_evm: bool, name: &str) {
+		// Verify consecutive steps at the same depth
+		let same_depth_violations: Vec<_> = trace
+			.struct_logs
+			.iter()
+			.zip(trace.struct_logs.iter().skip(1))
+			.enumerate()
+			.filter(|(_, (curr, next))| curr.depth == next.depth)
+			.filter_map(|(i, (curr, next))| {
+				let expected = curr.gas.saturating_sub(curr.gas_cost);
+				let valid = if is_evm { expected == next.gas } else { next.gas <= expected };
+				(!valid).then_some((i, curr.depth, curr.gas, curr.gas_cost, expected, next.gas))
+			})
+			.collect();
+
+		assert!(
+			same_depth_violations.is_empty(),
+			"{name}: same-depth gas violations (step, depth, gas, gas_cost, expected, actual): {same_depth_violations:?}",
+		);
+	}
+
+	for test_case in test_cases {
+		for fixture_type in [FixtureType::Solc, FixtureType::Resolc] {
+			ExtBuilder::default().existential_deposit(200).build().execute_with(|| {
+				let _ = <Test as Config>::Currency::set_balance(&ALICE, 100_000_000_000);
+
+				let actual_trace = (test_case.setup)(fixture_type);
+				let is_evm = matches!(fixture_type, FixtureType::Solc | FixtureType::SolcRuntime);
+				let name = test_case.name;
+				let vm_type = if is_evm { "EVM" } else { "PVM" };
+
+				let expected_json_str = if is_evm {
+					test_case.expected_evm_trace
+				} else {
+					test_case.expected_pvm_trace
+				};
+				let expected: ExecutionTrace = serde_json::from_str(expected_json_str)
+					.unwrap_or_else(|e| {
+						panic!("{name} ({vm_type}): failed to parse expected JSON: {e}")
+					});
+				// Normalize both traces for comparison (zeroes out dynamic values)
+				let normalized_actual = normalize_trace(&actual_trace);
+				let normalized_expected = normalize_trace(&expected);
+				assert_eq!(
+					normalized_actual, normalized_expected,
+					"{name} ({vm_type}): trace mismatch"
+				);
+
+				verify_gas_consistency(&actual_trace, is_evm, &format!("{name} ({vm_type})"));
+			});
+		}
+	}
 }

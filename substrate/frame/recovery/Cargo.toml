@@ -18,9 +18,10 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 codec = { features = ["derive"], workspace = true }
 frame = { workspace = true, features = ["runtime"] }
-scale-info = { features = ["derive"], workspace = true }
-frame-system = { workspace = true }
 frame-support = { workspace = true }
+frame-system = { workspace = true }
+log = { workspace = true, optional = true }
+scale-info = { features = ["derive"], workspace = true }
 
 [dev-dependencies]
 pallet-balances = { workspace = true, default-features = true }
@@ -30,26 +31,28 @@ sp-runtime = { workspace = true }
 [features]
 default = ["std"]
 runtime-benchmarks = [
+	"frame-support/runtime-benchmarks",
+	"frame-system/runtime-benchmarks",
 	"frame/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
-	"frame-support/runtime-benchmarks",
-	"frame-system/runtime-benchmarks"
 ]
 std = [
 	"codec/std",
+	"frame-support/std",
+	"frame-system/std",
 	"frame/std",
+	"log?/std",
 	"pallet-balances/std",
 	"scale-info/std",
 	"sp-io/std",
 	"sp-runtime/std",
-	"frame-support/std",
-	"frame-system/std"
 ]
 try-runtime = [
+	"dep:log",
+	"frame-support/try-runtime",
+	"frame-system/try-runtime",
 	"frame/try-runtime",
 	"pallet-balances/try-runtime",
 	"sp-runtime/try-runtime",
-	"frame-support/try-runtime",
-	"frame-system/try-runtime"
 ]

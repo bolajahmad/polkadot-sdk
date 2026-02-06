@@ -16,23 +16,18 @@
 // limitations under the License.
 
 //! Multi-block migration from v0 to v1 for the recovery pallet.
-//!
-//! This migration transforms the old storage format to the new format:
-//! - `Recoverable` -> `FriendGroups` (inheritor set to multisig of friends)
-//! - `ActiveRecoveries` -> `Attempt` (approvals preserved, inheritor will be multisig)
-//! - `Proxy` -> `Inheritor` (mapping inverted, preserves existing recovery access)
 
 extern crate alloc;
 
 use super::{v0, PALLET_MIGRATIONS_ID};
+use crate::{pallet, Pallet};
 #[cfg(feature = "try-runtime")]
 use alloc::vec::Vec;
-use crate::{pallet, Pallet};
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::{
 	migrations::{MigrationId, SteppedMigration, SteppedMigrationError},
 	pallet_prelude::PhantomData,
-	traits::{Consideration, Get, ReservableCurrency},
+	traits::{fungible::MutateHold, Consideration, Get, ReservableCurrency},
 	weights::WeightMeter,
 	BoundedVec,
 };
@@ -51,9 +46,9 @@ pub enum MigrationCursor<AccountId: MaxEncodedLen> {
 /// Multi-block migration from v0 to v1.
 ///
 /// This migration:
-/// 1. Converts `Recoverable` entries to `FriendGroups` with inheritor set to the
-///    multisig account derived from friends + threshold (so friends can collectively
-///    control inherited accounts via the multisig pallet)
+/// 1. Converts `Recoverable` entries to `FriendGroups` with inheritor set to the multisig account
+///    derived from friends + threshold (so friends can collectively control inherited accounts via
+///    the multisig pallet)
 /// 2. Converts `ActiveRecoveries` to `Attempt` entries, preserving approval state
 /// 3. Converts `Proxy` entries to `Inheritor` (inverts the mapping)
 ///
@@ -90,38 +85,30 @@ impl<T: v0::MigrationConfig> SteppedMigration for MigrateV0ToV1<T> {
 			match cursor {
 				MigrationCursor::Recoverable(last_key) => {
 					let mut iter = if let Some(ref key) = last_key {
-						v0::Recoverable::<T>::iter_from(v0::Recoverable::<T>::hashed_key_for(key))
+						v0::Recoverable::<T>::iter_from_key(key)
 					} else {
 						v0::Recoverable::<T>::iter()
 					};
 
 					if let Some((account, config)) = iter.next() {
-						// Unreserve the old deposit
-						let _ = <T as v0::MigrationConfig>::Currency::unreserve(&account, config.deposit);
-
-						// Compute the multisig account ID from friends and threshold.
-						// This is the account that the friends can collectively control,
-						// making it the natural inheritor for the migrated recovery config.
-						let inheritor = v0::multi_account_id::<T::AccountId>(
-							&config.friends,
-							config.threshold,
+						// Unreserve the old deposit, we ignore the case that this could reap
+						let _ = <T as v0::MigrationConfig>::Currency::unreserve(
+							&account,
+							config.deposit,
 						);
 
-						// Convert to v1 FriendGroup with defaults:
-						// - inheritor: multisig account derived from friends + threshold
-						// - inheritance_order: 0
-						// - cancel_delay: same as delay_period
-						let cancel_delay = config.delay_period;
-						let friend_group = config.into_v1_friend_group(
-							inheritor,
-							0, // inheritance_order
-							cancel_delay,
-						);
+						// We calculate a multisig and use it as inheritor since the old logic did
+						// not have a dedicated inheritor.
+						let mut sorted_friends = config.friends.to_vec();
+						sorted_friends.sort();
+						let inheritor =
+							v0::multi_account_id::<T::AccountId>(&sorted_friends, config.threshold);
+						let friend_group = config.into_v1_friend_group(inheritor);
 
-						// Try to create new v1 storage entry with consideration ticket
 						let friend_groups = BoundedVec::try_from(alloc::vec![friend_group])
-							.expect("single friend group always fits; qed");
+							.expect("ensured by integrity_test; qed");
 						let footprint = Pallet::<T>::friend_group_footprint(&friend_groups);
+
 						match T::FriendGroupsConsideration::new(&account, footprint) {
 							Ok(ticket) => {
 								pallet::FriendGroups::<T>::insert(
@@ -151,107 +138,115 @@ impl<T: v0::MigrationConfig> SteppedMigration for MigrateV0ToV1<T> {
 						v0::ActiveRecoveries::<T>::iter()
 					};
 
-					if let Some((lost, rescuer, recovery)) = iter.next() {
-						// Unreserve the old deposit
-						let _ = <T as v0::MigrationConfig>::Currency::unreserve(
-							&rescuer,
-							recovery.deposit,
-						);
-
-						// Try to migrate to v1 Attempt if we have FriendGroups for this account
-						if let Some((friend_groups, _)) = pallet::FriendGroups::<T>::get(&lost) {
-							if let Some(fg) = friend_groups.first() {
-								// Convert vouched friends list to approval bitfield
-								let mut approvals = crate::ApprovalBitfieldOf::<T>::default();
-								for voucher in recovery.friends.iter() {
-									if let Some(index) =
-										fg.friends.iter().position(|f| f == voucher)
-									{
-										let _ = approvals.set_if_not_set(index);
-									}
-								}
-
-								let attempt = crate::AttemptOf::<T> {
-									friend_group_index: 0,
-									initiator: rescuer.clone(),
-									init_block: recovery.created,
-									last_approval_block: recovery.created,
-									approvals,
-								};
-
-								// Create attempt ticket and store
-								let security_deposit = T::SecurityDeposit::get();
-								if let Ok(ticket) = crate::AttemptTicketOf::<T>::new(
-									&rescuer,
-									Pallet::<T>::attempt_footprint(),
-								) {
-									// Hold security deposit
-									use frame_support::traits::fungible::MutateHold;
-									if <T as pallet::Config>::Currency::hold(
-										&crate::HoldReason::SecurityDeposit.into(),
-										&rescuer,
-										security_deposit,
-									)
-									.is_ok()
-									{
-										pallet::Attempt::<T>::insert(
-											&lost,
-											0u32,
-											(attempt, ticket, security_deposit),
-										);
-									} else {
-										frame_support::defensive!(
-											"MigrateV0ToV1: Failed to hold security deposit"
-										);
-									}
-								} else {
-									frame_support::defensive!(
-										"MigrateV0ToV1: Failed to create Attempt ticket"
-									);
-								}
-							}
-						}
-
-						v0::ActiveRecoveries::<T>::remove(&lost, &rescuer);
-						cursor = MigrationCursor::ActiveRecoveries(Some((lost, rescuer)));
-					} else {
+					let Some((lost, rescuer, recovery)) = iter.next() else {
 						cursor = MigrationCursor::Proxy(None);
+						continue;
+					};
+
+					cursor =
+						MigrationCursor::ActiveRecoveries(Some((lost.clone(), rescuer.clone())));
+					v0::ActiveRecoveries::<T>::remove(&lost, &rescuer);
+
+					// Unreserve the old deposit
+					let _ =
+						<T as v0::MigrationConfig>::Currency::unreserve(&rescuer, recovery.deposit);
+
+					// Try to find the friend group for this recovery that we already migrated
+					let Some((friend_groups, _)) = pallet::FriendGroups::<T>::get(&lost) else {
+						frame_support::defensive!(
+							"MigrateV0ToV1: Failed to find FriendGroups for lost account"
+						);
+						continue;
+					};
+
+					if friend_groups.len() != 1 {
+						frame_support::defensive!(
+							"MigrateV0ToV1: Expected exactly one friend group for lost account"
+						);
+						continue;
+					}
+
+					let Some(fg) = friend_groups.first() else {
+						frame_support::defensive!(
+							"MigrateV0ToV1: Failed to find friend group for lost account"
+						);
+						continue;
+					};
+
+					// Convert vouched friends list to approval bitfield
+					let mut approvals = crate::ApprovalBitfieldOf::<T>::default();
+					for voucher in recovery.friends.iter() {
+						if let Some(index) = fg.friends.iter().position(|f| f == voucher) {
+							let _ = approvals.set_if_not_set(index);
+						} else {
+							frame_support::defensive!(
+								"MigrateV0ToV1: Voucher not found in friend group"
+							);
+							continue;
+						}
+					}
+
+					let attempt = crate::AttemptOf::<T> {
+						friend_group_index: 0, // 0 since there is only one friend group
+						initiator: rescuer.clone(),
+						init_block: recovery.created,
+						last_approval_block: recovery.created,
+						approvals,
+					};
+
+					// Create attempt ticket and store
+					let security_deposit = T::SecurityDeposit::get();
+					let Ok(ticket) = crate::AttemptTicketOf::<T>::new(
+						&rescuer,
+						Pallet::<T>::attempt_footprint(),
+					) else {
+						frame_support::defensive!("MigrateV0ToV1: Failed to create Attempt ticket");
+						continue;
+					};
+
+					if <T as pallet::Config>::Currency::hold(
+						&crate::HoldReason::SecurityDeposit.into(),
+						&rescuer,
+						security_deposit,
+					)
+					.is_ok()
+					{
+						pallet::Attempt::<T>::insert(
+							&lost,
+							0u32, // group index 0
+							(attempt, ticket, security_deposit),
+						);
+					} else {
+						frame_support::defensive!("MigrateV0ToV1: Failed to hold security deposit");
 					}
 				},
 				MigrationCursor::Proxy(last_key) => {
 					let mut iter = if let Some(ref key) = last_key {
-						v0::Proxy::<T>::iter_from(v0::Proxy::<T>::hashed_key_for(key))
+						v0::Proxy::<T>::iter_from_key(key)
 					} else {
 						v0::Proxy::<T>::iter()
 					};
 
-					if let Some((rescuer, lost)) = iter.next() {
-						// Decrement the old consumer reference
-						let _ = frame_system::Pallet::<T>::dec_consumers(&rescuer);
+					let Some((rescuer, lost)) = iter.next() else { return Ok(None) };
+					cursor = MigrationCursor::Proxy(Some(rescuer.clone()));
+					v0::Proxy::<T>::remove(&rescuer);
 
-						// Convert to v1 Inheritor (note: mapping is inverted)
-						// v0: Proxy[rescuer] = lost (rescuer can control lost)
-						// v1: Inheritor[lost] = (order, inheritor, ticket)
-						let inheritor = rescuer.clone();
-						let inheritance_order = 0u32;
+					// All ongoing rescuers got a consumer ref... bad old code
+					let _ = frame_system::Pallet::<T>::dec_consumers(&rescuer);
 
-						// Create inheritor ticket
-						if let Ok(ticket) = Pallet::<T>::inheritor_ticket(&inheritor) {
-							pallet::Inheritor::<T>::insert(
-								&lost,
-								(inheritance_order, inheritor, ticket),
-							);
-						} else {
-							frame_support::defensive!(
-								"MigrateV0ToV1: Failed to create Inheritor ticket"
-							);
-						}
+					let inheritor = rescuer.clone();
+					let inheritance_order = 0u32;
 
-						v0::Proxy::<T>::remove(&rescuer);
-						cursor = MigrationCursor::Proxy(Some(rescuer));
+					// Create inheritor ticket
+					if let Ok(ticket) = Pallet::<T>::inheritor_ticket(&inheritor) {
+						pallet::Inheritor::<T>::insert(
+							&lost,
+							(inheritance_order, inheritor, ticket),
+						);
 					} else {
-						// Migration complete!
-						return Ok(None);
+						frame_support::defensive!(
+							"MigrateV0ToV1: Failed to create Inheritor ticket"
+						);
 					}
 				},
 			}
@@ -284,8 +279,7 @@ impl<T: v0::MigrationConfig> SteppedMigration for MigrateV0ToV1<T> {
 		use codec::Decode;
 
 		let (recoverable_count, active_recoveries_count, proxy_count) =
-			<(u32, u32, u32)>::decode(&mut &state[..])
-				.expect("Failed to decode pre_upgrade state");
+			<(u32, u32, u32)>::decode(&mut &state[..]).expect("Failed to decode pre_upgrade state");
 
 		// All old storage should be cleared
 		assert_eq!(v0::Recoverable::<T>::iter().count(), 0);
@@ -306,11 +300,11 @@ impl<T: v0::MigrationConfig> SteppedMigration for MigrateV0ToV1<T> {
 		);
 
 		// FriendGroups should have same count as Recoverable (unless some failed)
-		assert!(friend_groups_count <= recoverable_count);
+		assert!(friend_groups_count == recoverable_count);
 		// Attempt should have same count as ActiveRecoveries (unless some failed)
-		assert!(attempt_count <= active_recoveries_count);
+		assert!(attempt_count == active_recoveries_count);
 		// Inheritor should have same count as Proxy (unless some failed)
-		assert!(inheritor_count <= proxy_count);
+		assert!(inheritor_count == proxy_count);
 
 		Ok(())
 	}
@@ -324,10 +318,7 @@ mod tests {
 		pallet,
 	};
 	use frame_support::{
-		migrations::SteppedMigration,
-		traits::ReservableCurrency,
-		weights::WeightMeter,
-		BoundedVec,
+		migrations::SteppedMigration, traits::ReservableCurrency, weights::WeightMeter, BoundedVec,
 	};
 
 	type T = Test;
@@ -340,6 +331,10 @@ mod tests {
 
 	fn run_migration() {
 		let mut cursor = None;
+
+		#[cfg(feature = "try-runtime")]
+		let data = MigrateV0ToV1::<T>::pre_upgrade().unwrap();
+
 		loop {
 			let mut meter = WeightMeter::new();
 			match MigrateV0ToV1::<T>::step(cursor, &mut meter) {
@@ -348,6 +343,9 @@ mod tests {
 				Err(e) => panic!("Migration failed: {:?}", e),
 			}
 		}
+
+		#[cfg(feature = "try-runtime")]
+		MigrateV0ToV1::<T>::post_upgrade(data).unwrap();
 	}
 
 	#[test]

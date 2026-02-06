@@ -19,11 +19,11 @@
 //!
 //! These represent the old storage layout before the v1 migration.
 
-use crate::InheritanceOrder;
 use codec::{Decode, Encode, MaxEncodedLen};
-use frame::deps::sp_io::hashing::blake2_256;
-use frame::deps::sp_runtime::traits::TrailingZeroInput;
-use frame::traits::BlockNumberProvider;
+use frame::{
+	deps::{sp_io::hashing::blake2_256, sp_runtime::traits::TrailingZeroInput},
+	traits::BlockNumberProvider,
+};
 use frame_support::{
 	storage_alias,
 	traits::{Currency, ReservableCurrency},
@@ -31,11 +31,9 @@ use frame_support::{
 };
 use scale_info::TypeInfo;
 
-/// Migration config - extends the new pallet Config with types needed for migration.
+/// Extended migration config for the migration.
 pub trait MigrationConfig: crate::pallet::Config {
-	/// The currency type used in v0.
-	/// Must implement ReservableCurrency for unreserving deposits.
-	/// The Balance type must match the new pallet's Balance type.
+	/// The currency to unreserve deposits.
 	type Currency: ReservableCurrency<Self::AccountId, Balance = crate::BalanceOf<Self>>;
 }
 
@@ -45,26 +43,30 @@ pub trait MigrationConfig: crate::pallet::Config {
 /// will be the multisig account that the friends can control together.
 ///
 /// NOTE: `who` must be sorted. If it is not, then you'll get the wrong answer.
-pub fn multi_account_id<AccountId: Encode + Decode>(who: &[AccountId], threshold: u16) -> AccountId {
+pub fn multi_account_id<AccountId: Encode + Decode>(
+	who: &[AccountId],
+	threshold: u16,
+) -> AccountId {
 	let entropy = (b"modlpy/utilisuba", who, threshold).using_encoded(blake2_256);
 	Decode::decode(&mut TrailingZeroInput::new(entropy.as_ref()))
 		.expect("infinite length input; no invalid inputs for type; qed")
 }
 
-/// Old balance type for v0 storage.
+/// Balance type for v0 storage.
 pub type BalanceOf<T> =
 	<<T as MigrationConfig>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-/// Old block number type from provider.
+/// Block number type from provider.
 pub type BlockNumberFromProviderOf<T> =
 	<<T as crate::pallet::Config>::BlockNumberProvider as BlockNumberProvider>::BlockNumber;
 
-/// Old friends bounded vec type.
-/// Uses MaxFriendsPerConfig from the new pallet Config (assumes same as old MaxFriends).
-pub type FriendsOf<T> =
-	BoundedVec<<T as frame_system::Config>::AccountId, <T as crate::pallet::Config>::MaxFriendsPerConfig>;
+/// Friends bounded vec type.
+pub type FriendsOf<T> = BoundedVec<
+	<T as frame_system::Config>::AccountId,
+	<T as crate::pallet::Config>::MaxFriendsPerConfig,
+>;
 
-/// Old recovery configuration structure from v0.
+/// Recovery configuration structure from v0.
 #[derive(Clone, Eq, PartialEq, Encode, Decode, Default, TypeInfo, MaxEncodedLen)]
 pub struct RecoveryConfig<BlockNumber, Balance, Friends> {
 	/// The minimum number of blocks since the start of the recovery process before the
@@ -79,25 +81,20 @@ pub struct RecoveryConfig<BlockNumber, Balance, Friends> {
 	pub threshold: u16,
 }
 
-impl<BlockNumber, Balance, Friends> RecoveryConfig<BlockNumber, Balance, Friends> {
-	/// Convert v0 RecoveryConfig to v1 FriendGroup.
-	///
-	/// Since v0 didn't have `inheritor`, `inheritance_order`, or `cancel_delay`,
-	/// these must be provided as parameters.
+impl<BlockNumber: Clone, Balance, Friends> RecoveryConfig<BlockNumber, Balance, Friends> {
+	/// Convert to a V1 `FriendGroup`.
 	pub fn into_v1_friend_group<AccountId>(
 		self,
 		inheritor: AccountId,
-		inheritance_order: InheritanceOrder,
-		cancel_delay: BlockNumber,
 	) -> crate::FriendGroup<BlockNumber, AccountId, Balance, Friends> {
 		crate::FriendGroup {
 			deposit: self.deposit,
 			friends: self.friends,
 			friends_needed: self.threshold as u32,
 			inheritor,
-			inheritance_delay: self.delay_period,
-			inheritance_order,
-			cancel_delay,
+			inheritance_delay: self.delay_period.clone(),
+			inheritance_order: 0,
+			cancel_delay: self.delay_period, // kinda random
 		}
 	}
 }
@@ -114,7 +111,7 @@ pub struct ActiveRecovery<BlockNumber, Balance, Friends> {
 	pub friends: Friends,
 }
 
-/// Old storage: The set of recoverable accounts and their recovery configuration.
+/// The set of recoverable accounts and their recovery configuration.
 #[storage_alias]
 pub type Recoverable<T: MigrationConfig> = StorageMap<
 	crate::pallet::Pallet<T>,

@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770405368195,
+  "lastUpdate": 1770418598674,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23813,6 +23813,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.006438975269999994,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "60601340+lexnv@users.noreply.github.com",
+            "name": "Alexandru Vasile",
+            "username": "lexnv"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8e911a6ebc6965480621db8e89b1ecb157df9eba",
+          "message": "ah-westend: Elastic Scaling with 3 cores on AssetHub Westend (#9880)\n\nThis PR enables elastic scaling on AssetHubWestend with 3 bulk cores.\n\nGuideline for enablement:\nhttps://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/enable_elastic_scaling/index.html\n\n### Next Steps\n- [x] Ensure collators are running with 2509 or newer\n- [x] Double check the changes locally\n- [x] If AH Westend looks good, we'll enable ES to AHPaseo\n\ncc @paritytech/sdk-node @sandreim\n\n---------\n\nSigned-off-by: Alexandru Vasile <alexandru.vasile@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: eduardspa <eduard@parity.io>\nCo-authored-by: Javier Viola <363911+pepoviola@users.noreply.github.com>\nCo-authored-by: Andrei Sandu <54316454+sandreim@users.noreply.github.com>\nCo-authored-by: Maksym H <1177472+mordamax@users.noreply.github.com>",
+          "timestamp": "2026-02-06T21:33:41Z",
+          "tree_id": "046fde999e271b5a7e8e90b01f6a5d55299ad6a1",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/8e911a6ebc6965480621db8e89b1ecb157df9eba"
+        },
+        "date": 1770418574225,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0026631675999999995,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009244827819999999,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006609077019999995,
             "unit": "seconds"
           }
         ]

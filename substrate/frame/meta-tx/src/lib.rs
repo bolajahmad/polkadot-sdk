@@ -80,7 +80,7 @@ use sp_std::prelude::*;
 /// Meta Transaction type.
 ///
 /// The data that is provided and signed by the signer and shared with the relayer.
-#[derive(Encode, Decode, PartialEq, Eq, TypeInfo, Clone, Debug, DecodeWithMemTracking)]
+#[derive(Encode, Decode, PartialEq, Eq, TypeInfo, Clone, Debug, DecodeWithMemTracking, SizeOf)]
 pub struct MetaTx<Call, Extension> {
 	/// The target call to be executed on behalf of the signer.
 	call: Call,
@@ -177,7 +177,7 @@ pub mod pallet {
 		#[pallet::weight({
 			let dispatch_info = meta_tx.call.get_dispatch_info();
 			let extension_weight = meta_tx.extension.weight(&meta_tx.call);
-			let bare_call_weight = T::WeightInfo::bare_dispatch();
+			let bare_call_weight = T::WeightInfo::bare_dispatch(4096); // 4KB
 			(
 				dispatch_info.call_weight
 					.saturating_add(extension_weight)
@@ -218,7 +218,7 @@ pub mod pallet {
 				.unwrap_or(info.total_weight());
 
 			Ok((
-				Some(T::WeightInfo::bare_dispatch_no_nesting().saturating_add(meta_weight)),
+				Some(T::WeightInfo::bare_dispatch(meta_tx_size as u32).saturating_add(meta_weight)),
 				true.into(),
 			)
 				.into())

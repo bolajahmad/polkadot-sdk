@@ -28,7 +28,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use clap::Parser;
-use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
+use jsonrpsee::{core::ClientError, ws_client::{WsClient, WsClientBuilder}};
 use pallet_revive::{
 	create1,
 	evm::{
@@ -43,6 +43,7 @@ use subxt::{
 	tx::{SubmittableTransaction, TxStatus},
 	OnlineClient,
 };
+use subxt_signer::eth::Keypair;
 
 const LOG_TARGET: &str = "eth-rpc-tests";
 
@@ -318,7 +319,8 @@ async fn run_all_eth_rpc_tests_inner() -> anyhow::Result<()> {
 		test_mixed_evm_substrate_transactions,
 		test_runtime_pallets_address_upload_code,
 		test_dry_run_of_contract_with_consume_all_gas,
-		test_gas_estimation_for_contract_requiring_binary_search
+		test_gas_estimation_for_contract_requiring_binary_search,
+		test_gas_estimation_with_no_funds
 	);
 
 	log::debug!(target: LOG_TARGET, "All tests completed successfully!");
@@ -889,7 +891,6 @@ async fn test_gas_estimation_for_contract_requiring_binary_search() -> anyhow::R
 	)?
 	.0;
 	let client = Arc::new(SharedResources::client().await);
-	let account = Account::default();
 
 	let receipt = TransactionBuilder::new(client.clone())
 		.input(code)
@@ -913,6 +914,8 @@ async fn test_gas_estimation_for_contract_requiring_binary_search() -> anyhow::R
 
 	// Assert
 	assert!(receipt.is_success());
+
+	Ok(())
 }
 
 async fn test_fibonacci_large_value_runs_out_of_gas() -> anyhow::Result<()> {
@@ -940,6 +943,53 @@ async fn test_fibonacci_large_value_runs_out_of_gas() -> anyhow::Result<()> {
 
 	let err = result.expect_err("fib(100) should run out of gas");
 	assert!(err.to_string().contains("OutOfGas"), "expected OutOfGas error, got: {err}");
+
+	Ok(())
+}
+
+async fn test_gas_estimation_with_no_funds() -> anyhow::Result<()> {
+	// Arrange
+	let code = pallet_revive_fixtures::compile_module_with_type(
+		"ProblematicDryRun",
+		pallet_revive_fixtures::FixtureType::Resolc,
+	)?
+	.0;
+	let client = Arc::new(SharedResources::client().await);
+	let account = Account::from(Keypair::from_seed([0xFF; 16].as_slice()).unwrap());
+
+	let receipt = TransactionBuilder::new(client.clone())
+		.input(code)
+		.send()
+		.await?
+		.wait_for_receipt()
+		.await?;
+	let contract_address = receipt
+		.contract_address
+		.expect("Expected the transaction to publish a contract");
+
+	// Act
+	let test_function_selector = [0xf8, 0xa8, 0xfd, 0x6d].to_vec();
+	let transaction = GenericTransaction {
+		from: Some(account.address()),
+		input: test_function_selector.into(),
+		to: Some(contract_address),
+		chain_id: Some(client.chain_id().await?),
+		nonce: Some(
+			client.get_transaction_count(account.address(), BlockTag::Latest.into()).await?,
+		),
+		r#type: Some(0u8.into()),
+		..Default::default()
+	};
+	let dry_run_result = client.estimate_gas(transaction, None).await;
+
+	// Assert
+	assert!(dry_run_result
+		.is_err_and(|err| {
+			matches!(
+				err,
+				ClientError::Call(error_object) 
+				if error_object.message().contains("insufficient funds for gas * price + value"))
+		}));
 
 	Ok(())
 }

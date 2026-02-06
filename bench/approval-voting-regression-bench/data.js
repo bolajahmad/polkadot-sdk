@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770325553738,
+  "lastUpdate": 1770366874879,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "alex.theissen@me.com",
-            "name": "Alexander Theißen",
-            "username": "athei"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "3515d4af2993ada853fc8a5d11b2474241545840",
-          "message": "revive: Precompiles should return dummy code when queried (#9001)\n\nFixes https://github.com/paritytech/contract-issues/issues/111\n\nThis fixes both the RPC and the opcodes `EXTCODESIZE` and `EXTCODEHASH`.\n\nAlso removed the disabled host function `is_contract`. Contracts do use\n`EXTCODESIZE` to determine if something is a contract exclusively.\n\nNeed to add some differential tests to our test suite to make sure that\nthe RPC matches geth behaviour:\n\nOn kitchensink:\n\n```shell\n# primitive precompiles should not return error but 0x\n$ cast code 0x0000000000000000000000000000000000000001\n0x\n\n# this is the erc pre-compile\n$ cast code 0x0000000000000000000000000000000000010000\n0x60006000fd\n```\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-30T08:40:16Z",
-          "tree_id": "4e458f071d2f268d819085a75a9426821bf63be3",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/3515d4af2993ada853fc8a5d11b2474241545840"
-        },
-        "date": 1751277903641,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 63627.479999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 52940.5,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.866273951030004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.38170389861,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.4337529759999983,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.46120169468002636,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.00001732448,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.3842746134900006,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.000018126519999999998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.385405149429999,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.353999566632293,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.000018126519999999998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.006036099650000001,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.91864838289003,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.00001732448,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting-parallel/approval-voting-gather-signatures",
             "value": 0.005805316829999995,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pgherveou@gmail.com",
+            "name": "PG Herveou",
+            "username": "pgherveou"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "298bf2cb182b6fe3530568060a47853e630f52cb",
+          "message": "Enforce match_arm_blocks = true for consistent formatting (#10958)\n\n## Summary\n\nFlips `match_arm_blocks` from `false` to `true` to ensure all multi-line\nmatch arm bodies are wrapped in braces consistently.\n\n## Problem\n\nWith `match_arm_blocks = false`, rustfmt doesn't *add* braces to\nmulti-line match arms, but it also doesn't *remove* existing braces.\nThis means both styles are valid:\n\n```rust\n// Style A (no braces)\nAccountIdOrAddress::AccountId(id) =>\n    <T::AddressMapper as AddressMapper<T>>::to_address(id),\n\n// Style B (with braces) - also valid, rustfmt won't change it\nAccountIdOrAddress::AccountId(id) => {\n    <T::AddressMapper as AddressMapper<T>>::to_address(id)\n},\n```\n\nLLMs tend to produce Style B, which creates unnecessary diff noise in\nPRs.\n\n## Solution\n\nSet `match_arm_blocks = true` to enforce Style B everywhere. Now there's\nexactly one valid style, eliminating the ambiguity.\n\n## Impact\n\n556 files changed — this is a one-time formatting update. All future\ncode will be consistently formatted.\n\nFollow-up to #10939.\n\n---------\n\nCo-authored-by: PG <pg@parity.io>\nCo-authored-by: PG Herveou <pg@pgherveou.com>",
+          "timestamp": "2026-02-06T07:25:57Z",
+          "tree_id": "b9543d172b17bc251288c321811b843ef4fc6cbd",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/298bf2cb182b6fe3530568060a47853e630f52cb"
+        },
+        "date": 1770366850067,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 52940.90000000001,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 63628.959999999985,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.000023479449999999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.005109732720000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3587256644599868,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.662160574600001,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.930981799999994,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.000026351250000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.490145364362918,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.7375707629400003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.000026351250000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.000023479449999999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.664714583200001,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.7921848827300068,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.7105155993500007,
             "unit": "seconds"
           }
         ]

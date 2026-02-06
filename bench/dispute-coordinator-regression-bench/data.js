@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770389712534,
+  "lastUpdate": 1770405368195,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23764,6 +23764,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "dispute-coordinator",
             "value": 0.002714278499999999,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "60601340+lexnv@users.noreply.github.com",
+            "name": "Alexandru Vasile",
+            "username": "lexnv"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3ecda3ceccd7a43f38d1553d3d6c5566c692a4b1",
+          "message": "slot_timer: Downgrade spammy log to debug (#10974)\n\nThe log is quite spammy with 12core setup since the last ~2 blocks will\nbe skipped in the last second of block production.\n\n---------\n\nSigned-off-by: Alexandru Vasile <alexandru.vasile@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-06T17:42:33Z",
+          "tree_id": "b09c05869ff4bbe87df81d0b77ba581b09c39ff0",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3ecda3ceccd7a43f38d1553d3d6c5566c692a4b1"
+        },
+        "date": 1770405344106,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0026190510299999997,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.00907486712999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006438975269999994,
             "unit": "seconds"
           }
         ]

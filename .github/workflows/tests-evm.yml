@@ -51,11 +51,11 @@ jobs:
           chmod +x ./resolc/resolc-x86_64-unknown-linux-musl
           echo "resolc-path=$(pwd)/resolc/resolc-x86_64-unknown-linux-musl" >> "$GITHUB_OUTPUT"
       - name: Run revive differential tests
-        uses: paritytech/revive-differential-tests/.github/actions/run-differential-tests@0e41f054405c054c37d524e5172ef8c514852e6b
+        uses: paritytech/revive-differential-tests/.github/actions/run-differential-tests@e1b9e9b6ebdf875138369d943cbee0bc859fdaa2
         with:
           platform: ${{ matrix.platform }}
           cargo-command: "forklift cargo"
-          revive-differential-tests-ref: "0e41f054405c054c37d524e5172ef8c514852e6b"
+          revive-differential-tests-ref: "e1b9e9b6ebdf875138369d943cbee0bc859fdaa2"
           resolc-path: ${{ steps.download.outputs.resolc-path }}
           expectations-file-path: ./.github/assets/${{ matrix.platform }}.json
 

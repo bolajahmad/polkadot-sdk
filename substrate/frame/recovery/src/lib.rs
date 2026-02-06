@@ -518,7 +518,7 @@ pub mod pallet {
 				Attempt::<T>::iter_prefix(&lost)
 			{
 				let Ok(friend_group) = Self::friend_group_of(&lost, friend_group_index) else {
-					continue
+					continue;
 				};
 				attempts.push((friend_group, attempt));
 			}

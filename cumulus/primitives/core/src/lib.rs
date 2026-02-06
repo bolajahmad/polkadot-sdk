@@ -253,8 +253,8 @@ pub struct BundleInfo {
 	pub index: u8,
 	/// Is this the last block in the bundle from the point of view of the node?
 	///
-	/// It is possible that at `index` zero the runtime outputs the
-	/// [`CumulusDigestItem::UseFullCore`] that informs the node to use an entire for one block
+	/// It is possible that the runtime outputs the
+	/// [`CumulusDigestItem::UseFullCore`] to inform the node to use an entire for one block
 	/// only.
 	pub maybe_last: bool,
 }
@@ -303,6 +303,10 @@ pub enum CumulusDigestItem {
 	/// A digest item informing the node that this block should be put alone onto a core.
 	///
 	/// In other words, the core should not be shared with other blocks.
+	///
+	/// Under certain conditions (mainly runtime misconfigurations) the digest is still set when
+	/// there are muliple blocks per core. This is done to communicate to the collator that block
+	/// production for this core should be stopped.
 	#[codec(index = 3)]
 	UseFullCore,
 }

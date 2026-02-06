@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770325486602,
+  "lastUpdate": 1770366806347,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "serban@parity.io",
-            "name": "Serban Iorga",
-            "username": "serban300"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "a51c31246a789078f6109428974a31e2af55e6b2",
-          "message": "XCMP and DMP improvements (#8860)\n\nRelated to https://github.com/paritytech/polkadot-sdk/issues/489\n\nThis PR changes the parachain receiving logic for XCMP and DMP by adding\nsome offchain processing before forwarding the messages to the parachain\n`set_validation_data` inherent. This enables us to relax the advancement\nrule.",
-          "timestamp": "2025-07-01T07:19:38Z",
-          "tree_id": "cbeb4c88307b11c741d5dcd44a9351ff7594f5cf",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/a51c31246a789078f6109428974a31e2af55e6b2"
-        },
-        "date": 1751358094739,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.229945858133334,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19478449359999997,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12492903279999998,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pgherveou@gmail.com",
+            "name": "PG Herveou",
+            "username": "pgherveou"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "298bf2cb182b6fe3530568060a47853e630f52cb",
+          "message": "Enforce match_arm_blocks = true for consistent formatting (#10958)\n\n## Summary\n\nFlips `match_arm_blocks` from `false` to `true` to ensure all multi-line\nmatch arm bodies are wrapped in braces consistently.\n\n## Problem\n\nWith `match_arm_blocks = false`, rustfmt doesn't *add* braces to\nmulti-line match arms, but it also doesn't *remove* existing braces.\nThis means both styles are valid:\n\n```rust\n// Style A (no braces)\nAccountIdOrAddress::AccountId(id) =>\n    <T::AddressMapper as AddressMapper<T>>::to_address(id),\n\n// Style B (with braces) - also valid, rustfmt won't change it\nAccountIdOrAddress::AccountId(id) => {\n    <T::AddressMapper as AddressMapper<T>>::to_address(id)\n},\n```\n\nLLMs tend to produce Style B, which creates unnecessary diff noise in\nPRs.\n\n## Solution\n\nSet `match_arm_blocks = true` to enforce Style B everywhere. Now there's\nexactly one valid style, eliminating the ambiguity.\n\n## Impact\n\n556 files changed — this is a one-time formatting update. All future\ncode will be consistently formatted.\n\nFollow-up to #10939.\n\n---------\n\nCo-authored-by: PG <pg@parity.io>\nCo-authored-by: PG Herveou <pg@pgherveou.com>",
+          "timestamp": "2026-02-06T07:25:57Z",
+          "tree_id": "b9543d172b17bc251288c321811b843ef4fc6cbd",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/298bf2cb182b6fe3530568060a47853e630f52cb"
+        },
+        "date": 1770366781574,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.22682425786667,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.11870397589999995,
             "unit": "seconds"
           }
         ]

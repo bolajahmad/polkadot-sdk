@@ -36,12 +36,25 @@ use std::{collections::HashSet, num::NonZeroU16, time::Duration};
 /// N collators, for N blocks each collator will gain `VALID_INCLUDED_CANDIDATE_BUMP` points and
 /// lose (N-1)*INACTIVITY_DECAY points. With the values below (VALID_INCLUDED_CANDIDATE_BUMP=100
 /// and INACTIVITY_DECAY=1) with N=100 collators no longer gain any score.
-
+///
 /// Time to reach max score (in hours) =
 /// 	VALID_INCLUDED_CANDIDATE_BUMP / MAX_SCORE * NUM_COLLATORS * BLOCK_TIME / 60 / 60
-
-///  Maximum reputation score. Scores higher than this will be
-/// saturated to this value.
+///
+/// REASONING:
+/// - We want high MAX_SCORE and low VALID_INCLUDED_CANDIDATE_BUMP so that it takes a lot of time
+///   (weeks) for a collator to build up reputation. Setting low value for MAX_SCORE will allow a
+///   malicious collator to reach top score fast and if it try to commit an offence the rest of the
+///   collators won't have an advantage against him. Keeping high MAX_SCORE will require far more
+///   effort to reach this level.
+/// - INACTIVITY_DECAY is 0 because its not fair to punish collator for not claiming a slot they are
+///   not supposed to claim. We can reconsider this value in the future if there is a mechanism to
+///   know the number of collators in the parachain and actually know when a collator skips its
+///   slot.
+/// - FAILED_FETCH_SLASH equals MAX_SCORE because this is a serious offence and we want a harsh
+///   punishment for it. A collator builds up reputation slowly but loses it fast if it act
+///   maliciously. Setting it to anything less will give unneeded advantage to a malicious collator.
+///
+/// Maximum reputation score. Scores higher than this will be saturated to this value.
 pub const MAX_SCORE: u16 = u16::MAX;
 /// Reputation bump for getting a valid candidate included in a finalized block.
 pub const VALID_INCLUDED_CANDIDATE_BUMP: u16 = 1;

@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770383363169,
+  "lastUpdate": 1770389644348,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "paolo@parity.io",
-            "name": "Paolo La Camera",
-            "username": "sigurpol"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "75deaab1061bf740a3c3f172668922b0a5c54344",
-          "message": "EPMB/unsigned: fixed multi-page winner computation (#8987)\n\n## The issue \n\nIn `FullSupportsOfMiner`, we initially considered `MaxWinnersPerPage` as\nthe overall maximum number of winners across pages. However, it should\nbe calculated as `Pages * MaxWinnersPerPage` to prevent the computed\nsolution from having a low overall total of winners, which could result\nin a `WrongWinnerCount` error.\n\nThis bug was identified in\n\n[#staking-miner-1074](https://github.com/paritytech/polkadot-staking-miner/issues/1074)\nwhile testing the staking miner in a setup with aggressive trimming to\nevaluate backer bounding.\n\n## How to test \n\nA test has been added to replicate this scenario:\n\nTest configuration:\n- `Pages=2`\n- `MaxWinnersPerPage=2`\n- `desired_targets=3` (3 or 4 doesn't matter here, the key point is that\nis strictly > `MaxWinnersPerPage`)\n- `MaxBackersPerWinner=1`\n\nBefore the fix in this PR: \n- `FullSupportsOfMiner` could only hold 2 winners in total (bounded by\n`MaxWinnersPerPage`)\n- But the mining algorithm needed to hold 3 winners across multiple\npages\n- This would cause a `WrongWinnerCount` error during verification\n\nWith the fix:\n- `FullSupportsOfMiner` can now hold `Pages * MaxWinnersPerPage = 2 * 2\n= 4` winners\n- The test passes with 3 winners across 2 pages (proving it can hold\nmore than `MaxWinnersPerPage=2`)\n- No `WrongWinnerCount` errors occur\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-30T14:07:56Z",
-          "tree_id": "c8956a48b2e8cb156ae38ceb128b344e27666883",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/75deaab1061bf740a3c3f172668922b0a5c54344"
-        },
-        "date": 1751317006553,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 52943.8,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 63632,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.858183696169995,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.000018929690000000002,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.862055073650003,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.375577320059999,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.00001758659,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.4222914759300007,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.4693211412800105,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.3689975167500004,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.2978812626823966,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.00001758659,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005584835080000005,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.36209908838,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.000018929690000000002,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 4.617635056292878,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "14218860+iulianbarbu@users.noreply.github.com",
+            "name": "Iulian Barbu",
+            "username": "iulianbarbu"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "9972470602d118fb07d968460b8a6dd5d4523141",
+          "message": "sync-templates: consider workspace lints (#11007)\n\n# Description\n\nTrying to sync temaplates with their dedicated repos. The job fails at\nsome point because the templates' crates (runtime/node) use:\n```toml\n[lints]\nworkspace = true\n```\nbut there is no lint directive in the worskpace's Cargo.toml.\n\nThis takes the workspace lints existing in polkadot-sdk workspace's\nCargo.toml and carries them to each template, in their workspace's\nCargo.toml.\n\n## Integration\n\nN/A\n\n## Review Notes\n\nError started here:\nhttps://github.com/paritytech/polkadot-sdk/actions/runs/21747118215/job/62737549819.\nTesting the sync job based on this branch here:\nhttps://github.com/paritytech/polkadot-sdk/actions/runs/21748717584 - it\nfails, it appears there are some env protection rules (reasonable as\nwell, we shouldn't be able to publish anything to the templates repo)\n\nSigned-off-by: Iulian Barbu <iulian.barbu@parity.io>",
+          "timestamp": "2026-02-06T13:44:46Z",
+          "tree_id": "0e327db6e5f86c10ac9428fcc70c4cedbf5312ec",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/9972470602d118fb07d968460b8a6dd5d4523141"
+        },
+        "date": 1770389619437,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 63626.509999999995,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 52941.90000000001,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.6898643284499992,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.662646605599999,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.00001877414,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.63234019386,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.287526649020004,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.000025807260000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8433532404999802,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.788876093819983,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.496011899592998,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.6671171713900015,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.000025807260000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.00001877414,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.006027904999999999,
             "unit": "seconds"
           }
         ]

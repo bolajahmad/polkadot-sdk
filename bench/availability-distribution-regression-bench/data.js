@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770366841029,
+  "lastUpdate": 1770383328664,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "serban@parity.io",
-            "name": "Serban Iorga",
-            "username": "serban300"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "a51c31246a789078f6109428974a31e2af55e6b2",
-          "message": "XCMP and DMP improvements (#8860)\n\nRelated to https://github.com/paritytech/polkadot-sdk/issues/489\n\nThis PR changes the parachain receiving logic for XCMP and DMP by adding\nsome offchain processing before forwarding the messages to the parachain\n`set_validation_data` inherent. This enables us to relax the advancement\nrule.",
-          "timestamp": "2025-07-01T07:19:38Z",
-          "tree_id": "cbeb4c88307b11c741d5dcd44a9351ff7594f5cf",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/a51c31246a789078f6109428974a31e2af55e6b2"
-        },
-        "date": 1751358120240,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022440178646666666,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012883205493333327,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1564807716400001,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008786516246666737,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "bitfield-distribution",
             "value": 0.022861009859999993,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "marian@parity.io",
+            "name": "Marian Radu",
+            "username": "marian-radu"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b4a1f75c4f26109c76f1e4b90eb93a2f44d0b0e7",
+          "message": "revive-eth-rpc: Use pending block for estimate_gas in dev mode (#10963)\n\nUse Pending as the default block for eth_estimateGas in dev mode,\nmatching Anvil/EDR behavior. Non-dev mode continues to use Latest\n(go-ethereum behavior).\n\nRefs https://github.com/paritytech/contract-issues/issues/261\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-06T11:55:08Z",
+          "tree_id": "3111445c469f16231e3b8e0028ad88c87824f5f5",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b4a1f75c4f26109c76f1e4b90eb93a2f44d0b0e7"
+        },
+        "date": 1770383303779,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.022948290226666664,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007003437706666667,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009709129406666682,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14455502298000003,
             "unit": "seconds"
           }
         ]

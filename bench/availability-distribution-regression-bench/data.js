@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770325520024,
+  "lastUpdate": 1770366841029,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "paolo@parity.io",
-            "name": "Paolo La Camera",
-            "username": "sigurpol"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "75deaab1061bf740a3c3f172668922b0a5c54344",
-          "message": "EPMB/unsigned: fixed multi-page winner computation (#8987)\n\n## The issue \n\nIn `FullSupportsOfMiner`, we initially considered `MaxWinnersPerPage` as\nthe overall maximum number of winners across pages. However, it should\nbe calculated as `Pages * MaxWinnersPerPage` to prevent the computed\nsolution from having a low overall total of winners, which could result\nin a `WrongWinnerCount` error.\n\nThis bug was identified in\n\n[#staking-miner-1074](https://github.com/paritytech/polkadot-staking-miner/issues/1074)\nwhile testing the staking miner in a setup with aggressive trimming to\nevaluate backer bounding.\n\n## How to test \n\nA test has been added to replicate this scenario:\n\nTest configuration:\n- `Pages=2`\n- `MaxWinnersPerPage=2`\n- `desired_targets=3` (3 or 4 doesn't matter here, the key point is that\nis strictly > `MaxWinnersPerPage`)\n- `MaxBackersPerWinner=1`\n\nBefore the fix in this PR: \n- `FullSupportsOfMiner` could only hold 2 winners in total (bounded by\n`MaxWinnersPerPage`)\n- But the mining algorithm needed to hold 3 winners across multiple\npages\n- This would cause a `WrongWinnerCount` error during verification\n\nWith the fix:\n- `FullSupportsOfMiner` can now hold `Pages * MaxWinnersPerPage = 2 * 2\n= 4` winners\n- The test passes with 3 winners across 2 pages (proving it can hold\nmore than `MaxWinnersPerPage=2`)\n- No `WrongWinnerCount` errors occur\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-06-30T14:07:56Z",
-          "tree_id": "c8956a48b2e8cb156ae38ceb128b344e27666883",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/75deaab1061bf740a3c3f172668922b0a5c54344"
-        },
-        "date": 1751316981873,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013129577186666663,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022502602880000003,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15756941038666672,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008852072880000068,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.010089918420000009,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pgherveou@gmail.com",
+            "name": "PG Herveou",
+            "username": "pgherveou"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "298bf2cb182b6fe3530568060a47853e630f52cb",
+          "message": "Enforce match_arm_blocks = true for consistent formatting (#10958)\n\n## Summary\n\nFlips `match_arm_blocks` from `false` to `true` to ensure all multi-line\nmatch arm bodies are wrapped in braces consistently.\n\n## Problem\n\nWith `match_arm_blocks = false`, rustfmt doesn't *add* braces to\nmulti-line match arms, but it also doesn't *remove* existing braces.\nThis means both styles are valid:\n\n```rust\n// Style A (no braces)\nAccountIdOrAddress::AccountId(id) =>\n    <T::AddressMapper as AddressMapper<T>>::to_address(id),\n\n// Style B (with braces) - also valid, rustfmt won't change it\nAccountIdOrAddress::AccountId(id) => {\n    <T::AddressMapper as AddressMapper<T>>::to_address(id)\n},\n```\n\nLLMs tend to produce Style B, which creates unnecessary diff noise in\nPRs.\n\n## Solution\n\nSet `match_arm_blocks = true` to enforce Style B everywhere. Now there's\nexactly one valid style, eliminating the ambiguity.\n\n## Impact\n\n556 files changed — this is a one-time formatting update. All future\ncode will be consistently formatted.\n\nFollow-up to #10939.\n\n---------\n\nCo-authored-by: PG <pg@parity.io>\nCo-authored-by: PG Herveou <pg@pgherveou.com>",
+          "timestamp": "2026-02-06T07:25:57Z",
+          "tree_id": "b9543d172b17bc251288c321811b843ef4fc6cbd",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/298bf2cb182b6fe3530568060a47853e630f52cb"
+        },
+        "date": 1770366816024,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007146507259999997,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009769507340000011,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.1448079263933334,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.022861009859999993,
             "unit": "seconds"
           }
         ]

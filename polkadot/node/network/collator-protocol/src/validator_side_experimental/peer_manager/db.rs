@@ -97,7 +97,6 @@ impl Backend for Db {
 		self.last_finalized = Some(leaf_number);
 		self.bump_reputations(bumps, decay_value)
 	}
-
 }
 
 impl Db {

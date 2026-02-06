@@ -241,7 +241,6 @@ impl PerLeafClaimQueueState {
 	pub fn free_slots(&self, leaf: &Hash) -> Vec<ParaId> {
 		self.leaves.get(leaf).map(|state| state.free_slots()).unwrap_or_default()
 	}
-
 }
 
 #[cfg(test)]

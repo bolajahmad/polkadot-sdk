@@ -509,10 +509,9 @@ impl<B: Backend> State<B> {
 		let metrics = &self.metrics;
 		let create_timer_fn = || metrics.time_collation_request_duration();
 
-		let (requests, maybe_delay) = self.collation_manager.try_make_new_fetch_requests(
-			connected_rep_query_fn,
-			create_timer_fn,
-		);
+		let (requests, maybe_delay) = self
+			.collation_manager
+			.try_make_new_fetch_requests(connected_rep_query_fn, create_timer_fn);
 
 		if !requests.is_empty() {
 			gum::debug!(

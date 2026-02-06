@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770405270815,
+  "lastUpdate": 1770418496460,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "1431590+nkpar@users.noreply.github.com",
-            "name": "Nikolai Kozlov",
-            "username": "nkpar"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "6824a6782354e274cf308be314f142551c5457ab",
-          "message": "Add optional auto-rebag within on-idle (#8684)\n\nImplemented an `on_idle` hook for automatic rebagging of accounts,\nenabling incremental correction of account positions within the\nbags-list during the idle phase of block execution. Introduced new\nstorages and configurable constants to support this functionality, along\nwith improvements in logging and internal helpers.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Ankan <10196091+Ank4n@users.noreply.github.com>\nCo-authored-by: Kian Paimani <5588131+kianenigma@users.noreply.github.com>",
-          "timestamp": "2025-07-01T17:34:56Z",
-          "tree_id": "d7d7c3d9377a77baccd6e32ad81ac989e50d8655",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/6824a6782354e274cf308be314f142551c5457ab"
-        },
-        "date": 1751394904906,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022310690713333338,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15753637962666667,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008708540660000097,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012883720000000001,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "bitfield-distribution",
             "value": 0.022911126093333328,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "60601340+lexnv@users.noreply.github.com",
+            "name": "Alexandru Vasile",
+            "username": "lexnv"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8e911a6ebc6965480621db8e89b1ecb157df9eba",
+          "message": "ah-westend: Elastic Scaling with 3 cores on AssetHub Westend (#9880)\n\nThis PR enables elastic scaling on AssetHubWestend with 3 bulk cores.\n\nGuideline for enablement:\nhttps://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/enable_elastic_scaling/index.html\n\n### Next Steps\n- [x] Ensure collators are running with 2509 or newer\n- [x] Double check the changes locally\n- [x] If AH Westend looks good, we'll enable ES to AHPaseo\n\ncc @paritytech/sdk-node @sandreim\n\n---------\n\nSigned-off-by: Alexandru Vasile <alexandru.vasile@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: eduardspa <eduard@parity.io>\nCo-authored-by: Javier Viola <363911+pepoviola@users.noreply.github.com>\nCo-authored-by: Andrei Sandu <54316454+sandreim@users.noreply.github.com>\nCo-authored-by: Maksym H <1177472+mordamax@users.noreply.github.com>",
+          "timestamp": "2026-02-06T21:33:41Z",
+          "tree_id": "046fde999e271b5a7e8e90b01f6a5d55299ad6a1",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/8e911a6ebc6965480621db8e89b1ecb157df9eba"
+        },
+        "date": 1770418471524,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.022872252426666663,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009745975306666647,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14449029915333336,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.006919665699999999,
             "unit": "seconds"
           }
         ]

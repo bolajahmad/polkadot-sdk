@@ -482,18 +482,16 @@ async fn get_overrides() -> OverrideKeys {
 		let mut overrides: HashMap<Vec<u8>, Vec<u8>> = Default::default();
 		let mut injects: HashMap<Vec<u8>, Vec<u8>> = Default::default();
 
-		let para_head_keys = [
-			// asset-hub (1000)
-			"cd710b30bd2eab0352ddcc26417aa1941b3c252fcb29d88eff4f3de5de4476c3b6ff6f7d467b87a9e8030000"
-		];
-		for key in para_head_keys {
-			if let Ok(para_head) = std::env::var(format!("ZOMBIE_{}", key)) {
+		// cd710b30bd2eab0352ddcc26417aa1941b3c252fcb29d88eff4f3de5de4476c3 -> para_heads prefix
+        for (key,var_value) in std::env::vars() {
+            if key.contains("ZOMBIE_cd710b30bd2eab0352ddcc26417aa1941b3c252fcb29d88eff4f3de5de4476c3") {
+				let full_key = key.strip_prefix("ZOMBIE_").expect("ENV VAR (para head) should be valid. qed");
 				overrides.insert(
-					hex::decode(key).expect("para_head_key should be valid").into(),
-					hex::decode(para_head).expect("para_head_value should be valid").into(),
+					hex::decode(full_key).expect("para_head_key should be valid").into(),
+					hex::decode(var_value).expect("para_head_value should be valid").into(),
 				);
-			}
-		}
+            }
+        }
 
 		if let Some(inner) = content.get("overrides") {
 			for (key, value) in inner {

@@ -1896,7 +1896,7 @@ impl<T: Config> Pallet<T> {
 
 		// Adding a 2% margin to the gas estimate.
 		let gas_estimate = high
-			.checked_div(U256::from(50))
+			.checked_div(U256::from(10))
 			.and_then(|margin| high.checked_add(margin))
 			.ok_or_else(|| {
 				EthTransactError::Message("failed to add a margin to the gas estimate".into())

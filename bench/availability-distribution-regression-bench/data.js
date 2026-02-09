@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770644603793,
+  "lastUpdate": 1770652043721,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "4211399+ordian@users.noreply.github.com",
-            "name": "ordian",
-            "username": "ordian"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "87a8fb03886485c6e0f5125ddfc7211ca9947803",
-          "message": "dispute-coordinator: handle race with offchain disabling (#9050)\n\nFixes a potential race with off-chain disabling when we learned about\ndisablement after importing a dispute from that validator.\n\nI think there's no need to handle startup to do deactivation. This will\nbe only relevant for when a node upgrades to the release with a fix and\nwriting a migration for that seems like an overkill since this scenario\nis very low probability.",
-          "timestamp": "2025-07-02T11:38:00Z",
-          "tree_id": "80d69b0fb439b35bd22fb88d94e7e7bfa85f0efa",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/87a8fb03886485c6e0f5125ddfc7211ca9947803"
-        },
-        "date": 1751460083908,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008695201073333422,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012972722446666664,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.02237010529333334,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1566199441933334,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.009511352360000001,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "seun@polytope.technology",
+            "name": "Seun Lanlege",
+            "username": "seunlanlege"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ba0839dd30e03bd2af44886eb351bdee4e674230",
+          "message": "implement `IERC20Metadata` for pallet-assets-precompiles (#10971)\n\n## Summary\n\nImplements the missing ERC20 metadata functions (`name`, `symbol`,\n`decimals`) for the pallet-assets precompile to provide full ERC20\ncompatibility. These functions were missing from the original\nimplementation and are essential for proper EVM wallet and tooling\nintegration.\n\n## Changes\n\n### Solidity Interface\n- **`substrate/primitives/ethereum-standards/src/IERC20.sol`**\n  - Added `name() external view returns (string memory)`\n  - Added `symbol() external view returns (string memory)`\n  - Added `decimals() external view returns (uint8)`\n\n### Precompile Implementation\n- **`substrate/frame/assets/precompiles/src/lib.rs`**\n- Implemented `name()` - reads metadata from pallet-assets storage and\nreturns UTF-8 string\n- Implemented `symbol()` - reads metadata from pallet-assets storage and\nreturns UTF-8 string\n- Implemented `decimals()` - reads metadata from pallet-assets storage\nand returns uint8 value\n- All functions charge appropriate gas using dedicated weight functions\n- Proper error handling for missing metadata and invalid UTF-8 encoding\n\n### Benchmarks\n- **`substrate/frame/assets/src/benchmarking.rs`**\n  - Added `get_name` benchmark - measures metadata read for name field\n- Added `get_symbol` benchmark - measures metadata read for symbol field\n- Added `get_decimals` benchmark - measures metadata read for decimals\nfield\n\n### Weight Functions\n- **`substrate/frame/assets/src/weights.rs`**\n  - Added `get_name() -> Weight` to WeightInfo trait\n  - Added `get_symbol() -> Weight` to WeightInfo trait\n  - Added `get_decimals() -> Weight` to WeightInfo trait\n  - Implemented for both `SubstrateWeight<T>` and `()` (fallback)\n- Each function: 1 storage read from `Assets::Metadata` (~12-12.5ms,\n2615 bytes proof size)\n\nCloses https://github.com/paritytech/polkadot-sdk/issues/8658\n\n---------\n\nCo-authored-by: 0xRVE <robertvaneerdewijk@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-09T14:33:54Z",
+          "tree_id": "d6a7f365b04bb187d5e5d23668a32d3c38ce3482",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/ba0839dd30e03bd2af44886eb351bdee4e674230"
+        },
+        "date": 1770652019208,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.006897493319999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14464792380666666,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.022964260593333327,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009677576173333308,
             "unit": "seconds"
           }
         ]

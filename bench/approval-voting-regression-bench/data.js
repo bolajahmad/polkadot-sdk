@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770418530860,
+  "lastUpdate": 1770642235319,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "10196091+Ank4n@users.noreply.github.com",
-            "name": "Ankan",
-            "username": "Ank4n"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "8546b7ab14b469cdc66bfb596f8dd899aced26b7",
-          "message": "[Staking] [AHM] Fixes insufficient slashing of nominators (and some other small issues). (#8937)\n\nChanges to pallet-staking-async\n\n## Removed\n- Config constant `MaxDisabledValidators`: This constant was removed\nsince validator disabling logic has been moved to pallet-session, making\nit redundant in staking-async.\n- Storage DoubleMap `NominatorSlashInEra`: This was used to track\nper-era maximum slashes for nominators. It’s no longer required — we now\nonly track the highest slash per validator per era.\n- Call `withdraw_overstake`: This was a temporary extrinsic meant to fix\noverstake issues, but with fungible migration of staking funds, this is\nno longer possible and the extrinsic is obsolete.\n\n## Changed\n- Nominator slashing logic: The logic now aggregates slashes from\ndistinct offending validators nominated by a nominator within the same\nera. For repeated offences by the same validator, only the highest slash\nfraction is applied. Previously, the pallet applied only the highest\nslash across all validators, regardless of how many were slashed.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-01T14:17:55Z",
-          "tree_id": "eab2686cd5968c2ae624a59303bc754c3bebe353",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/8546b7ab14b469cdc66bfb596f8dd899aced26b7"
-        },
-        "date": 1751386143431,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 63637.02999999999,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 52940.5,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.36876591822,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.40651028695,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.48865730023001863,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.4481003450923082,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005575921520000008,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.354955858990001,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.000021031410000000004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.875456941610029,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.000020597540000000003,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.8825189875600117,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.000020597540000000003,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.368472668139999,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.000021031410000000004,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting-parallel",
             "value": 13.812238135180014,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "yrong1997@gmail.com",
+            "name": "Ron",
+            "username": "yrong"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "51c34ff0b984df85d44acd1837889c7a1ed80cf8",
+          "message": "Snowbridge: Describe the token location with the length field included to avoid collisions (#10771)\n\n### Context\n\nFor `GeneralKey`, two different XCM junctions that differ only in length\ncan produce the same description bytes, and therefore the same TokenId.\n\nWe do have several PNAs registered that could be affected—for example,\nBNC from the Bifrost team and ACA from the Acala team—where the tokens\nare represented using GeneralKey. However, these tokens are not\ncurrently in use; there have been no transfers and no tokens minted yet.\n\nAs a result, I believe simply re-registering these tokens should be\nsufficient, without requiring a runtime storage migration.\n\n---------\n\nCo-authored-by: Clara van Staden <claravanstaden64@gmail.com>\nCo-authored-by: Branislav Kontur <bkontur@gmail.com>",
+          "timestamp": "2026-02-09T11:53:46Z",
+          "tree_id": "5bb59a5e179698ca9158dd6683d97f44e60ae8d8",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/51c34ff0b984df85d44acd1837889c7a1ed80cf8"
+        },
+        "date": 1770642210579,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 63625.630000000005,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 52939.2,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.7979589255299891,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.00002486431,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.00003572694000000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.528441620172961,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.00003572694000000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.66744469102,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3922093925899994,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.00002486431,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.988794289529988,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.005504832039999999,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.71559729042,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.6709450117900007,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.7391341461400005,
             "unit": "seconds"
           }
         ]

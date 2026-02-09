@@ -149,32 +149,26 @@ impl<T: Config> Pallet<T> {
 		who: T::AccountId,
 		price_limit: BalanceOf<T>,
 	) -> Result<(), DispatchError> {
-		let status = Status::<T>::get().ok_or(Error::<T>::Uninitialized)?;
-		let mut sale = SaleInfo::<T>::get().ok_or(Error::<T>::NoSales)?;
-		Self::ensure_cores_for_sale(&status, &sale)?; // TODO: Move it after checking if the market allows to buy?
-
 		let now = RCBlockNumberProviderOf::<T::Coretime>::current_block_number();
-		// TODO: Check if it can be the case.
-		ensure!(now > sale.sale_start, Error::<T>::TooEarly);
-		let blocks_since_sale_begin = now.saturating_sub(sale.sale_start);
-		match Self::place_order(blocks_since_sale_begin, &who, price_limit)? {
+		match Self::place_order(now, &who, price_limit)? {
 			OrderResult::BidPlaced { id, bid_price } => {
 				Self::charge(&who, bid_price)?;
 
 				Self::deposit_event(Event::BidPlaced { bid_id: id, price: bid_price });
 			},
-			OrderResult::Sold { price } => {
-				let core = Self::purchase_core(&who, price, &mut sale)?;
-				SaleInfo::<T>::put(&sale);
+			OrderResult::Sold { price, region_begin, region_end, core } => {
+				Self::charge(&who, price);
+
 				let id = Self::issue(
 					core,
-					sale.region_begin,
+					region_begin,
 					CoreMask::complete(),
-					sale.region_end,
+					region_end,
 					Some(who.clone()),
 					Some(price),
 				);
-				let duration = sale.region_end.saturating_sub(sale.region_begin);
+				let duration = region_end.saturating_sub(region_begin);
+
 				Self::deposit_event(Event::Purchased { who, region_id: id, price, duration });
 			},
 		};

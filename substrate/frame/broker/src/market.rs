@@ -16,13 +16,14 @@
 // limitations under the License.
 
 use core::cmp;
-use frame_support::traits::tokens::Balance;
+use frame_support::{ensure, traits::tokens::Balance};
 use frame_system::pallet_prelude::AccountIdFor;
 use sp_arithmetic::FixedPointNumber;
 use sp_runtime::{DispatchError, FixedU64, SaturatedConversion, Saturating};
 
 use crate::{
-	BalanceOf, Config, Configuration, Pallet, PotentialRenewalId, RelayBlockNumberOf, SaleInfo,
+	BalanceOf, Config, Configuration, CoreIndex, Pallet, PotentialRenewalId, RelayBlockNumberOf,
+	SaleInfo, SaleInfoRecordOf, Status, Timeslice,
 };
 
 // TODO: Extend the documentation.
@@ -45,7 +46,7 @@ pub trait Market<Balance, RelayBlockNumber, AccountId> {
 	/// - `since_timeslice_start` - amount of blocks passed since the current timeslice start
 	/// - `price_limit` - maximum price which the buyer is willing to pay
 	fn place_order(
-		since_timeslice_start: RelayBlockNumber,
+		block_number: RelayBlockNumber,
 		who: &AccountId,
 		price_limit: Balance,
 	) -> Result<OrderResult<Balance, Self::BidId>, Self::Error>;
@@ -79,7 +80,7 @@ pub trait Market<Balance, RelayBlockNumber, AccountId> {
 
 pub enum OrderResult<Balance, BidId> {
 	BidPlaced { id: BidId, bid_price: Balance },
-	Sold { price: Balance },
+	Sold { price: Balance, region_begin: Timeslice, region_end: Timeslice, core: CoreIndex },
 }
 
 pub enum RenewalOrderResult<Balance, BidId> {
@@ -102,6 +103,9 @@ pub enum MarketError {
 	Overpriced,
 	BidNotExist,
 	Uninitialized,
+	TooEarly,
+	Unavailable,
+	SoldOut,
 }
 
 // TODO: Proper conversion
@@ -117,17 +121,36 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 	type BidId = ();
 
 	fn place_order(
-		since_timeslice_start: RelayBlockNumberOf<T>,
-		_who: &AccountIdFor<T>,
+		block_number: RelayBlockNumberOf<T>,
+		who: &AccountIdFor<T>,
 		price_limit: BalanceOf<T>,
 	) -> Result<OrderResult<BalanceOf<T>, Self::BidId>, Self::Error> {
-		let sell_price = sell_price::<T>(since_timeslice_start)?;
+		let mut sale = SaleInfo::<T>::get().ok_or(MarketError::NoSales)?;
+		// TODO: don't read status here.
+		let status = Status::<T>::get().ok_or(MarketError::Uninitialized)?;
+
+		ensure!(sale.first_core < status.core_count, MarketError::Unavailable);
+		ensure!(sale.cores_sold < sale.cores_offered, MarketError::SoldOut);
+
+		// TODO: Check if it can be the case.
+		ensure!(block_number > sale.sale_start, MarketError::TooEarly);
+		let blocks_since_sale_begin = block_number.saturating_sub(sale.sale_start);
+
+		let sell_price = sell_price::<T>(blocks_since_sale_begin)?;
 
 		if price_limit < sell_price {
-			Err(MarketError::Overpriced)
-		} else {
-			Ok(OrderResult::Sold { price: sell_price })
-		}
+			return Err(MarketError::Overpriced)
+		};
+
+		let core = purchase_core::<T>(who, sell_price, &mut sale);
+		SaleInfo::<T>::put(&sale);
+
+		Ok(OrderResult::Sold {
+			price: sell_price,
+			region_begin: sale.region_begin,
+			region_end: sale.region_end,
+			core,
+		})
 	}
 
 	fn place_renewal_order(
@@ -161,6 +184,19 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 	) -> Vec<TickAction<AccountIdFor<T>, BalanceOf<T>, Self::BidId>> {
 		vec![]
 	}
+}
+
+fn purchase_core<T: Config>(
+	who: &T::AccountId,
+	price: BalanceOf<T>,
+	sale: &mut SaleInfoRecordOf<T>,
+) -> CoreIndex {
+	let core = sale.first_core.saturating_add(sale.cores_sold);
+	sale.cores_sold.saturating_inc();
+	if sale.cores_sold <= sale.ideal_cores_sold || sale.sellout_price.is_none() {
+		sale.sellout_price = Some(price);
+	}
+	core
 }
 
 fn sell_price<T: Config>(

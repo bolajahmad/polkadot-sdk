@@ -3253,8 +3253,9 @@ pub mod pallet {
 		/// Claim trapped balance for a pool member.
 		///
 		/// In rare scenarios, pool members may have excess held balance that is not accounted
-		/// for in their pool points due to bugs or edge cases in the staking system. This
-		/// extrinsic allows affected members to claim this trapped balance.
+		/// for in their pool points. This can occur when points are incorrectly dissolved
+		/// without releasing the corresponding held funds. This extrinsic allows affected
+		/// members to recover such trapped funds.
 		///
 		/// The extrinsic calculates the expected balance based on the member's points and
 		/// compares it with their actual held balance. If there's a positive difference, that
@@ -3276,11 +3277,11 @@ pub mod pallet {
 
 			let who = ensure_signed(origin)?;
 
-			// check member exists
+			// Fail-fast: verify member exists before performing expensive operations
 			let member =
 				PoolMembers::<T>::get(&who).ok_or(Error::<T>::PoolMemberNotFound)?;
 
-			// Get bonded pool
+			// Fetch the bonded pool to get the pool account for withdrawal operations
 			let bonded_pool =
 				BondedPool::<T>::get(member.pool_id).ok_or(Error::<T>::PoolNotFound)?;
 
@@ -3313,12 +3314,14 @@ pub mod pallet {
 			let trapped_amount = actual_balance.saturating_sub(expected_balance);
 			ensure!(!trapped_amount.is_zero(), Error::<T>::NoTrappedBalance);
 
-			// Release the trapped amount
+			// Release the trapped funds from delegation back to the member's free balance.
+			// Since these funds are not tracked in pool accounting (points), we can safely
+			// release them without affecting the pool's integrity.
 			T::StakeAdapter::member_withdraw(
 				Member::from(who.clone()),
 				Pool::from(bonded_pool.bonded_account()),
 				trapped_amount,
-				0, // no slashing spans needed for this operation
+				0,
 			)?;
 
 			Self::deposit_event(Event::<T>::TrappedBalanceClaimed {

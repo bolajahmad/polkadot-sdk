@@ -3271,7 +3271,10 @@ pub mod pallet {
 		/// # Errors
 		/// - `NoTrappedBalance`: The member has no trapped balance to claim.
 		#[pallet::call_index(26)]
-		#[pallet::weight(T::WeightInfo::claim_trapped_balance())]
+		#[pallet::weight(
+			T::WeightInfo::apply_slash()
+				.saturating_add(T::WeightInfo::withdraw_unbonded_update(T::MaxUnbonding::get()))
+		)]
 		pub fn claim_trapped_balance(
 			origin: OriginFor<T>,
 			member_account: AccountIdLookupOf<T>,

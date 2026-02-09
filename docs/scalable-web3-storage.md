@@ -11,11 +11,35 @@
 
 ## Executive Summary
 
-**The core insight:** Storage isn't free—someone pays, so someone naturally cares. That paying stakeholder verifies their own data as a byproduct of use. Stronger guarantees and decentralization emerge naturally from data importance: when data matters enough, more users/businesses add replicas, each with significant stake at risk. A bucket replicated by major providers across multiple jurisdictions is practically guaranteed by the economic stakes each provider would lose. And you never need to trust: you can always verify yourself or add your own replica.
+Storage isn't free—someone pays. That someone naturally cares. Their client
+software verifies automatically: spot-checking random chunks in the background
+during routine operations like backup updates. A few KB per week, invisible to
+users.
 
-**What we're building:** A bucket-based storage system where providers lock stake and clients can challenge. The chain exists as a credible threat, not as the hot path. Normal operations (reads, writes, storage) happen directly between clients and providers. The chain is only touched for setup, checkpoints, and disputes.
+We build on this: providers lock stake, clients can challenge. If a provider
+doesn't serve data, they lose their stake. The chain exists as a credible
+threat, not the hot path—normal operations happen directly between clients and
+providers. Setup, checkpoints, disputes: that's when you touch the chain.
 
-**Why it's different:** Existing Web3 storage either proves too much (Filecoin's continuous cryptographic proofs—heavy, slow) or guarantees too little (IPFS—no persistence). We use game theory: rational providers serve data because being challenged costs more than storage savings. This scales with provider capacity, not chain throughput.
+We don't stop at storage—we go through some lengths to guarantee retrieval too.
+Challenges extract actual data on-chain. Too slow and expensive for bulk
+recovery, but your most critical data is directly recoverable. More importantly,
+since providers pay part of challenge costs even when they respond, this
+pressures them into serving off-chain directly.
+
+Existing Web3 storage either proves too much (Filecoin's continuous proofs—heavy,
+slow, chain-bound) or guarantees too little (IPFS—no persistence at all). We use
+game theory: Rational providers serve because being challenged costs more
+than any savings from deleting data. This scales with provider capacity, not
+chain throughput.
+
+Stronger guarantees emerge from data importance. When data matters enough, more
+parties add replicas, each with stake at risk. A bucket replicated across major
+providers in multiple jurisdictions is practically guaranteed by the combined
+economic stakes. And if you don't trust the aggregate: verify yourself, or add
+your own replica.
+
+Also mutable storage is provided, in addition to content addressed immutable storage.
 
 ---
 
@@ -37,53 +61,126 @@
 
 ## The Problem with Web3 Storage
 
-Decentralized storage faces a fundamental tension: **guarantees vs. throughput**.
+Decentralized storage faces a fundamental tension: **guarantees vs. throughput**. Existing solutions either prove too much (expensive, doesn't scale) or guarantee too little (no persistence). But there's a deeper issue: even "strong" cryptographic proofs don't actually guarantee what users care about.
 
-### The Heavyweight Approach: Filecoin
+### IPFS: A Protocol, Not a Storage Solution
 
-Filecoin provides strong cryptographic guarantees. Providers "seal" data into 32GB sectors—a process taking ~1.5 hours with specialized GPU hardware. Every 24 hours, every sector must be proven on-chain via Proof-of-Spacetime.
+IPFS is a content-addressing protocol—a way to name data by its hash. This is genuinely useful: content hashes are location-independent, self-verifying names. But IPFS is not a storage system. It provides:
 
-This works for cold archival storage. But for interactive applications:
-- **Write latency**: Minutes to hours (sealing)
-- **Hardware**: GPU required, commodity hardware insufficient
-- **Chain load**: Every sector, every day, proven on-chain
-- **Rigidity**: 32GB sectors don't fit small files; padding wastes space
+- **Naming**: Data identified by hash (CID)
+- **Routing**: DHT for peer discovery
+- **Transfer**: Protocol for fetching chunks
 
-Filecoin's newer PDP (Proof of Data Possession, May 2025) improves hot storage, but still requires periodic proofs. The fundamental constraint remains: **chain throughput bounds storage capacity**.
+What IPFS explicitly does *not* provide:
 
-### The Lightweight Approach: IPFS
+- **Persistence**: No guarantee anyone stores the data
+- **Availability**: A CID with no providers is a dangling pointer
+- **Incentives**: No reason for nodes to serve data to strangers
+- **Fast discovery**: DHT lookups take 2-10 seconds and often fail
 
-IPFS provides content addressing and a peer-to-peer network. Data is identified by hash, seemingly removing provider dependence.
+The fundamental issue: **a content hash is just a name**. Knowing the name doesn't tell you where the data lives, who stores it, or whether it exists at all. You must hope someone, somewhere, cares enough to keep it.
 
-But content hashes are just names. Nothing requires anyone to store the data:
-- **No persistence**: Nodes can drop data immediately
-- **No read incentives**: Why serve data to strangers for free?
-- **Slow discovery**: DHT lookups take 2-10 seconds, often fail
-- **No accountability**: A hash with no providers is a dangling pointer
+### Filecoin: Incentivizing IPFS Storage
 
-### The Common Thread
+Filecoin adds an incentive layer to IPFS. Providers lock collateral and commit to store data. The chain verifies storage through cryptographic proofs—Proof-of-Replication (data is stored) and Proof-of-Spacetime (data persists over time).
 
-Both approaches struggle with the same question: **How do we know data is available?**
+**The heavyweight approach (PoRep/PoSt):**
+- Data "sealed" into 32GB sectors (~1.5 hours, requires GPU)
+- Every sector proven on-chain every 24 hours (WindowPoSt)
+- Chain processes millions of proofs daily at network scale
 
-Filecoin answers with cryptography: continuous proofs. This is expensive and doesn't scale.
+This works for cold archival. But for interactive applications: write latency is minutes to hours, hardware requirements exclude commodity servers, and 32GB sectors waste space for small files.
 
-IPFS doesn't answer at all: hope someone cares enough to store it.
+**The lighter approach (PDP, May 2025):**
+Filecoin's Proof of Data Possession improves hot storage significantly:
+- No sealing required—data immediately accessible
+- No GPU needed—CPU-only verification (SHA2 Merkle proofs)
+- Constant proof size—160 bytes challenged regardless of data volume
+- ~10-20x lower gas costs than WindowPoSt
 
-Neither provides fast, reliable discovery. Neither handles the read incentive problem well. And for chain-bnased proofs, throughput fundamentally limits capacity.
+But PDP still requires periodic proofs—every 30 minutes per ProofSet. At network scale with millions of ProofSets, the chain must still process millions of proof submissions daily. **Chain throughput still bounds storage capacity**, just at a higher ceiling.
+
+### The Deeper Problem: What Do Proofs Actually Guarantee?
+
+Here's what's often overlooked: **cryptographic proofs don't guarantee persistence—payments do.**
+
+Consider what Filecoin's proofs actually prove:
+- ✓ Provider has the data *right now*
+- ✓ Provider had the data *at each proof interval*
+- ✗ Provider will have the data *tomorrow*
+- ✗ Data will survive if the storage deal expires
+- ✗ Data will survive if the client stops paying
+
+When a Filecoin storage deal expires, the provider can (and economically should) delete the data. The proofs were all valid. The data is still gone.
+
+Continuous proofs create an appearance of trustless persistence. But the trust hasn't been eliminated—it's been hidden. You're trusting that someone pays and keeps paying for the storage and on top of that you have no guarantee of data delivery, even if the data is technically available.
+
+### CID Addressing Hides Dependencies
+
+Content addressing (CIDs) has a subtle problem: **it obscures where data actually lives**.
+
+When you reference `bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3okurat...`, you're saying "I want data with this hash." You're not saying:
+- Who stores it
+- What guarantees they've made
+- How long they've committed to store it
+- What stake backs that commitment
+
+This is fine for ephemeral caching. It's problematic for anything you depend on. You can't answer "will this data exist next month?" without tracking down the storage deals separately.
+
+### Summary
+
+Even with Filecoin, IPFS is still lacking:
+
+| Question | IPFS Answer | Filecoin Answer |
+|----------|-------------|-----------------|
+| Who stores my data? | Unknown (hope someone) | Provider (but deal expires) |
+| How long will it persist? | Unknown | Until deal ends |
+| What if they delete it? | Nothing | Slash (but data still gone) |
+| How do I verify? | Fetch it yourself | Chain proves periodically |
+| Does it scale? | N/A (no guarantees) | Bounded by chain throughput |
+
+**What's missing:** A system that makes storage relationships explicit, scales with provider capacity rather than chain throughput, and provides guarantees that match what users actually need—not cryptographic proofs for their own sake, but assurance that data remains accessible.
 
 ---
 
 ## Our Approach: Pragmatic Verification
 
-We start from a different premise.
+We start from a different premise: **make dependencies explicit, verify what matters, skip the overhead for what doesn't.**
+
+### Bucket Addressing: Explicit Storage Relationships
+
+Instead of pure content addressing (CID), we use **bucket addressing**. A bucket is an on-chain entity that makes storage relationships visible and removes the need for costly DHT lookups - it provides discoverabilty.
+
+**Immutable references** (like CIDs) include a content hash:
+```
+bucket://42/<data_root>
+         │       └── Merkle root of the data (content-addressed, immutable)
+         └── bucket_id (on-chain, shows who stores it)
+```
+
+This is similar to a CID—the `data_root` pins the exact content—but the bucket tells you *where* to find it and *who* is responsible for storing it.
+
+**Mutable references** resolve against current bucket state:
+```
+bucket://42/fs/my_website/logo.png    // filesystem path, latest snapshot
+bucket://42/latest/leaf/17            // current leaf 17
+```
+
+The key difference from pure CIDs:
+
+| Aspect | CID (`bafybei...`) | Bucket (`bucket://42/...`) |
+|--------|-------------------|---------------------------|
+| Who stores it? | Unknown | Providers A, B, C (on-chain) |
+| What guarantees? | Unknown | 1000 DOT stake each |
+| How long? | Unknown | Until block 1,000,000 |
+| Content immutability | Hash = content | Hash in path = immutable; path-only = mutable |
+| Can I verify? | Fetch and hope | Fetch & challenge if needed|
+
+**The bucket_id is the stable anchor.** Providers can come and go, but the bucket_id never changes. Applications reference buckets, not providers. When you see a bucket reference, you can look up exactly who stores it, what stake backs it, and how long they've committed—no hoping, no DHT lookups, no uncertainty.
 
 ### Storage Only Matters If Someone Cares
 
-Consider: what does it mean to "guarantee" storage of data no one ever reads?
-
-If a file sits untouched for years—never read, never verified, never needed—what exactly is being guaranteed? The cryptographic proof that some provider has *something* on disk? But the practical guarantee—that useful data remains accessible—requires someone to actually want it.
-
-**Our design assumption:** A rational client who paid for storage will periodically verify their data exists. By reading it. By spot-checking random chunks. If no one ever checks, the data has no practical value worth guaranteeing.
+Our design assumption: A rational client who paid for storage will periodically verify their data exists. By reading it. By spot-checking random chunks. If no one ever checks, the data has no practical value worth guaranteeing.
 
 This isn't a limitation. In reality, most data written is never read again—but that's fine. Someone still cares enough to pay for storage. Verification is automated and free: when you update your backup, the software spot-checks random existing chunks in the background. You might never restore that backup (hopefully you won't need to), but each incremental update verifies storage at no cost to you. The key is that this isn't fire-and-forget—there's ongoing interaction, even if minimal, and that interaction enables verification.
 
@@ -108,7 +205,7 @@ Correct. Humans are unreliable. Software isn't.
 
 The client software—the backup app, the file browser, the media player—performs verification automatically. When you open your backup app, it spot-checks a few random chunks in the background. When you browse a folder, the client fetches the directory listing chunks—verifying they exist and match their hashes. When you play a video, every chunk delivered is verified against its hash.
 
-This happens without user action, without user awareness, without user discipline. The lazy human doesn't need to remember to verify. The software does it continuously, invisibly, as part of normal operation.
+This happens without user action, without user awareness, without user discipline. The lazy human doesn't need to remember to verify. The software does it continuously, invisibly, as part of normal operation. Defaults matter.
 
 ### Objective Reliability Emerges from Subjective Checks
 
@@ -129,7 +226,7 @@ What if you don't trust aggregate metrics? What if you have strict requirements?
 
 **Add your own replica.** Anyone can create a replica agreement with any provider they choose. Pick a provider you trust, pay them directly, verify them yourself. Now you have at least one replica whose reliability you've personally established.
 
-Or simply **challenge directly.** Anyone can challenge any provider for any data they have a commitment for. Don't trust that a provider still has your data? Challenge one random chunk. If they respond, you've verified (and recovered that chunk). If they don't, they get slashed, and the world learns they're unreliable.
+Or simply **challenge directly.** Anyone can challenge any provider for any data they have a commitment for. Don't trust that a provider still has your data? Fetch one random chunk. If they respond, you've verified (and recovered that chunk). If they don't, you challenge, they get slashed, and the world learns they're unreliable.
 
 The point: you're never dependent on trusting others' verification. You can always verify yourself, at any time, for any data you care about.
 
@@ -230,18 +327,16 @@ Providers fall into two categories with different trust models:
 - Receive writes directly from clients
 - Count toward `min_providers` for checkpoints
 - Limited to ~5 per bucket (prevents bloat)
-- Can be early-terminated by admin (for misbehavior)
 
 **Replica Providers** (permissionless):
 - Added by anyone (you, a third party, a charity)
 - Sync data autonomously from primaries or other replicas
 - Paid per successful sync confirmation
 - Unlimited count
-- Cannot be early-terminated (run to expiry)
 
 **Why this split?**
 
-Writes need coordination—someone must order appends to the MMR. That's the admin's job, via primary providers they control.
+Writes need coordination—someone must order appends to the MMR. This is why writes are restricted to writer and admin accounts.
 
 But reads don't need coordination. Any provider with the data can serve it. Replicas provide permissionless read redundancy. Even if an admin is compromised or malicious, replicas ensure the data remains accessible from independent sources.
 
@@ -260,13 +355,37 @@ In normal operation, clients and providers interact directly:
 The chain is touched only for:
 - **Bucket creation**: Once
 - **Agreement setup**: Per provider
-- **Checkpoints**: Infrequent, batched (primaries)
-- **Sync confirmations**: Replicas confirm they've synced to a checkpoint
+- **Checkpoints**: Can be made infrequent, depending on use case
+- **Sync confirmations**: Replicas confirm they've synced to a checkpoint - frequency depending on use case
 - **Disputes**: Rare, expensive, avoided by rational actors
 
-This inversion is key to scalability. Traditional approaches put everything on-chain (or prove everything to the chain). We put almost nothing on-chain—but the threat of on-chain resolution keeps everyone honest.
+Most heavy load is expected from checkpoints and sync confirmations, both scale with the number of writes and both can be batched to reduce load if necessary.
 
-**Why does this work?**
+**Immediate guarantees without chain writes:**
+
+When a client uploads data, the provider returns a signed commitment—a signature over the new MMR state including the client's data. This signature is the client's guarantee:
+
+1. **With signature only**: Client holds provider's signature. If provider denies having the data or refuses to serve, client can prove provider committed to storing it. The signature enables a challenge.
+
+2. **After checkpoint**: The MMR root is on-chain, establishing the canonical bucket state. This adds:
+   - **Synchronization**: All parties agree on the bucket's state at that point
+   - **Public verifiability**: Anyone can challenge based on the on-chain commitment, not just signature holders
+   - **Multi-provider attestation**: Multiple primaries signed the same state
+   - **Durability**: The commitment is in chain history—can't be lost if client loses the signature
+
+Compare to Filecoin (including PDP):
+- Data must be committed to a ProofSet **on-chain** before any guarantee exists
+- Until the chain transaction confirms, you have only the provider's word
+- Batching is possible, but guarantees still wait for chain confirmation
+
+This is a key difference. We get immediate off-chain guarantees via signatures; checkpoints batch to the chain for synchronization and public verifiability, but aren't required for the guarantee to be actionable.
+
+**Why does the signature-based guarantee work?**
+
+The provider's signature is cryptographic proof they acknowledged receiving the data. If the provider later refuses to serve it:
+- Client initiates challenge, presenting the signed commitment
+- Provider must produce the data or lose their entire stake
+- The signature proves the provider can't claim "I never had that data"
 
 On-chain challenges are expensive for everyone. The challenger must deposit funds. The provider must submit actual chunk data with Merkle proofs. Both sides pay transaction fees.
 
@@ -299,6 +418,7 @@ StorageAgreement
 - Providers need predictability to provision storage
 - Clients need assurance data won't be dropped mid-term
 - Price volatility is handled by locking price at creation/extension
+- Third parties can rely on data staying available until agreement expiration (at least)
 
 ### Provider Stake
 
@@ -310,8 +430,6 @@ Provider
 ├── committed_bytes: u64    // sum of max_bytes across agreements
 ├── stats: { agreements, extensions, burns, challenges_received, challenges_failed }
 ```
-
-The stake-to-bytes ratio determines how much a provider can commit to. Higher stake = more capacity = more earning potential.
 
 **Full stake at risk**: A single failed challenge slashes the provider's *entire stake*, not just the stake for that bucket. This makes cheating economics absurd—deleting 1% of data to save $0.12/year risks losing thousands of dollars in stake.
 
@@ -364,9 +482,11 @@ Imagine a provider who technically kept the data but was slow, unresponsive, or 
 - On-chain record of burn damages reputation
 - Future clients see: "This provider had X agreements burned"
 
-**Why would anyone burn?**
+In addition to the challenging mechanism, this burn instead of pay possibility is part of guaranteeing/incentivizing good enough retrievability, not just storing.
 
-Burning costs *more* than paying. When burning, the client loses the locked payment AND pays an additional premium (governance-configurable, e.g., 10%) from their account. This premium is deducted at burn time—if the client lacks sufficient funds, the burn fails and they must pay instead.
+**Avoiding abuse**
+
+Burning costs *more* than paying. When burning, the client loses the locked payment AND pays an additional premium (governance-configurable, e.g., 10%) from their account. This premium is deducted at burn time—if the client lacks sufficient funds, the burn fails and they must pay instead (or top up their account).
 
 This design has several important properties:
 - **Anti-griefing**: Spite burns cost the client extra, not just the provider
@@ -405,11 +525,13 @@ Why this fails:
 It's not binary (serve/don't serve). Providers can "barely serve"—responding only to challenges while degrading normal service. But this is self-defeating long-term as clients migrate to better providers, and short-term gains are capped by challenge costs.
 
 **Organizational collusion (censorship):** Single entity runs providers globally, receives government pressure to censor. Protection through economics:
-- Censoring all replicas = all stakes slashed (3 providers × 1000 DOT = ~$450,000)
+- Censoring all replicas = all stakes slashed
 - Pressure must exceed economic penalty to force compliance
 - Permissionless replicas can't be controlled by original provider
 
 We don't prevent collusion cryptographically. We make it economically irrational through stake requirements, practically difficult through latency-based verification, and strategically unstable through client optionality and provider competition.
+
+In the end, the guarantees are provided by stake. Client and provider are getting aligned on risks. If content have a real risk of getting censored somewhere, a colluding provider also faces a real risk of losing its stake.
 
 ---
 
@@ -428,7 +550,7 @@ But slashing doesn't guarantee **quality of service**. A provider can technicall
 - **Without payment incentives**: Serve all at 100KB/s each. Everyone slow, no slashing.
 - **With payment incentives**: 100 paying clients get 800KB/s each, 900 free clients share remaining bandwidth.
 
-Slashing ensures data CAN be retrieved. Payments ensure it's retrieved QUICKLY and RELIABLY.
+Slashing ensures data can be retrieved. Payments ensure it's retrieved quickly and reliably.
 
 ### The Solution: Payment-Based Prioritization
 
@@ -464,8 +586,6 @@ Proof-of-DOT (detailed in [issue #6173](https://github.com/paritytech/polkadot-s
 2. **Registered** (Proof-of-DOT): Always get basic service, reputation tracked, can build payment history
 3. **Paying** (Proof-of-DOT + payments): Premium service based on payment history
 
-**Important:** The DOT locked for identity is separate from payment priority. A client who locked DOT for identity but paid 100 DOT in fees gets better service than one who locked 100 DOT but never paid. Identity enables participation; payments determine service quality.
-
 **Distinction from Proof of Personhood:** Proof-of-DOT allows multiple identities per person (if they pay for each). It's designed for abundant resources (bandwidth, connections) where we want sustainable economics, not scarcity. Proof of Personhood is for truly scarce resources (votes, airdrops) where one-per-human matters. They complement each other: proven persons could get DOT for Proof-of-DOT registration for free.
 
 ### How Competition Drives Quality
@@ -476,11 +596,12 @@ The feedback loop is natural:
 3. Poor service → switch providers or stop paying
 4. Providers compete for paying clients
 
-Example: A viral video receives 10,000 requests. Paying users stream instantly, free users buffer. Client software suggests: "High demand content. Pay 5 cents for instant access?"
+Example: A viral video receives 10,000 requests. Paying users stream instantly, free users buffer. Client software suggests: "High demand content. Pay 1 cent for instant access?"
 
 ### Challenge as Price Ceiling
 
 If a provider demands more than the challenge cost to serve data, clients can challenge on-chain instead. This caps extortion attempts—rational providers price below the challenge threshold to avoid:
+
 - Paying challenge costs
 - Getting no payment
 - Reputation damage
@@ -506,9 +627,7 @@ Clients should evaluate providers on:
 *Note: Specific stake thresholds will emerge from market dynamics and can be refined based on production data.*
 
 **Track record**: Check on-chain stats:
-- Total agreements vs. agreements extended (extension = client satisfactionV2 - better structure
-
-First draft)
+- Total agreements vs. agreements extended (extension = client satisfaction)
 - Agreements burned (burn = client dissatisfaction)
 - Challenges received vs. failed (failed = catastrophic failure)
 - Provider age (longer = more track record)
@@ -524,7 +643,7 @@ By tracking latency over time and shifting toward lower-latency providers, clien
 - Slow or overloaded providers
 - Providers not actually in their claimed region
 
-**Geographic redundancy emerges**: If a client sees consistently low latency from certain providers in a regionand high latency from others, the low-latency providers are genuinely serving from Europe. By selecting providers with consistently good latency from different regions, you achieve verified geographic distribution—not by trusting claims, but by measuring physics.
+**Geographic redundancy emerges**: If a client sees consistently low latency from certain providers in a region and high latency from others, the low-latency providers are genuinely serving from Europe. By selecting providers with consistently good latency from different regions, you achieve verified geographic distribution—not by trusting claims, but by measuring physics.
 
 **Cross-region verification in practice**:
 1. Select providers in distinct regions (EU, US-East, Asia)
@@ -702,7 +821,7 @@ Updates:
 Setup:
 ├── min_providers = 3
 ├── Frozen bucket (immutable audit trail)
-├── 3-5 providers (stake homogeneity, infrastructure diversity)
+├── 5 providers (stake homogeneity, infrastructure diversity)
 
 Verification:
 ├── Continuous background sampling
@@ -721,27 +840,56 @@ Compliance:
 
 ### vs. Filecoin
 
-| Aspect | Filecoin | This Design |
-|--------|----------|-------------|
-| Proof mechanism | Cryptographic (PoRep/PoSt) | Game-theoretic (challenges) |
-| Chain load | Heavy (every 24h per sector) | Minimal (disputes only) |
-| Write latency | Minutes-hours (sealing) | Sub-second |
-| Hardware | GPU required | Commodity |
-| Sector size | 32GB fixed | Flexible (any size) |
-| Best for | Cold archival | Hot interactive |
+| Aspect | Filecoin (PoSt) | Filecoin (PDP) | This Design |
+|--------|-----------------|----------------|-------------|
+| Proof mechanism | zk-SNARK | SHA2 Merkle | Game-theoretic |
+| Proof frequency | Every 24h/sector | Every 30min/ProofSet | On dispute only |
+| Chain load | O(sectors × time) | O(ProofSets × time) | O(disputes) |
+| Write latency | Hours (sealing) | Immediate | Immediate |
+| Write guarantee | After chain tx | After chain tx | Immediate (signature) |
+| Hardware | GPU required | CPU sufficient | Commodity |
+| Best for | Cold archival | Hot storage | Hot interactive |
 
-**Trade-off**: Filecoin provides stronger cryptographic guarantees and objective guarantees even for data no one is actively using. We optimize for data someone cares about and verifies.
+**The scaling difference:**
+
+```
+Filecoin at 1M ProofSets:
+  Chain load = 1M × 48 proofs/day = 48M proof txs/day
+  Even at ~100K gas each = chain saturation
+
+This design at 1M buckets:
+  Chain load = setup + checkpoints + disputes
+  With rational actors: disputes → 0
+  Chain load: minimal, bounded by setup activity and consensus needing writes
+```
+
+**Our position:** Filecoin proves storage *exists*. We guarantee data is *retrievable*.
+
+Filecoin proofs don't deliver data—a provider can pass every proof while refusing
+to serve you. Our challenges extract actual chunk data on-chain. Chain recovery is
+limited by throughput and cost, but still valuable:
+
+1. **Last-resort recovery**: Your most precious 1GB of baby photos from a 2TB backup
+   is extractable chunk-by-chunk.
+2. **Pressure to serve**: Providers pay part of challenge costs even when they respond.
+   Every challenge hurts, so providers are strongly incentivized to serve off-chain
+   directly.
+
+**When Filecoin is better:** Third-party verifiable audit trails—proof that data
+existed at specific times, without being the paying client.
 
 ### vs. IPFS
 
 | Aspect | IPFS | This Design |
 |--------|------|-------------|
+| What it is | Content-addressing protocol | Storage system |
 | Discovery | DHT (2-10s, unreliable) | Chain (instant, reliable) |
 | Persistence | No guarantees | Contractual + slashing |
 | Read incentives | None | Proof-of-DOT priority |
-| Mutable references | No | Yes (bucket-addressed) |
+| Mutable references | No (hash = content) | Yes (bucket = container) |
+| Storage visibility | Hidden (who has this CID?) | Explicit (on-chain agreements) |
 
-**Trade-off**: IPFS provides content addressing without guarantees. We add economic guarantees at the cost of requiring on-chain bucket setup.
+**Trade-off**: IPFS provides content addressing—useful as a naming/transfer layer. We provide storage guarantees on top. They're complementary: buckets could use IPFS for chunk transfer while providing the accountability layer IPFS lacks.
 
 ### vs. Arweave
 
@@ -800,9 +948,16 @@ Open to third-party providers. Add permissionless replica agreements.
 
 ## Future Directions
 
+### Protocol-Based Verification (Optional Premium)
+
+For use cases requiring stronger guarantees than game-theoretic verification—particularly
+replicas (which lack natural client verification) and fire-and-forget archival—optional
+periodic proofs similar to Filecoin's PDP could be added as a premium feature. This can
+be layered on later without changing the core protocol.
+
 ### Isolation Mode
 
-Admins can instruct providers to temporarily refuse serving non-members, then challenge a specific provider. If that provider was freeloading (fetching from others), they can't respond. Detects freeloading without on-chain enforcement. Note: This was explained in more detail in the previous version of this doc, but became harder with the introduction of replicas - which should not be controllable by the admin. Incentives still align as honest providers have an interest to help catching free-loaders. Latency measurements and high stake should get us very far though.
+Admins can instruct providers to temporarily refuse serving non-members, then challenge a specific provider. If that provider was freeloading (fetching from others), they can't respond. Detects freeloading without on-chain enforcement. Note: This was explained in more detail in the previous version of this doc, but became harder with the introduction of replicas—which should not be controllable by the admin. Incentives still align as honest providers have an interest in helping catch free-loaders. Latency measurements and high stake should get us very far though.
 
 ---
 
@@ -810,13 +965,17 @@ Admins can instruct providers to temporarily refuse serving non-members, then ch
 
 We've designed a storage system for the common case: data that someone cares about.
 
-**The key insight:** When clients have skin in the game—they paid for storage—they naturally verify. Verification becomes automatic, invisible, a byproduct of normal use. The "verifier's dilemma" disappears.
+**The key insight:** Storage depends on payments, not proofs. When someone pays for storage, they care. When they care, they verify—automatically, invisibly, as a byproduct of use. Cryptographic proofs for active data are redundant overhead; for dormant data, they provide weaker guarantees than they appear (data still vanishes when payments stop).
 
-**The architecture:** Buckets provide stable identity. Providers lock stake and face slashing. Primaries handle writes; replicas add permissionless redundancy. The chain is the credible threat that keeps everyone honest without being the hot path.
+**The architecture:** Buckets make storage relationships explicit—who stores what, with what stake, until when. No hiding behind content hashes that obscure dependencies. Providers lock stake and face slashing. The chain exists as a credible threat, not the hot path. Normal operations happen off-chain; the chain is touched only for setup, checkpoints, and rare disputes.
 
-**The result:** Storage that scales with provider capacity, not chain throughput. Writes are instant. Reads are fast. Guarantees are economic, not cryptographic—and for active data with interested clients, that's enough.
+**The scaling model:**
+- Filecoin: O(storage × time) chain load—every sector/ProofSet proven periodically
+- This design: O(disputes) chain load—with rational actors, approaches zero
 
-For data no one ever checks, no one ever reads, no one ever wants or fire & forget use cases or needed stronger objective guarantees, even for unpopular data—use Filecoin.
+**The result:** Storage capacity bounded by provider infrastructure, not chain throughput. Writes are instant. Reads are fast. Guarantees are economic, not cryptographic—and for data with interested clients, economic guarantees backed by slashable stake are both sufficient and more honest about what's actually being guaranteed.
+
+**When to use something else:** For true fire-and-forget archival where you want objective proof data existed even if no one ever reads it, Filecoin's continuous proofs add value. For permanent storage with upfront payment, consider Arweave. We're optimized for interactive storage where someone is paying attention.
 
 ---
 
@@ -833,22 +992,32 @@ For data no one ever checks, no one ever reads, no one ever wants or fire & forg
 
 3. **Proof of Data Possession (PDP)**: Launched May 2025, enabling hot storage verification without sealing.
    - [Introducing PDP: Verifiable Hot Storage on Filecoin](https://filecoin.io/blog/posts/introducing-proof-of-data-possession-pdp-verifiable-hot-storage-on-filecoin/)
+   - [PDP Overview | Filecoin Onchain Cloud](https://docs.filecoin.cloud/core-concepts/pdp-overview/)
+   - [FIP Discussion #1009 - Proof of Data Possession](https://github.com/filecoin-project/FIPs/discussions/1009)
+
+4. **PDP Technical Details**: 30-minute proving period, 160-byte challenge size (5 × 32-byte leaves), SHA2 Merkle proofs, no GPU required. ProofSets are mutable—can add/delete/modify without aggregation bottlenecks.
+   - [FilOzone PDP Repository](https://github.com/FilOzone/pdp)
+   - [PDP Installation Guide](https://docs.filecoin.io/storage-providers/pdp/install-and-run-pdp)
+
+5. **Chain Throughput Constraints**: Pre-HyperDrive (2021), storage onboarding used >100% of chain capacity, limiting growth to ~40 PiB/day. WindowPoSt consumes ~42% of all chain messages.
+   - [HyperDrive Upgrade](https://filecoin.io/blog/posts/filecoin-v13-hyperdrive-network-upgrade-unlocks-10-25x-increase-in-storage-onboarding/)
+   - [FIP-0010: Off-chain WindowPoSt Verification](https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0010.md)
 
 ### IPFS
 
-4. **DHT Lookup Latency**: Median retrieval times of 2.7-4.4 seconds; P90/P95 can extend to 10+ seconds.
+6. **DHT Lookup Latency**: Median retrieval times of 2.7-4.4 seconds; P90/P95 can extend to 10+ seconds.
    - [Design and Evaluation of IPFS: A Storage Layer for the Decentralized Web](https://arxiv.org/pdf/2208.05877)
    - [IPFS KPIs | ProbeLab](https://www.probelab.io/ipfs/kpi/)
    - [Consensys IPFS Lookup Measurement](https://github.com/Consensys/ipfs-lookup-measurement)
 
 ### Network Latency
 
-5. **Transatlantic Latency**: Round-trip times between EU and US hubs typically range 60-80ms, with theoretical minimum ~55ms based on speed of light in fiber.
+7. **Transatlantic Latency**: Round-trip times between EU and US hubs typically range 60-80ms, with theoretical minimum ~55ms based on speed of light in fiber.
    - Physical constraint: ~5,500km distance, light travels at ~200,000 km/s in fiber
 
 ### Detection Probability
 
-6. **Spot-check Math**: For as little as 3 random checks per week with 10% data deletion:
+8. **Spot-check Math**: For as little as 3 random checks per week with 10% data deletion:
    - P(miss per week) = 0.9³ = 0.729
    - P(detect in 13 weeks) = 1 - 0.729¹³ ≈ 0.98
    - P(detect in 26 weeks) = 1 - 0.729²⁶ ≈ 0.9997

@@ -1958,3 +1958,40 @@ fn pool_members_need_full_bonding_duration_when_nominators_slashable() {
 		assert!(PoolMembers::<Runtime>::get(20).is_none());
 	});
 }
+
+#[test]
+fn claim_trapped_balance_applies_pending_slash_first() {
+	new_test_ext().execute_with(|| {
+		let alice = 100;
+		assert_ok!(Balances::mint_into(&alice, 300));
+		assert_ok!(Balances::mint_into(&10, 250));
+
+		// Create pool and join
+		assert_ok!(Pools::create(RuntimeOrigin::signed(10), 200, 10, 10, 10));
+		assert_ok!(Pools::nominate(RuntimeOrigin::signed(10), 1, vec![1, 2, 3]));
+		assert_ok!(Pools::join(RuntimeOrigin::signed(alice), 100, 1));
+
+		let pool_account = Pools::generate_bonded_account(1);
+
+		// Apply a slash to the pool
+		set_current_era(1);
+		pallet_staking_async::slashing::do_slash::<Runtime>(
+			&pool_account,
+			50,
+			&mut Default::default(),
+			&mut Default::default(),
+			1,
+		);
+
+		// Verify pool and member have pending slash
+		assert!(Pools::api_pool_pending_slash(1) > 0);
+		assert!(Pools::api_member_pending_slash(alice) > 0);
+
+		// claim_trapped_balance succeeds by applying the slash, even though there's no trapped
+		// balance. This is useful work - users can call this to apply their pending slash.
+		assert_ok!(Pools::claim_trapped_balance(RuntimeOrigin::signed(alice)));
+
+		// Verify slash was applied
+		assert_eq!(Pools::api_member_pending_slash(alice), 0);
+	});
+}

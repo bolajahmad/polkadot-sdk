@@ -310,6 +310,28 @@ mod bonded_pool {
 			assert_eq!(bonded_pool.points_to_balance(u128::MAX), u128::MAX);
 		})
 	}
+
+	#[test]
+	fn claim_trapped_balance_basic_checks() {
+		ExtBuilder::default().build_and_execute(|| {
+			let member = 20;
+
+			// Non-existent member cannot claim
+			assert_noop!(
+					Pools::claim_trapped_balance(RuntimeOrigin::signed(member)),
+					Error::<Runtime>::PoolMemberNotFound
+				);
+
+			// Member joins pool
+			assert_ok!(Pools::join(RuntimeOrigin::signed(member), 100, 1));
+
+			// Member with no trapped balance cannot claim
+			assert_noop!(
+					Pools::claim_trapped_balance(RuntimeOrigin::signed(member)),
+					Error::<Runtime>::NoTrappedBalance
+				);
+		});
+	}
 }
 
 mod reward_pool {

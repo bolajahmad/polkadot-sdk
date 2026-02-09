@@ -46,6 +46,7 @@ std = [
 	"codec/std",
 	"curve25519-dalek",
 	"ed25519-dalek",
+	"frame-support/std",
 	"hkdf",
 	"hkdf?/std",
 	"rand",
@@ -61,7 +62,6 @@ std = [
 	"sp-runtime/std",
 	"thiserror",
 	"x25519-dalek",
-	"frame-support/std"
 ]
 serde = [
 	"dep:serde",

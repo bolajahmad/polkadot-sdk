@@ -33,7 +33,7 @@ use codec::{Compact, Decode, Encode, MaxEncodedLen};
 use futures::future::pending;
 use futures::{channel::oneshot, future::FusedFuture, prelude::*, stream::FuturesUnordered};
 use prometheus_endpoint::{
-	prometheus, register, Counter, Gauge, Histogram, HistogramOpts, PrometheusError, Registry, U64,
+	register, Counter, Gauge, Histogram, HistogramOpts, PrometheusError, Registry, U64,
 };
 use sc_network::{
 	config::{NonReservedPeerMode, SetConfig},
@@ -59,6 +59,7 @@ use std::{
 	num::NonZeroUsize,
 	pin::Pin,
 	sync::Arc,
+	time::Instant,
 };
 use tokio::time::timeout;
 pub mod config;
@@ -93,17 +94,17 @@ const INITIAL_SYNC_BURST_INTERVAL: std::time::Duration = std::time::Duration::fr
 
 struct Metrics {
 	propagated_statements: Counter<U64>,
-	known_statements_received: Counter<U64>,
-	skipped_oversized_statements: Counter<U64>,
-	propagated_statements_chunks: Histogram,
 	pending_statements: Gauge<U64>,
-	ignored_statements: Counter<U64>,
 	peers_connected: Gauge<U64>,
 	statements_received: Counter<U64>,
-	duplicate_statements_received: Counter<U64>,
 	bytes_sent_total: Counter<U64>,
 	bytes_received_total: Counter<U64>,
 	sent_latency_seconds: Histogram,
+	validation_pipeline_duration_seconds: Histogram,
+	initial_sync_statements_sent: Counter<U64>,
+	initial_sync_bursts_total: Counter<U64>,
+	initial_sync_peers_active: Gauge<U64>,
+	initial_sync_duration_seconds: Histogram,
 }
 
 impl Metrics {
@@ -116,40 +117,10 @@ impl Metrics {
 				)?,
 				r,
 			)?,
-			known_statements_received: register(
-				Counter::new(
-					"substrate_sync_known_statement_received",
-					"Number of statements received via gossiping that were already in the statement store",
-				)?,
-				r,
-			)?,
-			skipped_oversized_statements: register(
-				Counter::new(
-					"substrate_sync_skipped_oversized_statements",
-					"Number of oversized statements that were skipped to be gossiped",
-				)?,
-				r,
-			)?,
-			propagated_statements_chunks: register(
-				Histogram::with_opts(
-					HistogramOpts::new(
-						"substrate_sync_propagated_statements_chunks",
-						"Distribution of chunk sizes when propagating statements",
-					).buckets(prometheus::exponential_buckets(1.0, 2.0, 14)?),
-				)?,
-				r,
-			)?,
 			pending_statements: register(
 				Gauge::new(
 					"substrate_sync_pending_statement_validations",
 					"Number of pending statement validations",
-				)?,
-				r,
-			)?,
-			ignored_statements: register(
-				Counter::new(
-					"substrate_sync_ignored_statements",
-					"Number of statements ignored due to exceeding MAX_PENDING_STATEMENTS limit",
 				)?,
 				r,
 			)?,
@@ -164,13 +135,6 @@ impl Metrics {
 				Counter::new(
 					"substrate_sync_statements_received",
 					"Total number of statements received from peers",
-				)?,
-				r,
-			)?,
-			duplicate_statements_received: register(
-				Counter::new(
-					"substrate_sync_duplicate_statements_received",
-					"Number of duplicate statements received from the same peer",
 				)?,
 				r,
 			)?,
@@ -194,8 +158,54 @@ impl Metrics {
 						"substrate_sync_statement_sent_latency_seconds",
 						"Time to send statement messages to peers",
 					)
-					// Buckets from 1ms to ~10s: 0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
-					.buckets(vec![0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]),
+					// Buckets from 1ms to ~10s: 0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25,
+					// 0.5, 1, 2.5, 5, 10
+					.buckets(vec![
+						0.001, 0.002, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+					]),
+				)?,
+				r,
+			)?,
+			validation_pipeline_duration_seconds: register(
+				Histogram::with_opts(
+					HistogramOpts::new(
+						"substrate_sync_statement_validation_pipeline_duration_seconds",
+						"End-to-end time from receiving a statement to completing validation",
+					)
+					.buckets(vec![
+						0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+					]),
+				)?,
+				r,
+			)?,
+			initial_sync_statements_sent: register(
+				Counter::new(
+					"substrate_sync_initial_sync_statements_sent",
+					"Total statements sent during initial sync bursts to newly connected peers",
+				)?,
+				r,
+			)?,
+			initial_sync_bursts_total: register(
+				Counter::new(
+					"substrate_sync_initial_sync_bursts_total",
+					"Total number of initial sync burst rounds processed",
+				)?,
+				r,
+			)?,
+			initial_sync_peers_active: register(
+				Gauge::new(
+					"substrate_sync_initial_sync_peers_active",
+					"Number of peers currently being synced via initial sync",
+				)?,
+				r,
+			)?,
+			initial_sync_duration_seconds: register(
+				Histogram::with_opts(
+					HistogramOpts::new(
+						"substrate_sync_initial_sync_duration_seconds",
+						"Per-peer total duration of initial sync from start to completion",
+					)
+					.buckets(vec![0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0]),
 				)?,
 				r,
 			)?,
@@ -335,8 +345,9 @@ pub struct StatementHandler<
 	/// Interval at which we call `propagate_statements`.
 	propagate_timeout: stream::Fuse<Pin<Box<dyn Stream<Item = ()> + Send>>>,
 	/// Pending statements verification tasks.
-	pending_statements:
-		FuturesUnordered<Pin<Box<dyn Future<Output = (Hash, Option<SubmitResult>)> + Send>>>,
+	pending_statements: FuturesUnordered<
+		Pin<Box<dyn Future<Output = (Hash, Option<SubmitResult>, Instant)> + Send>>,
+	>,
 	/// As multiple peers can send us the same statement, we group
 	/// these peers using the statement hash while the statement is
 	/// imported. This prevents that we import the same statement
@@ -376,6 +387,7 @@ pub struct Peer {
 /// Tracks pending initial sync state for a peer (hashes only, statements fetched on-demand).
 struct PendingInitialSync {
 	hashes: Vec<Hash>,
+	started_at: Instant,
 }
 
 /// Result of finding a sendable chunk of statements.
@@ -495,8 +507,9 @@ where
 	#[cfg(any(test, feature = "test-helpers"))]
 	pub fn pending_statements_mut(
 		&mut self,
-	) -> &mut FuturesUnordered<Pin<Box<dyn Future<Output = (Hash, Option<SubmitResult>)> + Send>>>
-	{
+	) -> &mut FuturesUnordered<
+		Pin<Box<dyn Future<Output = (Hash, Option<SubmitResult>, Instant)> + Send>>,
+	> {
 		&mut self.pending_statements
 	}
 
@@ -511,7 +524,10 @@ where
 						metrics.pending_statements.set(self.pending_statements.len() as u64);
 					});
 				},
-				(hash, result) = self.pending_statements.select_next_some() => {
+				(hash, result, received_at) = self.pending_statements.select_next_some() => {
+					self.metrics.as_ref().map(|metrics| {
+						metrics.validation_pipeline_duration_seconds.observe(received_at.elapsed().as_secs_f64());
+					});
 					if let Some(peers) = self.pending_statements_peers.remove(&hash) {
 						if let Some(result) = result {
 							peers.into_iter().for_each(|p| self.on_handle_statement_import(p, &result));
@@ -574,16 +590,12 @@ where
 				log::trace!(target: LOG_TARGET, "Sent {} statements to {}", chunk.len(), peer);
 				self.metrics.as_ref().map(|metrics| {
 					metrics.propagated_statements.inc_by(chunk.len() as u64);
-					metrics.propagated_statements_chunks.observe(chunk.len() as f64);
 					metrics.bytes_sent_total.inc_by(bytes_to_send);
 				});
 				SendChunkResult::Sent(chunk_end)
 			},
 			ChunkResult::SkipOversized => {
 				log::warn!(target: LOG_TARGET, "Statement too large, skipping");
-				self.metrics.as_ref().map(|metrics| {
-					metrics.skipped_oversized_statements.inc();
-				});
 				SendChunkResult::Skipped
 			},
 		}
@@ -648,15 +660,28 @@ where
 				if !self.sync.is_major_syncing() && !role.is_light() {
 					let hashes = self.statement_store.statement_hashes();
 					if !hashes.is_empty() {
-						self.pending_initial_syncs.insert(peer, PendingInitialSync { hashes });
+						self.pending_initial_syncs.insert(
+							peer,
+							PendingInitialSync { hashes, started_at: Instant::now() },
+						);
 						self.initial_sync_peer_queue.push_back(peer);
+						self.metrics.as_ref().map(|metrics| {
+							metrics.initial_sync_peers_active.inc();
+						});
 					}
 				}
 			},
 			NotificationEvent::NotificationStreamClosed { peer } => {
 				let _peer = self.peers.remove(&peer);
 				debug_assert!(_peer.is_some());
-				self.pending_initial_syncs.remove(&peer);
+				if let Some(pending) = self.pending_initial_syncs.remove(&peer) {
+					self.metrics.as_ref().map(|metrics| {
+						metrics.initial_sync_peers_active.dec();
+						metrics
+							.initial_sync_duration_seconds
+							.observe(pending.started_at.elapsed().as_secs_f64());
+					});
+				}
 				self.initial_sync_peer_queue.retain(|p| *p != peer);
 				self.metrics.as_ref().map(|metrics| {
 					metrics.peers_connected.set(self.peers.len() as u64);
@@ -705,9 +730,6 @@ where
 						statements_left,
 						MAX_PENDING_STATEMENTS,
 					);
-					self.metrics.as_ref().map(|metrics| {
-						metrics.ignored_statements.inc_by(statements_left);
-					});
 					break;
 				}
 
@@ -715,19 +737,12 @@ where
 				peer.known_statements.insert(hash);
 
 				if self.statement_store.has_statement(&hash) {
-					self.metrics.as_ref().map(|metrics| {
-						metrics.known_statements_received.inc();
-					});
-
 					if let Some(peers) = self.pending_statements_peers.get(&hash) {
 						if peers.contains(&who) {
 							log::trace!(
 								target: LOG_TARGET,
 								"Already received the statement from the same peer {who}.",
 							);
-							self.metrics.as_ref().map(|metrics| {
-								metrics.duplicate_statements_received.inc();
-							});
 							self.network.report_peer(who, rep::DUPLICATE_STATEMENT);
 						}
 					}
@@ -739,12 +754,13 @@ where
 				match self.pending_statements_peers.entry(hash) {
 					Entry::Vacant(entry) => {
 						let (completion_sender, completion_receiver) = oneshot::channel();
+						let received_at = Instant::now();
 						match self.queue_sender.try_send((s, completion_sender)) {
 							Ok(()) => {
 								self.pending_statements.push(
 									async move {
 										let res = completion_receiver.await;
-										(hash, res.ok())
+										(hash, res.ok(), received_at)
 									}
 									.boxed(),
 								);
@@ -868,6 +884,16 @@ where
 		}
 	}
 
+	/// Record initial sync completion metrics for a peer being removed.
+	fn record_initial_sync_completion(&self, started_at: Instant) {
+		self.metrics.as_ref().map(|metrics| {
+			metrics.initial_sync_peers_active.dec();
+			metrics
+				.initial_sync_duration_seconds
+				.observe(started_at.elapsed().as_secs_f64());
+		});
+	}
+
 	/// Process one batch of initial sync for the next peer in the queue (round-robin).
 	async fn process_initial_sync_burst(&mut self) {
 		if self.sync.is_major_syncing() {
@@ -882,8 +908,14 @@ where
 			return;
 		};
 
+		self.metrics.as_ref().map(|metrics| {
+			metrics.initial_sync_bursts_total.inc();
+		});
+
 		if entry.get().hashes.is_empty() {
+			let started_at = entry.get().started_at;
 			entry.remove();
+			self.record_initial_sync_completion(started_at);
 			return;
 		}
 
@@ -903,7 +935,9 @@ where
 			Ok(r) => r,
 			Err(e) => {
 				log::debug!(target: LOG_TARGET, "Failed to fetch statements for initial sync: {e:?}");
+				let started_at = entry.get().started_at;
 				entry.remove();
+				self.record_initial_sync_completion(started_at);
 				return;
 			},
 		};
@@ -917,11 +951,16 @@ where
 		let to_send: Vec<_> = statements.iter().map(|(_, stmt)| stmt).collect();
 		match self.send_statement_chunk(&peer_id, &to_send).await {
 			SendChunkResult::Failed => {
-				self.pending_initial_syncs.remove(&peer_id);
+				if let Some(pending) = self.pending_initial_syncs.remove(&peer_id) {
+					self.record_initial_sync_completion(pending.started_at);
+				}
 				return;
 			},
 			SendChunkResult::Sent(sent) => {
 				debug_assert_eq!(to_send.len(), sent);
+				self.metrics.as_ref().map(|metrics| {
+					metrics.initial_sync_statements_sent.inc_by(sent as u64);
+				});
 				// Mark statements as known
 				if let Some(peer) = self.peers.get_mut(&peer_id) {
 					for (hash, _) in &statements {
@@ -936,7 +975,9 @@ where
 		if has_more {
 			self.initial_sync_peer_queue.push_back(peer_id);
 		} else {
-			self.pending_initial_syncs.remove(&peer_id);
+			if let Some(pending) = self.pending_initial_syncs.remove(&peer_id) {
+				self.record_initial_sync_completion(pending.started_at);
+			}
 		}
 	}
 }

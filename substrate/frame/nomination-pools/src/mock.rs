@@ -371,6 +371,19 @@ impl DelegateMock {
 		AgentBalanceMap::set(&agents);
 	}
 
+	/// Set the agent balance with explicit control over delegated, unclaimed_withdrawals, and
+	/// pending_slash. This is useful for simulating edge cases in tests.
+	pub fn set_agent_balance_full(
+		who: AccountId,
+		delegated: Balance,
+		unclaimed_withdrawals: Balance,
+		pending_slash: Balance,
+	) {
+		let mut agents = AgentBalanceMap::get();
+		agents.insert(who, (delegated, unclaimed_withdrawals, pending_slash));
+		AgentBalanceMap::set(&agents);
+	}
+
 	pub fn set_delegator_balance(who: AccountId, amount: Balance) {
 		let mut delegators = DelegatorBalanceMap::get();
 		delegators.insert(who, amount);

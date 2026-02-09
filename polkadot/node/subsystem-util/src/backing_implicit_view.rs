@@ -68,7 +68,7 @@ struct AllowedRelayParents {
 }
 
 impl AllowedRelayParents {
-	fn allowed_relay_parents_for(&self) -> &[Hash] {
+	fn allowed_relay_parents(&self) -> &[Hash] {
 		&self.allowed_relay_parents_contiguous
 	}
 }
@@ -238,7 +238,7 @@ impl View {
 		block_info
 			.maybe_allowed_relay_parents
 			.as_ref()
-			.map(|mins| mins.allowed_relay_parents_for())
+			.map(|mins| mins.allowed_relay_parents())
 	}
 
 	/// Returns all paths from the oldest block in storage to each leaf that passes through

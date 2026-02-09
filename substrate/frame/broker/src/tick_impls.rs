@@ -415,11 +415,37 @@ impl<T: Config> Pallet<T> {
 
 					Self::deposit_event(Event::BidClosed { bid_id: id, refund, owner });
 				},
-				TickAction::RenewRegion { who, renewal_id, refund } => {
-					//
+				TickAction::RenewRegion { owner, renewal_id, refund } => {
+					// TODO: Process error.
+					Self::refund(&owner, refund);
+					// TODO: Process error.
+					Self::do_renew(owner, renewal_id.core);
 				},
-				TickAction::SellRegion { who, refund } => {
-					//
+				TickAction::SellRegion { owner, refund } => {
+					// TODO: Process error.
+					Self::refund(&owner, refund);
+
+					// TODO: Process error.
+					let mut sale = SaleInfo::<T>::get().ok_or(Error::<T>::NoSales).unwrap();
+					// TODO: Process error.
+					let core =
+						Self::purchase_core(&owner, BalanceOf::<T>::zero(), &mut sale).unwrap();
+					SaleInfo::<T>::put(&sale);
+					let id = Self::issue(
+						core,
+						sale.region_begin,
+						CoreMask::complete(),
+						sale.region_end,
+						Some(owner.clone()),
+						None, // TODO: Determine `paid`?
+					);
+					let duration = sale.region_end.saturating_sub(sale.region_begin);
+					Self::deposit_event(Event::Purchased {
+						who: owner,
+						region_id: id,
+						price: BalanceOf::<T>::zero(), // TODO: Determine price?
+						duration,
+					});
 				},
 			}
 		}

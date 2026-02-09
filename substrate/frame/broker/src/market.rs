@@ -70,7 +70,7 @@ pub trait Market<Balance, RelayBlockNumber, AccountId> {
 	/// Logic that gets called in `on_initialize` hook.
 	fn tick(
 		since_timeslice_start: RelayBlockNumber,
-	) -> Result<Vec<TickAction<AccountId, Balance, Self::BidId>>, Self::Error>;
+	) -> Vec<TickAction<AccountId, Balance, Self::BidId>>;
 }
 
 pub enum OrderResult<Balance, BidId> {
@@ -150,8 +150,8 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 
 	fn tick(
 		since_timeslice_start: RelayBlockNumberOf<T>,
-	) -> Result<Vec<TickAction<AccountIdFor<T>, BalanceOf<T>, Self::BidId>>, Self::Error> {
-		Ok(vec![])
+	) -> Vec<TickAction<AccountIdFor<T>, BalanceOf<T>, Self::BidId>> {
+		vec![]
 	}
 }
 

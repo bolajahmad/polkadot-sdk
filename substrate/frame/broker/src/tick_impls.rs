@@ -82,6 +82,9 @@ impl<T: Config> Pallet<T> {
 
 		Status::<T>::put(&status);
 
+		// TODO: Consume weight.
+		Self::process_market_logic();
+
 		meter.consumed()
 	}
 
@@ -397,5 +400,25 @@ impl<T: Config> Pallet<T> {
 		};
 
 		AutoRenewals::<T>::set(auto_renewals);
+	}
+
+	fn process_market_logic() {
+		// TODO: Compute since_timeslice_start.
+		let now = RCBlockNumberProviderOf::<T::Coretime>::current_block_number();
+		let result = <Self as Market<_, _, _>>::tick(now);
+
+		for action in result {
+			match action {
+				TickAction::CloseBid { id, amount } => {
+					//
+				},
+				TickAction::RenewRegion { who, renewal_id, refund } => {
+					//
+				},
+				TickAction::SellRegion { who, refund } => {
+					//
+				},
+			}
+		}
 	}
 }

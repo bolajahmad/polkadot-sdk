@@ -1620,7 +1620,8 @@ impl<T: Config> Pallet<T> {
 		// so delegation changes persist even if the call fails.
 		// The pre-dispatch weight assumes all authorizations create new accounts (worst case).
 		// Refund the difference for authorizations that hit existing accounts.
-		let exec_config = ExecConfig::new_eth_tx(effective_gas_price, encoded_len, base_info.total_weight());
+		let exec_config =
+			ExecConfig::new_eth_tx(effective_gas_price, encoded_len, base_info.total_weight());
 		let auth_result = if !authorization_list.is_empty() {
 			evm::eip7702::process_authorizations::<T>(&authorization_list, &signer, &exec_config)?
 		} else {

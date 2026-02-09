@@ -156,12 +156,9 @@ mod benchmarks {
 		let auth_result;
 		#[block]
 		{
-			auth_result = eip7702::process_authorizations::<T>(
-				&authorization_list,
-				&caller,
-				&exec_config,
-			)
-			.expect("should succeed");
+			auth_result =
+				eip7702::process_authorizations::<T>(&authorization_list, &caller, &exec_config)
+					.expect("should succeed");
 		}
 
 		assert_eq!(auth_result.new_accounts, n as u32, "All authorizations should be new");
@@ -199,12 +196,9 @@ mod benchmarks {
 		let auth_result;
 		#[block]
 		{
-			auth_result = eip7702::process_authorizations::<T>(
-				&authorization_list,
-				&caller,
-				&exec_config,
-			)
-			.expect("should succeed");
+			auth_result =
+				eip7702::process_authorizations::<T>(&authorization_list, &caller, &exec_config)
+					.expect("should succeed");
 		}
 
 		assert_eq!(auth_result.new_accounts, 0u32);

@@ -36,7 +36,7 @@ use sp_runtime::SaturatedConversion;
 pub const EIP7702_MAGIC: u8 = 0x05;
 
 /// Result of processing EIP-7702 authorization tuples.
-#[derive(Default)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct AuthorizationResult {
 	/// Number of authorizations that created new accounts.
 	pub new_accounts: u32,

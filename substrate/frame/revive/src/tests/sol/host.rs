@@ -309,34 +309,31 @@ fn pallet_code_works() {
 			},
 		];
 
-		for tc in cases {
-			let code = Contracts::code(&tc.addr);
-			match tc.expected {
+		for TestCase { name, addr, expected } in cases {
+			let code = Contracts::code(&addr);
+			match expected {
 				Expected::Code(expected) => {
-					assert_eq!(code, expected, "Pallet::code for {} failed", tc.name);
+					assert_eq!(code, expected, "Pallet::code for {name} failed");
 				},
 				Expected::Delegated(target) => {
 					assert_eq!(
 						code.len(),
 						23,
-						"Delegation indicator for {} should be 23 bytes",
-						tc.name
+						"Delegation indicator for {name} should be 23 bytes",
 					);
 					assert_eq!(
 						&code[0..3],
 						&[0xef, 0x01, 0x00],
-						"Delegation prefix for {} wrong",
-						tc.name
+						"Delegation prefix for {name} wrong",
 					);
 					assert_eq!(
 						&code[3..23],
 						target.as_bytes(),
-						"Delegation target for {} wrong",
-						tc.name
+						"Delegation target for {name} wrong",
 					);
 				},
 				Expected::Empty => {
-					assert!(code.is_empty(), "Pallet::code for {} should be empty", tc.name);
+					assert!(code.is_empty(), "Pallet::code for {name} should be empty");
 				},
 			}
 		}

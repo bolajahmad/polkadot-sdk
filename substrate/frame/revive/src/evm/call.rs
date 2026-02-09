@@ -23,8 +23,10 @@ use crate::{
 		runtime::SetWeightLimit,
 		TYPE_EIP7702, TYPE_LEGACY,
 	},
-	extract_code_and_data, BalanceOf, CallOf, Config, GenericTransaction, Pallet, Weight, Zero,
-	LOG_TARGET, RUNTIME_PALLETS_ADDR,
+	extract_code_and_data,
+	metering::EthTxInfo,
+	BalanceOf, CallOf, Config, GenericTransaction, Pallet, Weight, Zero, LOG_TARGET,
+	RUNTIME_PALLETS_ADDR,
 };
 use alloc::{boxed::Box, vec::Vec};
 use codec::DecodeLimit;
@@ -261,16 +263,22 @@ impl GenericTransaction {
 			InvalidTransaction::Payment
 		})?.saturated_into();
 
-		// EIP-7702: Ensure enough storage deposit to cover ED for new accounts
+		// EIP-7702: Ensure enough gas to cover ED for new accounts
 		// from authorizations (worst case: all authorizations create new accounts).
 		if !self.authorization_list.is_empty() {
 			let ed = <Pallet<T>>::min_balance();
 			let auth_ed_cost = ed.saturating_mul(self.authorization_list.len().saturated_into());
-			if storage_deposit < auth_ed_cost {
+
+			let info = <T as Config>::FeeInfo::dispatch_info(&call);
+			let extra_weight = info.total_weight().saturating_sub(weight_limit);
+			let max_deposit =
+				EthTxInfo::<T>::new(encoded_len, extra_weight).max_deposit(gas.saturated_into());
+
+			if max_deposit < auth_ed_cost {
 				log::debug!(
 					target: LOG_TARGET,
 					"Not enough gas to cover ED for authorization accounts. \
-					storage_deposit={storage_deposit:?} required={auth_ed_cost:?}"
+					max_deposit={max_deposit:?} required={auth_ed_cost:?}"
 				);
 				return Err(InvalidTransaction::Payment);
 			}

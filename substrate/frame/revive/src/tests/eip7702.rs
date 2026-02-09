@@ -35,9 +35,9 @@ use sp_core::{H160, H256, U256};
 fn test_process_authorizations(auths: &[AuthorizationListEntry]) -> AuthorizationResult {
 	let origin = <Test as Config>::AddressMapper::to_account_id(&H160::from([0xFF; 20]));
 	let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&origin, 10_000_000_000);
-	<Test as Config>::FeeInfo::deposit_txfee(
-		<<Test as Config>::Currency as Balanced<_>>::issue(10_000_000_000),
-	);
+	<Test as Config>::FeeInfo::deposit_txfee(<<Test as Config>::Currency as Balanced<_>>::issue(
+		10_000_000_000,
+	));
 	let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
 	crate::evm::eip7702::process_authorizations::<Test>(auths, &origin, &exec_config)
 		.expect("process_authorizations failed")
@@ -166,9 +166,10 @@ fn valid_signature_is_verified_correctly() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth = signer.sign_authorization(chain_id, target, nonce);
 
-		let result = test_process_authorizations(&[auth]);
-		assert_eq!(result.existing_accounts, 1);
-		assert_eq!(result.new_accounts, 0);
+		assert_eq!(
+			test_process_authorizations(&[auth]),
+			AuthorizationResult { existing_accounts: 1, new_accounts: 0 },
+		);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target));
@@ -192,9 +193,7 @@ fn invalid_chain_id_rejects_authorization() {
 		let auth = signer.sign_authorization(wrong_chain_id, target, nonce);
 
 		// Authorization with wrong chain_id should be skipped (not error)
-		let result = test_process_authorizations(&[auth]);
-		assert_eq!(result.existing_accounts, 0);
-		assert_eq!(result.new_accounts, 0);
+		assert_eq!(test_process_authorizations(&[auth]), AuthorizationResult::default());
 
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
 	});
@@ -219,9 +218,7 @@ fn nonce_mismatch_rejects_authorization() {
 		let auth = signer.sign_authorization(chain_id, target, wrong_nonce);
 
 		// Authorization with wrong nonce should be skipped (not error)
-		let result = test_process_authorizations(&[auth]);
-		assert_eq!(result.existing_accounts, 0);
-		assert_eq!(result.new_accounts, 0);
+		assert_eq!(test_process_authorizations(&[auth]), AuthorizationResult::default());
 
 		assert!(!AccountInfo::<Test>::is_delegated(&signer.address));
 	});
@@ -250,9 +247,10 @@ fn multiple_authorizations_from_same_authority_first_wins() {
 		let auth2 = signer.sign_authorization(chain_id, target2, nonce);
 		let auth3 = signer.sign_authorization(chain_id, target3, nonce);
 
-		let result = test_process_authorizations(&[auth1, auth2, auth3]);
-		assert_eq!(result.existing_accounts, 1);
-		assert_eq!(result.new_accounts, 0);
+		assert_eq!(
+			test_process_authorizations(&[auth1, auth2, auth3]),
+			AuthorizationResult { existing_accounts: 1, new_accounts: 0 },
+		);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		// First authorization wins since we process blindly
@@ -276,9 +274,10 @@ fn authorization_increments_nonce() {
 		let nonce_before = frame_system::Pallet::<Test>::account_nonce(&authority_id);
 		let auth = signer.sign_authorization(chain_id, target, U256::from(nonce_before));
 
-		let result = test_process_authorizations(&[auth]);
-		assert_eq!(result.existing_accounts, 1);
-		assert_eq!(result.new_accounts, 0);
+		assert_eq!(
+			test_process_authorizations(&[auth]),
+			AuthorizationResult { existing_accounts: 1, new_accounts: 0 },
+		);
 
 		let nonce_after = frame_system::Pallet::<Test>::account_nonce(&authority_id);
 		assert_eq!(nonce_after, nonce_before + 1);
@@ -300,9 +299,10 @@ fn chain_id_zero_accepts_any_chain() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth = signer.sign_authorization(U256::zero(), target, nonce);
 
-		let result = test_process_authorizations(&[auth]);
-		assert_eq!(result.existing_accounts, 1);
-		assert_eq!(result.new_accounts, 0);
+		assert_eq!(
+			test_process_authorizations(&[auth]),
+			AuthorizationResult { existing_accounts: 1, new_accounts: 0 },
+		);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target));
@@ -323,9 +323,10 @@ fn new_account_sets_delegation() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth = signer.sign_authorization(chain_id, target, nonce);
 
-		let result = test_process_authorizations(&[auth]);
-		assert_eq!(result.existing_accounts, 0);
-		assert_eq!(result.new_accounts, 1);
+		assert_eq!(
+			test_process_authorizations(&[auth]),
+			AuthorizationResult { existing_accounts: 0, new_accounts: 1 },
+		);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target));
@@ -348,17 +349,19 @@ fn clearing_delegation_with_zero_address() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth1 = signer.sign_authorization(chain_id, target, nonce);
 
-		let result1 = test_process_authorizations(&[auth1]);
-		assert_eq!(result1.existing_accounts, 1);
-		assert_eq!(result1.new_accounts, 0);
+		assert_eq!(
+			test_process_authorizations(&[auth1]),
+			AuthorizationResult { existing_accounts: 1, new_accounts: 0 },
+		);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 
 		let new_nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth2 = signer.sign_authorization(chain_id, H160::zero(), new_nonce);
-		let result2 = test_process_authorizations(&[auth2]);
-		assert_eq!(result2.existing_accounts, 1);
-		assert_eq!(result2.new_accounts, 0);
+		assert_eq!(
+			test_process_authorizations(&[auth2]),
+			AuthorizationResult { existing_accounts: 1, new_accounts: 0 },
+		);
 
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), None);
@@ -396,9 +399,10 @@ fn process_multiple_authorizations_from_different_signers() {
 		let auth2 = signer2.sign_authorization(chain_id, target, nonce2);
 		let auth3 = signer3.sign_authorization(chain_id, target, nonce3);
 
-		let result = test_process_authorizations(&[auth1, auth2, auth3]);
-		assert_eq!(result.existing_accounts, 2);
-		assert_eq!(result.new_accounts, 1);
+		assert_eq!(
+			test_process_authorizations(&[auth1, auth2, auth3]),
+			AuthorizationResult { existing_accounts: 2, new_accounts: 1 },
+		);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority1));
 		assert!(AccountInfo::<Test>::is_delegated(&authority2));
@@ -595,6 +599,15 @@ fn delegation_chain_does_not_execute() {
 		// Alice delegates to the Counter contract
 		assert_ok!(AccountInfo::<Test>::set_delegation(&ALICE_ADDR, counter.addr));
 
+		// Helper to read Alice's number storage slot
+		let read_number = || {
+			let result = builder::bare_call(ALICE_ADDR)
+				.data(Counter::numberCall {}.abi_encode())
+				.build_and_unwrap_result();
+			assert!(!result.did_revert());
+			Counter::numberCall::abi_decode_returns(&result.data).unwrap()
+		};
+
 		// Case 1: Calling Alice executes the contract - setNumber(42) should work
 		let result = builder::bare_call(ALICE_ADDR)
 			.data(
@@ -603,6 +616,7 @@ fn delegation_chain_does_not_execute() {
 			)
 			.build_and_unwrap_result();
 		assert!(!result.did_revert(), "calling Alice should execute Counter code");
+		assert_eq!(read_number(), alloy_core::primitives::U256::from(42));
 
 		// Case 2: A contract can delegatecall to Alice and execute the code
 		let caller_contract =
@@ -621,6 +635,8 @@ fn delegation_chain_does_not_execute() {
 		assert!(!result.did_revert(), "delegatecall to Alice should work");
 		let decoded = Caller::delegateCall::abi_decode_returns(&result.data).unwrap();
 		assert!(decoded.success, "delegatecall to Alice should succeed");
+		// delegatecall modifies the caller's storage, not Alice's
+		assert_eq!(read_number(), alloy_core::primitives::U256::from(42));
 
 		// Case 3: Bob delegates to Alice (chain: Bob -> Alice -> Counter)
 		// Calling Bob should NOT execute code because chains are not followed
@@ -634,7 +650,8 @@ fn delegation_chain_does_not_execute() {
 			.build_and_unwrap_result();
 		// Bob is treated as an EOA (no code), so the call succeeds but does nothing
 		assert!(!result.did_revert(), "call to Bob should not revert (treated as EOA transfer)");
-		// The call returns empty data because Bob has no code to execute
 		assert!(result.data.is_empty(), "call to Bob should return empty (no code executed)");
+		// Alice's number should be unchanged
+		assert_eq!(read_number(), alloy_core::primitives::U256::from(42));
 	});
 }

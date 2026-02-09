@@ -652,6 +652,17 @@ impl<T: Config> EthTxInfo<T> {
 		deposit_gas.saturating_add(&weight_gas)
 	}
 
+	/// Compute the maximum deposit available from a gas budget assuming zero execution weight
+	/// and zero deposit consumed. This is the upper bound on how much deposit the transaction
+	/// could ever spend.
+	pub fn max_deposit(&self, eth_gas_limit: BalanceOf<T>) -> BalanceOf<T> {
+		let max_gas = SignedGas::<T>::from_ethereum_gas(eth_gas_limit);
+		let overhead_gas =
+			self.gas_consumption(&Weight::zero(), &DepositOf::<T>::Charge(Zero::zero()));
+		let remaining = max_gas.saturating_sub(&overhead_gas);
+		remaining.to_adjusted_deposit_charge().unwrap_or_default()
+	}
+
 	/// Calculate maximal possible remaining weight that can be consumed given a particular gas
 	/// limit.
 	///

@@ -781,3 +781,46 @@ fn dry_run_bounded_execution_runs_out_of_gas() {
 		);
 	});
 }
+
+#[test_case(FixtureType::Solc   , "DepositDirect" ; "solc direct")]
+#[test_case(FixtureType::Resolc , "DepositDirect" ; "resolc direct")]
+fn nested_call_storage_refund(fixture_type: FixtureType, fixture_name: &str) {
+	let (code, _) = compile_module_with_type(fixture_name, fixture_type).unwrap();
+
+	ExtBuilder::default().build().execute_with(|| {
+		let _ = <Test as Config>::Currency::set_balance(&ALICE, 100_000_000_000);
+
+		let Contract { addr: caller_addr, .. } =
+			builder::bare_instantiate(Code::Upload(code)).build_and_unwrap_contract();
+
+		// First, get the result when setting and clearing storage directly (no nested call)
+		let direct_result = builder::bare_call(caller_addr)
+			.data(DepositPrecompile::setAndClearCall {}.abi_encode())
+			.build();
+
+		// Clear storage to reset state for a fair comparison
+		builder::bare_call(caller_addr)
+			.data(DepositPrecompile::clearAllCall {}.abi_encode())
+			.build();
+
+		// Now get the result when clearing via nested call
+		// The parent sets storage (a=2, b=3), then calls this.clear() to clear it
+		// The child frame must see the parent's pending storage to calculate refunds correctly
+		let nested_result = builder::bare_call(caller_addr)
+			.data(DepositPrecompile::setAndCallClearCall {}.abi_encode())
+			.build();
+
+		// Both approaches should produce the same storage deposit result.
+		// Before the fix for issue #213, the nested call variant would produce
+		// different results because the child frame couldn't see the parent's
+		// pending storage allocation when calculating the refund.
+		assert_eq!(
+			direct_result.storage_deposit, nested_result.storage_deposit,
+			"Nested call should produce same net storage deposit as direct call"
+		);
+		assert_eq!(
+			direct_result.max_storage_deposit, nested_result.max_storage_deposit,
+			"Nested call should produce same max storage deposit as direct call"
+		);
+	});
+}

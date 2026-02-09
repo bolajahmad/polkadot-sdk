@@ -1787,15 +1787,19 @@ impl<T: Config> Pallet<T> {
 		log::trace!(target: LOG_TARGET, "eth_estimate_gas starting with low={low}, high={high}");
 
 		// If the user has specified a gas limit then this is the limit we use as the high bound for
-		// the binary search.
-		if let Some(gas_limit) = tx.gas {
+		// the binary search. Also, if the user didn't specify a gas limit then we need to skip the
+		// balance checks.
+		let perform_balance_checks = if let Some(gas_limit) = tx.gas {
 			high = gas_limit;
 			log::trace!(target: LOG_TARGET, "eth_estimate_gas high limited by the gas limit high={high}");
+			true
+		} else {
+			false
 		};
 
 		// Cap the high bound of the binary search based on the account's balance if it can be done.
 		let fee_cap = tx.max_fee_per_gas.or(tx.gas_price);
-		if let (Some(fee_cap), Some(from)) = (fee_cap, tx.from) {
+		if let (Some(fee_cap), Some(from), true) = (fee_cap, tx.from, perform_balance_checks) {
 			let mut available_balance = Self::evm_balance(&from);
 			if let Some(value) = tx.value {
 				available_balance = available_balance.checked_sub(value).ok_or_else(|| {
@@ -1823,7 +1827,7 @@ impl<T: Config> Pallet<T> {
 			let eth_transact_result = with_transaction(|| {
 				TransactionOutcome::Rollback(Ok::<_, DispatchError>(Self::dry_run_eth_transact(
 					transaction,
-					config.clone(),
+					config.with_perform_balance_checks(perform_balance_checks),
 				)))
 			})
 			.expect("Rollback shouldn't error out");
@@ -1873,7 +1877,7 @@ impl<T: Config> Pallet<T> {
 			let dry_run_result = with_transaction(|| {
 				TransactionOutcome::Rollback(Ok::<_, DispatchError>(Self::dry_run_eth_transact(
 					transaction,
-					config.clone(),
+					config.with_perform_balance_checks(perform_balance_checks),
 				)))
 			})
 			.expect("Rollback shouldn't error out");
@@ -1976,7 +1980,7 @@ impl<T: Config> Pallet<T> {
 
 		// emulate transaction behavior
 		let fees = call_info.tx_fee.saturating_add(call_info.storage_deposit);
-		if let Some(from) = &from {
+		if let (Some(from), Some(true)) = (&from, dry_run_config.perform_balance_checks) {
 			let fees = if gas.is_some() { fees } else { Zero::zero() };
 			let balance = Self::evm_balance(from);
 			if balance < Pallet::<T>::convert_native_to_evm(fees).saturating_add(value) {

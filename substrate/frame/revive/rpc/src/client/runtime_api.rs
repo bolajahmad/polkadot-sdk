@@ -20,7 +20,7 @@ use crate::{
 	subxt_client::{self, SrcChainConfig},
 	ClientError,
 };
-use futures::{stream, StreamExt, TryFutureExt};
+use futures::TryFutureExt;
 use pallet_revive::{
 	evm::{
 		Block as EthBlock, BlockNumberOrTagOrHash, BlockTag, GenericTransaction, ReceiptGasInfo,
@@ -79,14 +79,12 @@ impl RuntimeApi {
 			},
 			_ => None,
 		};
-
 		let payload = subxt_client::apis()
 			.revive_api()
 			.eth_estimate_gas(tx.clone().into(), DryRunConfig::new(timestamp_override).into());
-		let estimated_gas =
-			self.0.call(payload).await.map(|value| value.map(|value| value.0))??;
-
-		Ok(estimated_gas)
+		let result =
+			self.0.call(payload).await?.map_err(|err| ClientError::TransactError(err.0))?;
+		Ok(result.0)
 	}
 
 	/// Dry run a transaction and returns the [`EthTransactInfo`] for the transaction.

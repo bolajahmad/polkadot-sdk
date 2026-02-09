@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770644668475,
+  "lastUpdate": 1770652112385,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "10196091+Ank4n@users.noreply.github.com",
-            "name": "Ankan",
-            "username": "Ank4n"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "8546b7ab14b469cdc66bfb596f8dd899aced26b7",
-          "message": "[Staking] [AHM] Fixes insufficient slashing of nominators (and some other small issues). (#8937)\n\nChanges to pallet-staking-async\n\n## Removed\n- Config constant `MaxDisabledValidators`: This constant was removed\nsince validator disabling logic has been moved to pallet-session, making\nit redundant in staking-async.\n- Storage DoubleMap `NominatorSlashInEra`: This was used to track\nper-era maximum slashes for nominators. It’s no longer required — we now\nonly track the highest slash per validator per era.\n- Call `withdraw_overstake`: This was a temporary extrinsic meant to fix\noverstake issues, but with fungible migration of staking funds, this is\nno longer possible and the extrinsic is obsolete.\n\n## Changed\n- Nominator slashing logic: The logic now aggregates slashes from\ndistinct offending validators nominated by a nominator within the same\nera. For repeated offences by the same validator, only the highest slash\nfraction is applied. Previously, the pallet applied only the highest\nslash across all validators, regardless of how many were slashed.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-01T14:17:55Z",
-          "tree_id": "eab2686cd5968c2ae624a59303bc754c3bebe353",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/8546b7ab14b469cdc66bfb596f8dd899aced26b7"
-        },
-        "date": 1751386168316,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.95799999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.034274379692,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04528547773799997,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.038219204493999986,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "seun@polytope.technology",
+            "name": "Seun Lanlege",
+            "username": "seunlanlege"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ba0839dd30e03bd2af44886eb351bdee4e674230",
+          "message": "implement `IERC20Metadata` for pallet-assets-precompiles (#10971)\n\n## Summary\n\nImplements the missing ERC20 metadata functions (`name`, `symbol`,\n`decimals`) for the pallet-assets precompile to provide full ERC20\ncompatibility. These functions were missing from the original\nimplementation and are essential for proper EVM wallet and tooling\nintegration.\n\n## Changes\n\n### Solidity Interface\n- **`substrate/primitives/ethereum-standards/src/IERC20.sol`**\n  - Added `name() external view returns (string memory)`\n  - Added `symbol() external view returns (string memory)`\n  - Added `decimals() external view returns (uint8)`\n\n### Precompile Implementation\n- **`substrate/frame/assets/precompiles/src/lib.rs`**\n- Implemented `name()` - reads metadata from pallet-assets storage and\nreturns UTF-8 string\n- Implemented `symbol()` - reads metadata from pallet-assets storage and\nreturns UTF-8 string\n- Implemented `decimals()` - reads metadata from pallet-assets storage\nand returns uint8 value\n- All functions charge appropriate gas using dedicated weight functions\n- Proper error handling for missing metadata and invalid UTF-8 encoding\n\n### Benchmarks\n- **`substrate/frame/assets/src/benchmarking.rs`**\n  - Added `get_name` benchmark - measures metadata read for name field\n- Added `get_symbol` benchmark - measures metadata read for symbol field\n- Added `get_decimals` benchmark - measures metadata read for decimals\nfield\n\n### Weight Functions\n- **`substrate/frame/assets/src/weights.rs`**\n  - Added `get_name() -> Weight` to WeightInfo trait\n  - Added `get_symbol() -> Weight` to WeightInfo trait\n  - Added `get_decimals() -> Weight` to WeightInfo trait\n  - Implemented for both `SubstrateWeight<T>` and `()` (fallback)\n- Each function: 1 storage read from `Assets::Metadata` (~12-12.5ms,\n2615 bytes proof size)\n\nCloses https://github.com/paritytech/polkadot-sdk/issues/8658\n\n---------\n\nCo-authored-by: 0xRVE <robertvaneerdewijk@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-09T14:33:54Z",
+          "tree_id": "d6a7f365b04bb187d5e5d23668a32d3c38ce3482",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/ba0839dd30e03bd2af44886eb351bdee4e674230"
+        },
+        "date": 1770652087455,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.40199999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.04999999999998,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03828103801799999,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06474627885799994,
             "unit": "seconds"
           }
         ]

@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770642167742,
+  "lastUpdate": 1770644570957,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "4211399+ordian@users.noreply.github.com",
-            "name": "ordian",
-            "username": "ordian"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "87a8fb03886485c6e0f5125ddfc7211ca9947803",
-          "message": "dispute-coordinator: handle race with offchain disabling (#9050)\n\nFixes a potential race with off-chain disabling when we learned about\ndisablement after importing a dispute from that validator.\n\nI think there's no need to handle startup to do deactivation. This will\nbe only relevant for when a node upgrades to the release with a fix and\nwriting a migration for that seems like an overkill since this scenario\nis very low probability.",
-          "timestamp": "2025-07-02T11:38:00Z",
-          "tree_id": "80d69b0fb439b35bd22fb88d94e7e7bfa85f0efa",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/87a8fb03886485c6e0f5125ddfc7211ca9947803"
-        },
-        "date": 1751460059630,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19817735136666662,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.259670791866668,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.11774120599999997,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "skunert49@gmail.com",
+            "name": "Sebastian Kunert",
+            "username": "skunert"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "3a747b02ae0a5032dfb3bd9a74548af92e7d693e",
+          "message": "Omni-node: Support asset-hub-polkadot and simplify resolver logic (#10978)\n\npolkadot-omni-node binary failed to sync Asset Hub Polkadot with a\n\"BadSignature\" verification error. DefaultRuntimeResolver always assumed\nSr25519 for Aura consensus, but Asset Hub Polkadot uses Ed25519. When we\nintroduced omni-node, we planned for people to use polkadot-parachain\nfor system chains. But it does not really make sense to keep this\nfootgun, its too easy to forget that AHP is the only chain using\nEd25519, so now we support it.\n\nAlso unified the resolver logic between omni-node and\npolkadot-parachain. Previously we were populating a `LegacyRuntime`\nenum, but all the variants where never used. Lets kill it. If ever\nneeded, we can bring it back.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-09T12:27:50Z",
+          "tree_id": "128bda679b4e248f9b2d36db29f02a088ac3b77c",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3a747b02ae0a5032dfb3bd9a74548af92e7d693e"
+        },
+        "date": 1770644546645,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.286265203966668,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.13017669423333336,
             "unit": "seconds"
           }
         ]

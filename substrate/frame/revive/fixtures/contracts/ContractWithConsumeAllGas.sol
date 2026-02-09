@@ -2,7 +2,7 @@
 
 pragma solidity >=0.4.21;
 
-contract ProblematicDryRun {
+contract ContractWithConsumeAllGas {
 	/**
 	 * Calls the `main` function with the max offset and length and returns the success code.
 	 */

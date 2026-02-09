@@ -849,7 +849,7 @@ async fn test_runtime_pallets_address_upload_code() -> anyhow::Result<()> {
 async fn test_dry_run_of_contract_with_consume_all_gas() -> anyhow::Result<()> {
 	// Arrange
 	let code = pallet_revive_fixtures::compile_module_with_type(
-		"ProblematicDryRun",
+		"ContractWithConsumeAllGas",
 		pallet_revive_fixtures::FixtureType::Resolc,
 	)?
 	.0;
@@ -954,7 +954,7 @@ async fn test_fibonacci_large_value_runs_out_of_gas() -> anyhow::Result<()> {
 async fn test_gas_estimation_with_no_funds_no_gas_specified() -> anyhow::Result<()> {
 	// Arrange
 	let code = pallet_revive_fixtures::compile_module_with_type(
-		"ProblematicDryRun",
+		"ContractWithConsumeAllGas",
 		pallet_revive_fixtures::FixtureType::Resolc,
 	)?
 	.0;
@@ -995,7 +995,7 @@ async fn test_gas_estimation_with_no_funds_no_gas_specified() -> anyhow::Result<
 async fn test_gas_estimation_with_no_funds_and_with_gas_specified() -> anyhow::Result<()> {
 	// Arrange
 	let code = pallet_revive_fixtures::compile_module_with_type(
-		"ProblematicDryRun",
+		"ContractWithConsumeAllGas",
 		pallet_revive_fixtures::FixtureType::Resolc,
 	)?
 	.0;

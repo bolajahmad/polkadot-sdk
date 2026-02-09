@@ -15,6 +15,7 @@ use nomt::{
 	hasher::Blake3Hasher, KeyReadWrite, KeyValueIterator, Nomt, Overlay as NomtOverlay, Session,
 	SessionParams, WitnessMode,
 };
+use nomt_core::witness::Witness as NomtWitness;
 use parking_lot::{ArcRwLockReadGuard, Mutex, RawRwLock, RwLock};
 use sp_core::storage::{ChildInfo, StateVersion};
 use sp_trie::recorder::Recorder;
@@ -34,7 +35,6 @@ pub enum StateBackendBuilder<S: TrieBackendStorage<H>, H: Hasher, C = DefaultCac
 	},
 	Nomt {
 		db: ArcRwLockReadGuard<parking_lot::RawRwLock, Nomt<Blake3Hasher>>,
-		recorder: bool,
 		overlay: Option<Vec<Arc<NomtOverlay>>>,
 	},
 }
@@ -52,7 +52,7 @@ where
 
 	/// Create a [`TrieBackend::Nomt`] state backend builder.
 	pub fn new_nomt(db: ArcRwLockReadGuard<parking_lot::RawRwLock, Nomt<Blake3Hasher>>) -> Self {
-		Self::Nomt { db, recorder: false, overlay: None }
+		Self::Nomt { db, overlay: None }
 	}
 }
 
@@ -63,34 +63,6 @@ where
 	H::Out: Codec,
 	C: TrieCacheProvider<H> + Send + Sync,
 {
-	pub fn wrap_with_recorder(backend: &StateBackend<S, H, C>) -> StateBackend<&S, H, &C> {
-		match &backend.inner {
-			InnerStateBackend::Trie(trie_backend) => {
-				let recorder_backend = TrieBackendBuilder::wrap(trie_backend)
-					.with_recorder(Default::default())
-					.build();
-				StateBackend { inner: InnerStateBackend::Trie(recorder_backend) }
-			},
-			InnerStateBackend::Nomt { recorder, session, reads, child_deltas, db } => todo!()
-				// TODO: How to deal with a reference of the session which needs to be able to create another
-				// session? 2 possibilities:
-				// 1. Each field becomes an option form where values are 'drained' and just a flag `invalidated`
-				// is kept to ensure that session is not used anymore.
-				// 2. `db` would be used to create another session and an entirely new StateBackend
-
-				// assert!(session.borrow().is_none());
-				// StateBackend {
-				// 	inner: InnerStateBackend::Nomt {
-				// 		recorder: *recorder,
-				// 		session: (,
-				// 		reads: (),
-				// 		child_deltas: (),
-				// 		db: (),
-				// 	},
-				// },
-		}
-	}
-
 	/// Create a state backend builder.
 	pub fn new_trie_with_cache(storage: S, root: H::Out, cache: C) -> Self {
 		Self::Trie { storage, root, recorder: None, cache: Some(cache) }
@@ -100,22 +72,6 @@ where
 	pub fn with_trie_optional_recorder(mut self, new_recorder: Option<Recorder<H>>) -> Self {
 		if let StateBackendBuilder::Trie { recorder, .. } = &mut self {
 			*recorder = new_recorder;
-		}
-		self
-	}
-
-	/// Use the given `recorder` for the to be configured [`TrieBackend::Trie`].
-	pub fn with_trie_recorder(mut self, new_recorder: Recorder<H>) -> Self {
-		if let StateBackendBuilder::Trie { recorder, .. } = &mut self {
-			*recorder = Some(new_recorder);
-		}
-		self
-	}
-
-	/// Toggle [`TrieBackend::Nomt`] recorder.
-	pub fn with_nomt_recorder(mut self) -> Self {
-		if let StateBackendBuilder::Nomt { recorder, .. } = &mut self {
-			*recorder = true;
 		}
 		self
 	}
@@ -158,8 +114,8 @@ where
 					.build();
 				StateBackend::new_trie_backend(trie_backend)
 			},
-			StateBackendBuilder::Nomt { db, recorder, overlay } =>
-				StateBackend::new_nomt_backend(db, recorder, overlay),
+			StateBackendBuilder::Nomt { db, overlay } =>
+				StateBackend::new_nomt_backend(db, overlay),
 		}
 	}
 }
@@ -167,10 +123,10 @@ where
 enum InnerStateBackend<S: TrieBackendStorage<H>, H: Hasher, C> {
 	Trie(TrieBackend<S, H, C>),
 	Nomt {
-		recorder: bool,
+		read_recorder: RefCell<Option<NomtReadRecorder>>,
 		session: RefCell<Option<Session<Blake3Hasher>>>,
-		reads: RefCell<BTreeMap<Vec<u8>, Option<Vec<u8>>>>,
 		child_deltas: RefCell<Vec<(Vec<u8>, Option<Vec<u8>>)>>,
+		maybe_overlays: Option<Vec<Arc<NomtOverlay>>>,
 		// NOTE: This needs to be placed after the session so the drop order
 		// unlock properly the read-locks.
 		db: ArcRwLockReadGuard<parking_lot::RawRwLock, Nomt<Blake3Hasher>>,
@@ -203,36 +159,75 @@ where
 
 	fn new_nomt_backend(
 		db: ArcRwLockReadGuard<parking_lot::RawRwLock, Nomt<Blake3Hasher>>,
-		recorder: bool,
-		overlay: Option<Vec<Arc<NomtOverlay>>>,
+		maybe_overlays: Option<Vec<Arc<NomtOverlay>>>,
 	) -> Self {
-		let witness_mode =
-			if recorder { WitnessMode::read_write() } else { WitnessMode::disabled() };
-		let overlay = overlay.unwrap_or(vec![]);
+		// NOTE: initially every nomt session has no witness mode attached,
+		// once the recorder is injected the session is dropped and a fresh
+		// one with enabled witnesses is created.
+
+		let overlays = maybe_overlays.clone().unwrap_or(vec![]);
 		let params = SessionParams::default()
-			.witness_mode(witness_mode)
-			.overlay(overlay.iter().map(|o| o.as_ref()))
+			.witness_mode(WitnessMode::disabled())
+			.overlay(overlays.iter().map(|o| o.as_ref()))
 			.unwrap();
-		let session = db.begin_session(params);
+		let session = RefCell::new(Some(db.begin_session(params)));
 
 		Self {
 			inner: InnerStateBackend::Nomt {
-				recorder,
-				session: RefCell::new(Some(session)),
-				reads: RefCell::new(BTreeMap::new()),
+				read_recorder: RefCell::new(None),
+				session,
 				child_deltas: RefCell::new(vec![]),
+				maybe_overlays,
 				db,
 			},
 		}
 	}
 
-	pub fn extract_proof(mut self) -> Option<StorageProof> {
-		match self.inner {
-			InnerStateBackend::Trie(trie_backend) =>
-				trie_backend.extract_proof().map(|trie_proof| StorageProof::Trie(trie_proof)),
-			InnerStateBackend::Nomt { recorder, session, reads, child_deltas, db } => todo!(),
+	/// Inject a `NomtReadRecorder` which will be used to keep track of
+	/// reads and, if injected, enables the Witness creation.
+	pub fn inject_nomt_recorder(&self, new_recorder: NomtReadRecorder) {
+		match &self.inner {
+			InnerStateBackend::Nomt { session, read_recorder, maybe_overlays, db, .. } => {
+				// PANIC: A recorder cannot be inserted twice.
+				assert!(read_recorder.borrow().is_none());
+
+				let overlays = maybe_overlays.clone().unwrap_or(vec![]);
+				let params = SessionParams::default()
+					.witness_mode(WitnessMode::read_write())
+					.overlay(overlays.iter().map(|o| o.as_ref()))
+					.unwrap();
+				let new_session = Some(db.begin_session(params));
+				*session.borrow_mut() = new_session;
+				*read_recorder.borrow_mut() = Some(new_recorder);
+			},
+			_ => unreachable!(),
 		}
 	}
+
+	// TODO: update to new 'inject' pattern.
+	// NOTE: this is only used by super::prove_read_on_backend where
+	// no modifications are expected, just reads.
+	// pub fn extract_proof(self) -> Option<StorageProof> {
+	// 	match self.inner {
+	// 		InnerStateBackend::Trie(trie_backend) =>
+	// 			trie_backend.extract_proof().map(|trie_proof| StorageProof::Trie(trie_proof)),
+	// 		InnerStateBackend::Nomt { .. } => {
+	// 			// NOTE: This code should be refectored, `self.storage_root` needs to fill the
+	// 			// read_recorder and thus is cannot be part of the above pattern matching
+	// 			// but must be extracted later.
+	// 			let (_new_root, _backend_transaction) =
+	// 				self.storage_root(core::iter::empty(), StateVersion::V1);
+	// 			// PANIC: The state has been alredy checked to be InnerStateBackend
+	// 			let InnerStateBackend::Nomt { read_recorder, .. } = self.inner else {
+	// 				unreachable!();
+	// 			};
+	// 			read_recorder
+	// 				.into_inner()
+	// 				.map(|recorder| recorder.drain_storage_proof())
+	// 				.map(|nomt_proof| StorageProof::Nomt(nomt_proof))
+	// 		},
+	// 	}
+	// }
 
 	fn trie(&self) -> Option<&TrieBackend<S, H, C>> {
 		match &self.inner {
@@ -279,15 +274,26 @@ where
 	fn storage(&self, key: &[u8]) -> Result<Option<StorageValue>, Self::Error> {
 		match &self.inner {
 			InnerStateBackend::Trie(trie_backend) => trie_backend.storage(key),
-			InnerStateBackend::Nomt { session, reads, recorder, .. } => {
+			InnerStateBackend::Nomt { session, read_recorder, .. } => {
+				// TODO: if read recorder is enabled there could be a `warm_up` read to
+				// reduce the i/o required during the commit.
+				// The same applies for writes, that otherwise are entirely traversed
+				// while committing the db.
+
 				let val = session
 					.borrow()
 					.as_ref()
 					.ok_or("Session must be open".to_string())?
 					.read(key.to_vec())
 					.map_err(|e| format!("{e:?}"))?;
-				if *recorder {
-					reads.borrow_mut().insert(key.to_vec(), val.clone());
+
+				// TODO: lock acquisition within the critical path is not the best
+				// thing to do. This should be refactored with a lock free data structure
+				// such as an imbl map.
+				if let Some(NomtReadRecorder { ref staging_reads, .. }) =
+					*read_recorder.borrow_mut()
+				{
+					staging_reads.lock().insert(key.to_vec(), val.clone());
 				}
 				Ok(val)
 			},
@@ -414,7 +420,7 @@ where
 		let res = match &self.inner {
 			InnerStateBackend::Trie(trie_backend) =>
 				trie_backend.storage_root(delta, state_version),
-			InnerStateBackend::Nomt { recorder, reads, child_deltas, session, .. } => {
+			InnerStateBackend::Nomt { child_deltas, session, read_recorder, .. } => {
 				let child_deltas = std::mem::take(&mut *child_deltas.borrow_mut()).into_iter().map(
 					|(key, maybe_val)| {
 						(
@@ -426,7 +432,14 @@ where
 					},
 				);
 
-				let mut actual_access: Vec<_> = if !*recorder {
+				// Joing reads that happened within this session before performing the update.
+				let read_recorder = read_recorder.borrow_mut();
+				let reads = read_recorder.as_ref().map(|read_recorder| {
+					read_recorder.join_staging_reads();
+					&read_recorder.reads
+				});
+
+				let mut actual_access: Vec<_> = if reads.is_none() {
 					delta
 						.into_iter()
 						.map(|(key, maybe_val)| {
@@ -443,7 +456,8 @@ where
 						.chain(child_deltas)
 						.collect()
 				} else {
-					let mut reads = reads.borrow_mut();
+					// UNWRAP: Above reads have been checked to not be None.
+					let mut reads = reads.unwrap().lock();
 					let mut actual_access = vec![];
 					for (key, maybe_val) in delta.into_iter() {
 						let maybe_val = maybe_val.as_ref().map(|inner_val| inner_val.to_vec());
@@ -487,6 +501,13 @@ where
 					.finish(actual_access)
 					.unwrap();
 				let witness = finished.take_witness();
+
+				if witness.is_some() {
+					if let Some(read_recorder) = read_recorder.as_ref() {
+						*read_recorder.witness.lock() = witness;
+					}
+				}
+
 				let root = finished.root().into_inner();
 				let overlay = finished.into_overlay();
 
@@ -494,7 +515,6 @@ where
 					sp_core::hash::convert_hash(&root),
 					BackendTransaction::new_nomt_transaction(NomtBackendTransaction {
 						transaction: overlay,
-						witness,
 					}),
 				)
 			},
@@ -696,40 +716,88 @@ where
 	}
 }
 
+// NOTE: This struct behaves differently for trie or nomt backend.
+// `ProofRecorder` is not even a proper name for what this struct does
+// on top of the nomt backend.
+//
+// ProofRecorder::Trie effectively records the visited nodes while
+// ProofRecorder::Nomt instead just records (stores) the reads that happen on the
+// state. This is used to specify that a witness needs to be created if
+// an update happens and to carry reads around reads performed on multiple states,
+// usually one for each extrinsic execution.
 #[derive(Clone)]
 pub enum ProofRecorder<H: Hasher> {
-	Uninit,
-	Trie { recorder: Option<sp_trie::recorder::Recorder<H>> },
-	Nomt {},
+	Trie(sp_trie::recorder::Recorder<H>),
+	Nomt(NomtReadRecorder),
 }
 
-impl<H: Hasher> Default for ProofRecorder<H> {
-	fn default() -> Self {
-		ProofRecorder::Uninit
+#[derive(Clone)]
+pub struct NomtReadRecorder {
+	reads: Arc<Mutex<BTreeMap<Vec<u8>, Option<Vec<u8>>>>>,
+	staging_reads: Arc<Mutex<BTreeMap<Vec<u8>, Option<Vec<u8>>>>>,
+	witness: Arc<Mutex<Option<NomtWitness>>>,
+}
+
+impl NomtReadRecorder {
+	fn join_staging_reads(&self) {
+		let staging_reads: BTreeMap<Vec<u8>, Option<Vec<u8>>> =
+			std::mem::take(&mut self.staging_reads.lock());
+		self.reads.lock().extend(staging_reads.into_iter());
 	}
+
+	fn drain_storage_proof(self) -> NomtWitness {
+		// UNWRAP: the recorder is moved here, it is not expected to be used anymore
+		// within other state backends.
+		Arc::into_inner(self.witness).unwrap().into_inner().unwrap()
+	}
+}
+
+#[derive(PartialEq, Eq)]
+pub enum BackendType {
+	Trie,
+	Nomt,
 }
 
 impl<H: Hasher> ProofRecorder<H> {
-	pub fn new() -> Self {
-		ProofRecorder::Uninit
+	pub fn new(backend_type: BackendType) -> Self {
+		match backend_type {
+			BackendType::Trie => ProofRecorder::Trie(Default::default()),
+			BackendType::Nomt => ProofRecorder::Nomt(NomtReadRecorder {
+				reads: Arc::new(Mutex::new(Default::default())),
+				staging_reads: Arc::new(Mutex::new(Default::default())),
+				witness: Arc::new(Mutex::new(None)),
+			}),
+		}
 	}
 
-	pub fn with_ignored_nodes(ignored_nodes: sp_trie::recorder::IgnoredNodes<H::Out>) -> Self {
-		ignored_nodes.assert_empty();
-		ProofRecorder::Uninit
+	pub fn with_ignored_nodes(_ignored_nodes: sp_trie::recorder::IgnoredNodes<H::Out>) -> Self {
+		todo!()
+		// ignored_nodes.assert_empty();
+		// ProofRecorder { inner: std::cell::OnceCell::new() }
 	}
 
-	pub fn as_trie_recorder(&self, storage_root: H::Out) -> sp_trie::recorder::TrieRecorder<'_, H> {
+	pub fn as_trie_recorder(&self) -> sp_trie::recorder::Recorder<H> {
 		match self {
-			ProofRecorder::Trie { recorder: Some(ref trie_recorder) } =>
-				trie_recorder.as_trie_recorder(storage_root),
+			ProofRecorder::Trie(trie_recorder) => trie_recorder.clone(),
+			_ => unreachable!(),
+		}
+	}
+
+	pub fn as_nomt_recorder(&self) -> NomtReadRecorder {
+		match self {
+			ProofRecorder::Nomt(nomt_read_recorder) => nomt_read_recorder.clone(),
 			_ => unreachable!(),
 		}
 	}
 
 	pub fn drain_storage_proof(self) -> StorageProof {
 		// NOTE: The external recorder needs to be able to drain the proof from the backend.
-		todo!()
+		match self {
+			ProofRecorder::Trie(trie_recorder) =>
+				StorageProof::Trie(trie_recorder.drain_storage_proof()),
+			ProofRecorder::Nomt(nomt_recorder) =>
+				StorageProof::Nomt(nomt_recorder.drain_storage_proof()),
+		}
 	}
 
 	pub fn to_storage_proof(&self) -> StorageProof {
@@ -747,14 +815,37 @@ impl<H: Hasher> ProofRecorder<H> {
 	pub fn recorded_keys(&self) -> HashMap<H::Out, HashMap<Arc<[u8]>, RecordedForKey>> {
 		todo!()
 	}
+
 	pub fn start_transaction(&self) {
-		todo!()
+		match self {
+			ProofRecorder::Trie(recorder) => recorder.start_transaction(),
+			ProofRecorder::Nomt(nomt_read_recorder) => {
+				// PANIC: A new transaction cannot start if the previous one
+				// has not been committed or rolled back.
+				assert!(nomt_read_recorder.staging_reads.lock().is_empty());
+			},
+		}
 	}
+
 	pub fn rollback_transaction(&self) -> Result<(), ()> {
-		todo!()
+		match self {
+			ProofRecorder::Trie(recorder) => recorder.rollback_transaction(),
+			ProofRecorder::Nomt(nomt_read_recorder) => {
+				// Delete all staging reads
+				*nomt_read_recorder.staging_reads.lock() = BTreeMap::new();
+				Ok(())
+			},
+		}
 	}
+
 	pub fn commit_transaction(&self) -> Result<(), ()> {
-		todo!()
+		match self {
+			ProofRecorder::Trie(recorder) => recorder.commit_transaction(),
+			ProofRecorder::Nomt(nomt_read_recorder) => {
+				nomt_read_recorder.join_staging_reads();
+				Ok(())
+			},
+		}
 	}
 }
 

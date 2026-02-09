@@ -171,13 +171,6 @@ pub enum StorageProof {
 
 #[cfg(feature = "std")]
 impl StorageProof {
-	pub fn encode_bytes(self) -> Vec<sp_core::Bytes> {
-		match self {
-			StorageProof::Trie(proof) => proof.into_iter_nodes().map(|node| node.into()).collect(),
-			StorageProof::Nomt(_witness) => todo!(),
-		}
-	}
-
 	pub fn trie_proof(self) -> Option<sp_trie::StorageProof> {
 		match self {
 			StorageProof::Trie(trie_proof) => Some(trie_proof),
@@ -850,17 +843,19 @@ mod execution {
 	{
 		let state_backend = backend.as_state_backend();
 
-		let mut proving_backend = StateBackendBuilder::wrap_with_recorder(&state_backend);
+		// TODO: update to new 'inject' pattern.
+		// let proving_backend = StateBackendBuilder::wrap_with_recorder(&state_backend);
 
-		for key in keys.into_iter() {
-			proving_backend
-				.storage(key.as_ref())
-				.map_err(|e| Box::new(e) as Box<dyn Error>)?;
-		}
+		// for key in keys.into_iter() {
+		// 	proving_backend
+		// 		.storage(key.as_ref())
+		// 		.map_err(|e| Box::new(e) as Box<dyn Error>)?;
+		// }
 
-		Ok(proving_backend
-			.extract_proof()
-			.expect("A recorder was set and thus, a storage proof can be extracted; qed"))
+		// Ok(proving_backend
+		// 	.extract_proof()
+		// 	.expect("A recorder was set and thus, a storage proof can be extracted; qed"))
+		todo!()
 	}
 
 	/// Generate storage read proof on pre-created trie backend.

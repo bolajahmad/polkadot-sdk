@@ -29,8 +29,6 @@ use core::marker::PhantomData;
 use hash_db::Hasher;
 #[cfg(feature = "std")]
 use nomt::Overlay as NomtOverlay;
-#[cfg(feature = "std")]
-use nomt_core::witness::Witness as NomtWitness;
 use sp_core::storage::{ChildInfo, StateVersion, TrackedStorageKey};
 #[cfg(feature = "std")]
 use sp_core::traits::RuntimeCode;
@@ -181,8 +179,6 @@ pub type TrieBackendTransaction<H> = PrefixedMemoryDB<H>;
 pub struct NomtBackendTransaction {
 	/// Nomt Overlay which contains the db transaction.
 	pub transaction: NomtOverlay,
-	/// Optional witness of the db transaction.
-	pub witness: Option<NomtWitness>,
 }
 
 /// The transaction type used by [`Backend`].

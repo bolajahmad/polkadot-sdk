@@ -94,7 +94,7 @@ pub struct CloseBidResult<AccountId, Balance> {
 pub enum TickAction<AccountId, Balance, BidId> {
 	SellRegion { who: AccountId, refund: Balance },
 	RenewRegion { who: AccountId, renewal_id: PotentialRenewalId, refund: Balance },
-	CloseBid { id: BidId, amount: Balance },
+	BidClosed { id: BidId, refund: Balance, owner: AccountId },
 }
 
 pub enum MarketError {

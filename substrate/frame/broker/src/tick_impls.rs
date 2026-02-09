@@ -409,8 +409,11 @@ impl<T: Config> Pallet<T> {
 
 		for action in result {
 			match action {
-				TickAction::CloseBid { id, amount } => {
-					//
+				TickAction::BidClosed { id, refund, owner } => {
+					// TODO: Process error.
+					Self::refund(&owner, refund);
+
+					Self::deposit_event(Event::BidClosed { bid_id: id, refund, owner });
 				},
 				TickAction::RenewRegion { who, renewal_id, refund } => {
 					//

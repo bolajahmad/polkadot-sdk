@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770642303857,
+  "lastUpdate": 1770644700938,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -23911,6 +23911,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "dispute-distribution",
             "value": 0.009104353799999987,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "skunert49@gmail.com",
+            "name": "Sebastian Kunert",
+            "username": "skunert"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "3a747b02ae0a5032dfb3bd9a74548af92e7d693e",
+          "message": "Omni-node: Support asset-hub-polkadot and simplify resolver logic (#10978)\n\npolkadot-omni-node binary failed to sync Asset Hub Polkadot with a\n\"BadSignature\" verification error. DefaultRuntimeResolver always assumed\nSr25519 for Aura consensus, but Asset Hub Polkadot uses Ed25519. When we\nintroduced omni-node, we planned for people to use polkadot-parachain\nfor system chains. But it does not really make sense to keep this\nfootgun, its too easy to forget that AHP is the only chain using\nEd25519, so now we support it.\n\nAlso unified the resolver logic between omni-node and\npolkadot-parachain. Previously we were populating a `LegacyRuntime`\nenum, but all the variants where never used. Lets kill it. If ever\nneeded, we can bring it back.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-09T12:27:50Z",
+          "tree_id": "128bda679b4e248f9b2d36db29f02a088ac3b77c",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3a747b02ae0a5032dfb3bd9a74548af92e7d693e"
+        },
+        "date": 1770644676987,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006496829659999997,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0026982014999999996,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009133146769999979,
             "unit": "seconds"
           }
         ]

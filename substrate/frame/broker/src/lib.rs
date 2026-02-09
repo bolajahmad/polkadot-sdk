@@ -521,6 +521,15 @@ pub mod pallet {
 			/// Bid amount.
 			price: BalanceOf<T>,
 		},
+		/// The bid was removed.
+		BidClosed {
+			/// Unique ID of the bid that was removed.
+			bid_id: BidIdOf<T>,
+			/// How much was returned to the original bidder.
+			refund: BalanceOf<T>,
+			/// An account that originally made the bid.
+			owner: T::AccountId,
+		},
 	}
 
 	#[pallet::error]

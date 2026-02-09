@@ -59,9 +59,16 @@ impl<T: Config> Pallet<T> {
 		T::PalletId::get().into_account_truncating()
 	}
 
+	// TODO: Differentiate between revenue and locking (revenue is from selling, locking is from
+	// bidding).
 	pub(crate) fn charge(who: &T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
 		let credit = T::Currency::withdraw(&who, amount, Exact, Expendable, Polite)?;
 		T::OnRevenue::on_unbalanced(credit);
+		Ok(())
+	}
+
+	pub(crate) fn refund(who: &T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
+		T::Currency::deposit(&who, amount, Exact)?;
 		Ok(())
 	}
 

@@ -16,6 +16,7 @@
 // limitations under the License.
 
 use core::cmp;
+use frame_support::traits::tokens::Balance;
 use frame_system::pallet_prelude::AccountIdFor;
 use sp_arithmetic::FixedPointNumber;
 use sp_runtime::{DispatchError, FixedU64, SaturatedConversion, Saturating};
@@ -65,7 +66,10 @@ pub trait Market<Balance, RelayBlockNumber, AccountId> {
 	///
 	/// If the market logic allows creating the bids this method allows to close any bids (either
 	/// forcefully if `maybe_check_owner` is `None` or checking the bid owner if it's `Some`).
-	fn close_bid(id: Self::BidId, maybe_check_owner: Option<AccountId>) -> Result<(), Self::Error>;
+	fn close_bid(
+		id: Self::BidId,
+		maybe_check_owner: Option<AccountId>,
+	) -> Result<CloseBidResult<AccountId, Balance>, Self::Error>;
 
 	/// Logic that gets called in `on_initialize` hook.
 	fn tick(
@@ -83,6 +87,10 @@ pub enum RenewalOrderResult<Balance, BidId> {
 	Sold { price: Balance, next_renewal_price: Balance },
 }
 
+pub struct CloseBidResult<AccountId, Balance> {
+	pub owner: AccountId,
+	pub refund: Balance,
+}
 pub enum TickAction<AccountId, Balance, BidId> {
 	SellRegion { who: AccountId, refund: Balance },
 	RenewRegion { who: AccountId, renewal_id: PotentialRenewalId, refund: Balance },
@@ -144,7 +152,7 @@ impl<T: Config> Market<BalanceOf<T>, RelayBlockNumberOf<T>, AccountIdFor<T>> for
 	fn close_bid(
 		id: Self::BidId,
 		maybe_check_owner: Option<AccountIdFor<T>>,
-	) -> Result<(), Self::Error> {
+	) -> Result<CloseBidResult<AccountIdFor<T>, BalanceOf<T>>, Self::Error> {
 		Err(MarketError::BidNotExist)
 	}
 

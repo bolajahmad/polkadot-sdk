@@ -649,6 +649,22 @@ impl<T: Config> Pallet<T> {
 		Ok(())
 	}
 
+	pub(crate) fn do_close_bid(
+		id: BidIdOf<T>,
+		maybe_check_owner: Option<T::AccountId>,
+	) -> DispatchResult {
+		let result = Pallet::<T>::close_bid(id, maybe_check_owner)?;
+		Self::refund(&result.owner, result.refund)?;
+
+		Self::deposit_event(Event::BidClosed {
+			bid_id: id,
+			refund: result.refund,
+			owner: result.owner,
+		});
+
+		Ok(())
+	}
+
 	pub(crate) fn ensure_cores_for_sale(
 		status: &StatusRecord,
 		sale: &SaleInfoRecordOf<T>,

@@ -124,6 +124,8 @@ use sp_runtime::traits::HashingFor;
 pub use sp_runtime::TransactionOutcome;
 use sp_runtime::{traits::Block as BlockT, ExtrinsicInclusionMode};
 #[cfg(feature = "std")]
+use sp_state_machine::backend::AsStateBackend;
+#[cfg(feature = "std")]
 pub use sp_state_machine::StorageProof;
 #[cfg(feature = "std")]
 use sp_state_machine::{backend::AsTrieBackend, Backend as StateBackend, OverlayedChanges};
@@ -678,7 +680,9 @@ pub struct CallApiAtParams<'a, Block: BlockT> {
 #[cfg(feature = "std")]
 pub trait CallApiAt<Block: BlockT> {
 	/// The state backend that is used to store the block states.
-	type StateBackend: StateBackend<HashingFor<Block>> + AsTrieBackend<HashingFor<Block>>;
+	type StateBackend: StateBackend<HashingFor<Block>>
+		+ AsTrieBackend<HashingFor<Block>>
+		+ AsStateBackend<HashingFor<Block>>;
 
 	/// Calls the given api function with the given encoded arguments at the given block and returns
 	/// the encoded result.
@@ -696,6 +700,8 @@ pub trait CallApiAt<Block: BlockT> {
 		at: Block::Hash,
 		extensions: &mut Extensions,
 	) -> Result<(), ApiError>;
+
+	fn backend_type(&self) -> sp_state_machine::state_backend::BackendType;
 }
 
 #[cfg(feature = "std")]
@@ -723,6 +729,10 @@ impl<Block: BlockT, T: CallApiAt<Block>> CallApiAt<Block> for std::sync::Arc<T> 
 		extensions: &mut Extensions,
 	) -> Result<(), ApiError> {
 		(**self).initialize_extensions(at, extensions)
+	}
+
+	fn backend_type(&self) -> sp_state_machine::state_backend::BackendType {
+		(**self).backend_type()
 	}
 }
 

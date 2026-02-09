@@ -782,6 +782,11 @@ impl<Block: BlockT> backend::Backend<Block> for Backend<Block> {
 		let mut blocks = self.pinned_blocks.write();
 		blocks.entry(hash).and_modify(|counter| *counter -= 1).or_insert(-1);
 	}
+
+	fn backend_type(&self) -> sp_state_machine::state_backend::BackendType {
+		// TODO: update the in memory backend to work with nomt.
+		todo!()
+	}
 }
 
 impl<Block: BlockT> backend::LocalBackend<Block> for Backend<Block> {}

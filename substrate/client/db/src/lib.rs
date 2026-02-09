@@ -2875,6 +2875,14 @@ impl<Block: BlockT> sc_client_api::backend::Backend<Block> for Backend<Block> {
 			self.blockchain.unpin(hash);
 		}
 	}
+
+	fn backend_type(&self) -> sp_state_machine::state_backend::BackendType {
+		if self.storage.nomt_db.is_some() {
+			sp_state_machine::state_backend::BackendType::Nomt
+		} else {
+			sp_state_machine::state_backend::BackendType::Trie
+		}
+	}
 }
 
 impl<Block: BlockT> sc_client_api::backend::LocalBackend<Block> for Backend<Block> {}

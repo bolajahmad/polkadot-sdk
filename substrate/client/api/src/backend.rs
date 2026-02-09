@@ -683,6 +683,8 @@ pub trait Backend<Block: BlockT>: AuxStore + Send + Sync {
 
 	/// Tells whether the backend requires full-sync mode.
 	fn requires_full_sync(&self) -> bool;
+
+	fn backend_type(&self) -> sp_state_machine::state_backend::BackendType;
 }
 
 /// Mark for all Backend implementations, that are making use of state data, stored locally.

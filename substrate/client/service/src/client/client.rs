@@ -830,10 +830,11 @@ where
 
 				if self.config.enable_import_proof_recording {
 					runtime_api.record_proof();
-					let recorder = runtime_api
-						.proof_recorder()
-						.expect("Proof recording is enabled in the line above; qed.");
-					runtime_api.register_extension(ProofSizeExt::new(recorder));
+					// TODO: handle Proof Size Estimation.
+					// let recorder = runtime_api
+					// 	.proof_recorder()
+					// 	.expect("Proof recording is enabled in the line above; qed.");
+					// runtime_api.register_extension(ProofSizeExt::new(recorder));
 				}
 
 				runtime_api.execute_block(
@@ -1564,6 +1565,10 @@ where
 		extensions.merge(self.executor.execution_extensions().extensions(at, block_number));
 
 		Ok(())
+	}
+
+	fn backend_type(&self) -> sp_state_machine::state_backend::BackendType {
+		self.backend.backend_type()
 	}
 }
 

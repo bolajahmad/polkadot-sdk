@@ -321,7 +321,8 @@ fn generate_runtime_api_base_structures() -> Result<TokenStream> {
 				}
 
 				fn record_proof(&mut self) {
-					self.recorder = std::option::Option::Some(std::default::Default::default());
+					let backend_type = #crate_::CallApiAt::<Block>::backend_type(self.call);
+					self.recorder = std::option::Option::Some(#crate_::ProofRecorder::<Block>::new(backend_type));
 				}
 
 				fn record_proof_with_recorder(&mut self, recorder: #crate_::ProofRecorder<Block>) {

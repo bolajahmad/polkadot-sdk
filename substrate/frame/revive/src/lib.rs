@@ -1803,7 +1803,7 @@ impl<T: Config> Pallet<T> {
 				})?;
 			}
 			if let Some(allowance) = available_balance.checked_div(fee_cap) {
-				if high > allowance {
+				if high > allowance && allowance != U256::zero() {
 					log::trace!(target: LOG_TARGET, "eth_estimate_gas high limited by the user's allowance high={high}");
 					high = allowance
 				}

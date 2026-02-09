@@ -2153,7 +2153,7 @@ impl<T: Config> StakingInterface for Pallet<T> {
 	sp_staking::std_or_benchmarks_enabled! {
 		fn set_era(era: EraIndex) {
 			ActiveEra::<T>::put(ActiveEraInfo { index: era, start: None });
-			CurrentEra::<T>::put(era.saturating_add(1));
+			CurrentEra::<T>::put(era);
 		}
 	}
 }

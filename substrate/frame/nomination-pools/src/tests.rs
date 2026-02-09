@@ -318,18 +318,18 @@ mod bonded_pool {
 
 			// Non-existent member cannot claim
 			assert_noop!(
-					Pools::claim_trapped_balance(RuntimeOrigin::signed(member)),
-					Error::<Runtime>::PoolMemberNotFound
-				);
+				Pools::claim_trapped_balance(RuntimeOrigin::signed(member)),
+				Error::<Runtime>::PoolMemberNotFound
+			);
 
 			// Member joins pool
 			assert_ok!(Pools::join(RuntimeOrigin::signed(member), 100, 1));
 
 			// Member with no trapped balance cannot claim
 			assert_noop!(
-					Pools::claim_trapped_balance(RuntimeOrigin::signed(member)),
-					Error::<Runtime>::NoTrappedBalance
-				);
+				Pools::claim_trapped_balance(RuntimeOrigin::signed(member)),
+				Error::<Runtime>::NoTrappedBalance
+			);
 		});
 	}
 }

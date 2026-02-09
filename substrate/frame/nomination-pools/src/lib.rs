@@ -3278,8 +3278,7 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 
 			// Fail-fast: verify member exists before performing expensive operations
-			let member =
-				PoolMembers::<T>::get(&who).ok_or(Error::<T>::PoolMemberNotFound)?;
+			let member = PoolMembers::<T>::get(&who).ok_or(Error::<T>::PoolMemberNotFound)?;
 
 			// Fetch the bonded pool to get the pool account for withdrawal operations
 			let bonded_pool =
@@ -3296,12 +3295,11 @@ pub mod pallet {
 						return Err(Error::<T>::Defensive(DefensiveError::SlashNotApplied).into());
 					}
 					false
-				}
+				},
 			};
 
 			// Re-fetch member after potential slash application
-			let member =
-				PoolMembers::<T>::get(&who).ok_or(Error::<T>::PoolMemberNotFound)?;
+			let member = PoolMembers::<T>::get(&who).ok_or(Error::<T>::PoolMemberNotFound)?;
 
 			// Calculate expected balance from ALL points (bonded + unbonding).
 			// This is the balance the member should have based on their pool accounting.

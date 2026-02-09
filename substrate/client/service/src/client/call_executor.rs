@@ -29,7 +29,11 @@ use sp_runtime::{
 	generic::BlockId,
 	traits::{Block as BlockT, HashingFor},
 };
-use sp_state_machine::{backend::AsTrieBackend, OverlayedChanges, StateMachine, StorageProof};
+use sp_state_machine::{
+	backend::{AsStateBackend, AsTrieBackend},
+	state_backend::BackendType,
+	OverlayedChanges, StateMachine, StorageProof,
+};
 use std::{cell::RefCell, sync::Arc};
 
 /// Call executor that executes methods locally, querying all required
@@ -152,32 +156,51 @@ where
 		let mut extensions = extensions.borrow_mut();
 
 		match recorder {
+			Some(recorder) if self.backend.backend_type() == BackendType::Trie => {
+				let trie_state = state.as_trie_backend();
+
+				let backend = sp_state_machine::TrieBackendBuilder::wrap(&trie_state)
+					.with_recorder(recorder.as_trie_recorder())
+					.build();
+
+				let mut state_machine = StateMachine::new(
+					&backend,
+					changes,
+					&self.executor,
+					method,
+					call_data,
+					&mut extensions,
+					&runtime_code,
+					call_context,
+				)
+				.set_parent_hash(at_hash);
+				state_machine.execute()
+			},
 			Some(recorder) => {
-				todo!("Update this code to properly used state backend and recorder")
-				// TODO: Here the already existing backend is wrapped using the separately
-				// created Recorder, this imply a refactor over the inner working of the
-				// nomt backend.
-				//
-				// let backend = StateBackendBuilder::wrap_with_recorder(&state)
+				let nomt_read_recorder = recorder.as_nomt_recorder();
+				let state_backend = state.as_state_backend();
 
-				// let trie_state = state.as_trie_backend();
+				// NOTE: This `inject` pattern differs from the `wrapping` which is being performed
+				// by the trie backend. It seems more complicated to replicate with nomt than just
+				// handling those two patterns separately.
 				//
-				// let backend = sp_state_machine::TrieBackendBuilder::wrap(&trie_state)
-				// 	.with_recorder(recorder.clone())
-				// 	.build();
+				// This is only a possible solution, a refactor pass should be performed to
+				// try to identify a better solution which fits best in combination with trie
+				// backend.
+				state_backend.inject_nomt_recorder(nomt_read_recorder);
 
-				// let mut state_machine = StateMachine::new(
-				// 	&backend,
-				// 	changes,
-				// 	&self.executor,
-				// 	method,
-				// 	call_data,
-				// 	&mut extensions,
-				// 	&runtime_code,
-				// 	call_context,
-				// )
-				// .set_parent_hash(at_hash);
-				// state_machine.execute()
+				let mut state_machine = StateMachine::new(
+					&state,
+					changes,
+					&self.executor,
+					method,
+					call_data,
+					&mut extensions,
+					&runtime_code,
+					call_context,
+				)
+				.set_parent_hash(at_hash);
+				state_machine.execute()
 			},
 			None => {
 				let mut state_machine = StateMachine::new(

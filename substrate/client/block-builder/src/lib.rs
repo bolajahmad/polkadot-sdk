@@ -39,6 +39,7 @@ use sp_runtime::{
 	traits::{Block as BlockT, Hash, HashingFor, Header as HeaderT, NumberFor, One},
 	Digest, ExtrinsicInclusionMode,
 };
+use sp_state_machine::{backend::AsStateBackend, state_backend::BackendType};
 use std::marker::PhantomData;
 
 pub use sp_block_builder::BlockBuilder as BlockBuilderApi;
@@ -138,14 +139,21 @@ pub struct BlockBuilderBuilderStage2<'a, B: BlockT, C> {
 
 impl<'a, B: BlockT, C> BlockBuilderBuilderStage2<'a, B, C> {
 	/// Enable proof recording for the block builder.
-	pub fn enable_proof_recording(mut self) -> Self {
-		self.proof_recorder = Some(Default::default());
+	pub fn enable_proof_recording(mut self) -> Self
+	where
+		C: CallApiAt<B>,
+	{
+		self.proof_recorder = Some(ProofRecorder::<B>::new(self.call_api_at.backend_type()));
 		self
 	}
 
 	/// Enable/disable proof recording for the block builder.
-	pub fn with_proof_recording(mut self, enable: bool) -> Self {
-		self.proof_recorder = enable.then(|| Default::default());
+	pub fn with_proof_recording(mut self, enable: bool) -> Self
+	where
+		C: CallApiAt<B>,
+	{
+		self.proof_recorder =
+			enable.then(|| ProofRecorder::<B>::new(self.call_api_at.backend_type()));
 		self
 	}
 
@@ -242,9 +250,13 @@ where
 
 		let mut api = call_api_at.runtime_api();
 
+		// NOTE: Forcing the usage of a ProofRecorder to test draining the storage proof.
+		let proof_recorder = Some(ProofRecorder::<Block>::new(call_api_at.backend_type()));
+
 		if let Some(recorder) = proof_recorder {
 			api.record_proof_with_recorder(recorder.clone());
-			api.register_extension(ProofSizeExt::new(recorder));
+			// TODO: handle ProofSizeEstimation!
+			// api.register_extension(ProofSizeExt::new(recorder));
 		}
 
 		api.set_call_context(CallContext::Onchain);
@@ -327,10 +339,61 @@ where
 			),
 		);
 
+		// TODO: if new code works remove this one.
+		// NOTE: trie and nomt proof extraction requires a different order,
+		// possibly the trie version could be adapted to nomt requirements.
+		// For now just follow two different code path.
+		// OLD
+		// let (storage_changes, proof) = match self.call_api_at.backend_type() {
+		// 	BackendType::Trie => {
+		// 		let proof = self.api.extract_proof();
+		// 		let state = self.call_api_at.state_at(self.parent_hash)?;
+		// 		let storage_changes = self
+		// 			.api
+		// 			.into_storage_changes(&state, self.parent_hash)
+		// 			.map_err(sp_blockchain::Error::StorageChanges)?;
+		// 		(storage_changes, proof)
+		// 	},
+		// 	BackendType::Nomt => {
+		// 		// TODO: proof extraction should stay here (order unchanged)
+		// 		let proof = self.api.extract_proof();
+
+		// 		let state = self.call_api_at.state_at(self.parent_hash)?;
+
+		// 		// NOTE: right now this seems to be the easiest way to know
+		// 		// if proof recording is enabled. If so, toggle the nomt state backend
+		// 		// to effectively produce a witness when 'into_storage_changes' is called.
+		// 		if let Some(proof_recorder) = self.api.proof_recorder() {
+		// 			let nomt_state_backend = state.as_state_backend();
+		// 			nomt_state_backend.inject_nomt_recorder(proof_recorder.as_nomt_recorder())
+		// 		}
+
+		// 		let storage_changes = self
+		// 			.api
+		// 			.into_storage_changes(&state, self.parent_hash)
+		// 			.map_err(sp_blockchain::Error::StorageChanges)?;
+
+		// 		// let proof = storage_changes.transaction.inner -> NomtBackendTransaction contains
+		// 		// the witness
+
+		// 		// TODO: or should it be moved here?
+		// 		// let proof = self.api.extract_proof();
+
+		// 		(storage_changes, proof)
+		// 	},
+		// };
+
 		let proof = self.api.extract_proof();
 
 		let state = self.call_api_at.state_at(self.parent_hash)?;
 
+		// NOTE: This function is expected to find an already computed storage change
+		// due to the previous `api.finalize_block` call which internally calls
+		// the host function `storage_root`.
+		//
+		// If something will change in the future than there is the need to inject
+		// the proof recorder within nomt because `call_api_at.state_at` doesn't do
+		// it on its own.
 		let storage_changes = self
 			.api
 			.into_storage_changes(&state, self.parent_hash)

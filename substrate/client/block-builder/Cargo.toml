@@ -24,7 +24,7 @@ sp-core = { workspace = true, default-features = true }
 sp-inherents = { workspace = true, default-features = true }
 sp-runtime = { workspace = true, default-features = true }
 sp-trie = { workspace = true, default-features = true }
+sp-state-machine = { workspace = true, default-features = true }
 
 [dev-dependencies]
-sp-state-machine = { workspace = true, default-features = true }
 substrate-test-runtime-client = { workspace = true }

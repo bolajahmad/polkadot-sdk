@@ -7785,7 +7785,7 @@ mod filter {
 				assert_eq!(DelegateMock::delegator_balance(Delegator::from(member)), Some(150));
 
 				// Call claim_trapped_balance to recover the 50 trapped funds
-				assert_ok!(Pools::claim_trapped_balance(RuntimeOrigin::signed(member)));
+				assert_ok!(Pools::claim_trapped_balance(RuntimeOrigin::signed(member), member));
 
 				// Verify the correct event was emitted
 				System::assert_last_event(tests::RuntimeEvent::Pools(
@@ -7801,7 +7801,7 @@ mod filter {
 
 				// Calling again fails - no more trapped balance
 				assert_noop!(
-					Pools::claim_trapped_balance(RuntimeOrigin::signed(member)),
+					Pools::claim_trapped_balance(RuntimeOrigin::signed(member), member),
 					Error::<Runtime>::NoTrappedBalance
 				);
 			});
@@ -7815,7 +7815,7 @@ mod filter {
 
 				// Non-existent member cannot claim
 				assert_noop!(
-					Pools::claim_trapped_balance(RuntimeOrigin::signed(member)),
+					Pools::claim_trapped_balance(RuntimeOrigin::signed(member), member),
 					Error::<Runtime>::PoolMemberNotFound
 				);
 
@@ -7824,7 +7824,7 @@ mod filter {
 
 				// Member with no trapped balance cannot claim
 				assert_noop!(
-					Pools::claim_trapped_balance(RuntimeOrigin::signed(member)),
+					Pools::claim_trapped_balance(RuntimeOrigin::signed(member), member),
 					Error::<Runtime>::NoTrappedBalance
 				);
 			});

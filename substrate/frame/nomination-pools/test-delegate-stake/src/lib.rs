@@ -1988,8 +1988,8 @@ fn claim_trapped_balance_applies_pending_slash_first() {
 		assert!(Pools::api_member_pending_slash(alice) > 0);
 
 		// claim_trapped_balance succeeds by applying the slash, even though there's no trapped
-		// balance. This is useful work - users can call this to apply their pending slash.
-		assert_ok!(Pools::claim_trapped_balance(RuntimeOrigin::signed(alice)));
+		// balance. This is useful work - anyone can call this to apply a member's pending slash.
+		assert_ok!(Pools::claim_trapped_balance(RuntimeOrigin::signed(alice), alice));
 
 		// Verify slash was applied
 		assert_eq!(Pools::api_member_pending_slash(alice), 0);

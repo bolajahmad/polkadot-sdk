@@ -241,8 +241,6 @@ pub fn test_authorities() -> Vec<BeefyId> {
 
 #[test]
 fn should_sign_and_verify() {
-	use sp_runtime::traits::Keccak256;
-
 	let set_id = 3;
 	let payload1 = Payload::from_single_entry(MMR_ROOT_ID, vec![42]);
 	let payload2 = Payload::from_single_entry(MMR_ROOT_ID, vec![128]);
@@ -254,7 +252,7 @@ fn should_sign_and_verify() {
 		(1, payload1.clone(), set_id, &BeefyKeyring::Bob),
 	);
 	// expect invalid equivocation proof
-	assert!(!check_double_voting_proof::<_, _, Keccak256>(&equivocation_proof));
+	assert!(!check_double_voting_proof::<_, _>(&equivocation_proof));
 
 	// generate an equivocation proof, with two votes in different rounds for
 	// different payloads signed by the same key
@@ -263,7 +261,7 @@ fn should_sign_and_verify() {
 		(2, payload2.clone(), set_id, &BeefyKeyring::Bob),
 	);
 	// expect invalid equivocation proof
-	assert!(!check_double_voting_proof::<_, _, Keccak256>(&equivocation_proof));
+	assert!(!check_double_voting_proof::<_, _>(&equivocation_proof));
 
 	// generate an equivocation proof, with two votes by different authorities
 	let equivocation_proof = generate_double_voting_proof(
@@ -271,7 +269,7 @@ fn should_sign_and_verify() {
 		(1, payload2.clone(), set_id, &BeefyKeyring::Bob),
 	);
 	// expect invalid equivocation proof
-	assert!(!check_double_voting_proof::<_, _, Keccak256>(&equivocation_proof));
+	assert!(!check_double_voting_proof::<_, _>(&equivocation_proof));
 
 	// generate an equivocation proof, with two votes in different set ids
 	let equivocation_proof = generate_double_voting_proof(
@@ -279,7 +277,7 @@ fn should_sign_and_verify() {
 		(1, payload2.clone(), set_id + 1, &BeefyKeyring::Bob),
 	);
 	// expect invalid equivocation proof
-	assert!(!check_double_voting_proof::<_, _, Keccak256>(&equivocation_proof));
+	assert!(!check_double_voting_proof::<_, _>(&equivocation_proof));
 
 	// generate an equivocation proof, with two votes in the same round for
 	// different payloads signed by the same key
@@ -289,7 +287,7 @@ fn should_sign_and_verify() {
 		(1, payload2, set_id, &BeefyKeyring::Bob),
 	);
 	// expect valid equivocation proof
-	assert!(check_double_voting_proof::<_, _, Keccak256>(&equivocation_proof));
+	assert!(check_double_voting_proof::<_, _>(&equivocation_proof));
 }
 
 trait ReportEquivocationFn:
@@ -407,7 +405,7 @@ fn report_equivocation_current_set_works(
 		// check that the balances of all other validators are left intact.
 		for validator in &validators {
 			if *validator == equivocation_validator_id {
-				continue
+				continue;
 			}
 
 			assert_eq!(Balances::total_balance(validator), initial_balance);
@@ -504,7 +502,7 @@ fn report_equivocation_old_set_works(
 		// check that the balances of all other validators are left intact.
 		for validator in &validators {
 			if *validator == equivocation_validator_id {
-				continue
+				continue;
 			}
 
 			assert_eq!(Balances::total_balance(validator), initial_balance);

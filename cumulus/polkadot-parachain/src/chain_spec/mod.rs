@@ -31,7 +31,6 @@ pub mod coretime;
 pub mod glutton;
 pub mod penpal;
 pub mod people;
-pub mod rococo_parachain;
 pub mod yet_another_parachain;
 
 /// Extracts the normalized chain id and parachain id from the input chain id.
@@ -58,7 +57,7 @@ impl LoadSpec for ChainSpecLoader {
 	fn load_spec(&self, id: &str) -> Result<Box<dyn ChainSpec>, String> {
 		Ok(match id {
 			// - Default-like
-			"staging" => Box::new(rococo_parachain::staging_rococo_parachain_local_config()),
+			"staging" => Box::new(penpal::staging_penpal_local_config()),
 			"tick" => Box::new(GenericChainSpec::from_json_bytes(
 				&include_bytes!("../../chain-specs/tick.json")[..],
 			)?),
@@ -89,13 +88,16 @@ impl LoadSpec for ChainSpecLoader {
 			)?),
 
 			// -- Asset Hub Westend
-			"asset-hub-westend-dev" | "westmint-dev" =>
-				Box::new(asset_hubs::asset_hub_westend_development_config()),
-			"asset-hub-westend-local" | "westmint-local" =>
-				Box::new(asset_hubs::asset_hub_westend_local_config()),
+			"asset-hub-westend-dev" | "westmint-dev" => {
+				Box::new(asset_hubs::asset_hub_westend_development_config())
+			},
+			"asset-hub-westend-local" | "westmint-local" => {
+				Box::new(asset_hubs::asset_hub_westend_local_config())
+			},
 			// the chain spec as used for generating the upgrade genesis values
-			"asset-hub-westend-genesis" | "westmint-genesis" =>
-				Box::new(asset_hubs::asset_hub_westend_config()),
+			"asset-hub-westend-genesis" | "westmint-genesis" => {
+				Box::new(asset_hubs::asset_hub_westend_config())
+			},
 			// the shell-based chain spec as used for syncing
 			"asset-hub-westend" | "westmint" => Box::new(GenericChainSpec::from_json_bytes(
 				&include_bytes!("../../chain-specs/asset-hub-westend.json")[..],
@@ -107,10 +109,12 @@ impl LoadSpec for ChainSpecLoader {
 			)?),
 
 			// -- Westend Collectives
-			"collectives-westend-dev" =>
-				Box::new(collectives::collectives_westend_development_config()),
-			"collectives-westend-local" =>
-				Box::new(collectives::collectives_westend_local_config()),
+			"collectives-westend-dev" => {
+				Box::new(collectives::collectives_westend_development_config())
+			},
+			"collectives-westend-local" => {
+				Box::new(collectives::collectives_westend_local_config())
+			},
 			"collectives-westend" => Box::new(GenericChainSpec::from_json_bytes(
 				&include_bytes!("../../chain-specs/collectives-westend.json")[..],
 			)?),
@@ -118,18 +122,22 @@ impl LoadSpec for ChainSpecLoader {
 			// -- BridgeHub
 			bridge_like_id
 				if bridge_like_id.starts_with(bridge_hubs::BridgeHubRuntimeType::ID_PREFIX) =>
+			{
 				bridge_like_id
 					.parse::<bridge_hubs::BridgeHubRuntimeType>()
 					.expect("invalid value")
-					.load_config()?,
+					.load_config()?
+			},
 
 			// -- Coretime
 			coretime_like_id
 				if coretime_like_id.starts_with(coretime::CoretimeRuntimeType::ID_PREFIX) =>
+			{
 				coretime_like_id
 					.parse::<coretime::CoretimeRuntimeType>()
 					.expect("invalid value")
-					.load_config()?,
+					.load_config()?
+			},
 
 			// -- Penpal
 			id if id.starts_with("penpal-rococo") => {
@@ -194,16 +202,19 @@ impl LoadSpec for ChainSpecLoader {
 			},
 
 			// -- People
-			people_like_id if people_like_id.starts_with(people::PeopleRuntimeType::ID_PREFIX) =>
+			people_like_id if people_like_id.starts_with(people::PeopleRuntimeType::ID_PREFIX) => {
 				people_like_id
 					.parse::<people::PeopleRuntimeType>()
 					.expect("invalid value")
-					.load_config()?,
+					.load_config()?
+			},
 
 			// -- Fallback (generic chainspec)
 			"" => {
-				log::warn!("No ChainSpec.id specified, so using default one, based on rococo-parachain runtime");
-				Box::new(rococo_parachain::rococo_parachain_local_config())
+				log::warn!(
+					"No ChainSpec.id specified, so using default one, based on Penpal runtime"
+				);
+				Box::new(penpal::staging_penpal_local_config())
 			},
 
 			// -- Loading a specific spec from disk
@@ -275,8 +286,9 @@ impl RuntimeResolverT for RuntimeResolver {
 	fn runtime(&self, chain_spec: &dyn ChainSpec) -> sc_cli::Result<Runtime> {
 		let legacy_runtime = LegacyRuntime::from_id(chain_spec.id());
 		Ok(match legacy_runtime {
-			LegacyRuntime::AssetHubPolkadot =>
-				Runtime::Omni(BlockNumber::U32, Consensus::Aura(AuraConsensusId::Ed25519)),
+			LegacyRuntime::AssetHubPolkadot => {
+				Runtime::Omni(BlockNumber::U32, Consensus::Aura(AuraConsensusId::Ed25519))
+			},
 			LegacyRuntime::AssetHub |
 			LegacyRuntime::BridgeHub(_) |
 			LegacyRuntime::Collectives |
@@ -284,8 +296,9 @@ impl RuntimeResolverT for RuntimeResolver {
 			LegacyRuntime::People(_) |
 			LegacyRuntime::Glutton |
 			LegacyRuntime::Penpal |
-			LegacyRuntime::Omni =>
-				Runtime::Omni(BlockNumber::U32, Consensus::Aura(AuraConsensusId::Sr25519)),
+			LegacyRuntime::Omni => {
+				Runtime::Omni(BlockNumber::U32, Consensus::Aura(AuraConsensusId::Sr25519))
+			},
 		})
 	}
 }
@@ -322,8 +335,7 @@ mod tests {
 		extension: E,
 	) -> DummyChainSpec<E> {
 		DummyChainSpec::builder(
-			rococo_parachain_runtime::WASM_BINARY
-				.expect("WASM binary was not built, please build it!"),
+			penpal_runtime::WASM_BINARY.expect("WASM binary was not built, please build it!"),
 			extension,
 		)
 		.with_name("Dummy local testnet")
@@ -338,8 +350,5 @@ mod tests {
 		let chain_spec =
 			create_default_with_extensions("penpal-rococo-1000", Extensions2::default());
 		assert_eq!(LegacyRuntime::Penpal, LegacyRuntime::from_id(chain_spec.id()));
-
-		let chain_spec = crate::chain_spec::rococo_parachain::rococo_parachain_local_config();
-		assert_eq!(LegacyRuntime::Omni, LegacyRuntime::from_id(chain_spec.id()));
 	}
 }

@@ -21,6 +21,8 @@ use super::*;
 use crate as pallet_session;
 #[cfg(feature = "historical")]
 use crate::historical as pallet_session_historical;
+
+use codec::Encode;
 use frame_support::{
 	derive_impl, parameter_types,
 	traits::{ConstU64, Hooks},
@@ -72,6 +74,10 @@ impl OpaqueKeys for PreUpgradeMockSessionKeys {
 			i if i == KEY_ID_B => &self.b[..],
 			_ => &[],
 		}
+	}
+
+	fn ownership_proof_is_valid(&self, _: &[u8], _: &[u8]) -> bool {
+		true
 	}
 }
 
@@ -208,6 +214,10 @@ pub fn before_session_end_called() -> bool {
 
 pub fn reset_before_session_end_called() {
 	BeforeSessionEndCalled::mutate(|b| *b = false);
+}
+
+pub fn create_set_keys_proof(owner: u64, public: &UintAuthorityId) -> Vec<u8> {
+	public.sign(&owner.encode()).unwrap().encode()
 }
 
 parameter_types! {

@@ -28,7 +28,7 @@ use sp_version::RuntimeVersion;
 pub mod error;
 pub mod helpers;
 
-pub use self::helpers::ReadProof;
+pub use self::helpers::{Proof, ReadProof};
 pub use error::Error;
 
 /// Substrate state API

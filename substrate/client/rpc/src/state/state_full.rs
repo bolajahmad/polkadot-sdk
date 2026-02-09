@@ -37,7 +37,7 @@ use sc_client_api::{
 	Backend, BlockBackend, BlockchainEvents, CallExecutor, ExecutorProvider, ProofProvider,
 	StorageProvider,
 };
-use sc_rpc_api::state::ReadProof;
+use sc_rpc_api::state::{Proof, ReadProof};
 use sc_tracing::block::TracingExecuteBlock;
 use sp_api::{CallApiAt, Metadata, ProvideRuntimeApi};
 use sp_blockchain::{
@@ -372,8 +372,12 @@ where
 			.and_then(|block| {
 				self.client
 					.read_proof(block, &mut keys.iter().map(|key| key.0.as_ref()))
-					// TODO: handle proof encoding.
-					.map(|proof| todo!())
+					.map(|proof| match proof {
+						sp_api::StorageProof::Trie(trie_proof) => Proof::Trie(
+							trie_proof.into_iter_nodes().map(|node| node.into()).collect(),
+						),
+						sp_api::StorageProof::Nomt(witness) => Proof::Nomt(witness),
+					})
 					.map(|proof| ReadProof { at: block, proof })
 			})
 			.map_err(client_err)
@@ -531,8 +535,12 @@ where
 						&child_info,
 						&mut keys.iter().map(|key| key.0.as_ref()),
 					)
-					// TODO: handle proof encoding.
-					.map(|proof| todo!())
+					.map(|proof| match proof {
+						sp_api::StorageProof::Trie(trie_proof) => Proof::Trie(
+							trie_proof.into_iter_nodes().map(|node| node.into()).collect(),
+						),
+						sp_api::StorageProof::Nomt(witness) => Proof::Nomt(witness),
+					})
 					.map(|proof| ReadProof { at: block, proof })
 			})
 			.map_err(client_err)

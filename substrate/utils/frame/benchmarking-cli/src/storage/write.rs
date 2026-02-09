@@ -215,10 +215,13 @@ impl StorageCmd {
 			let nomt_storage = RwLock::read_arc(nomt_db.as_ref().unwrap());
 			let mut nomt_backend_builder =
 				DbStateBuilder::<HashingFor<Block>>::new_nomt(nomt_storage);
-			if !self.params.disable_pov_recorder {
-				nomt_backend_builder = nomt_backend_builder.with_nomt_recorder();
-			}
-			(nomt_backend_builder.build(), None)
+
+			// TODO: adapt code to NomtReadRecorder.
+			// if !self.params.disable_pov_recorder {
+			// 	nomt_backend_builder = nomt_backend_builder.with_nomt_recorder();
+			// }
+			// (nomt_backend_builder.build(), None)
+			todo!()
 		} else {
 			let recorder = (!self.params.disable_pov_recorder).then(|| Default::default());
 			let trie_backend =

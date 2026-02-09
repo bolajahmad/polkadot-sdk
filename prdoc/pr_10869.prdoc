@@ -6,7 +6,7 @@ doc:
 
     Adds ForeignAssetIdExtractor which converts a u32 asset id to an XCM Location type.
 crates:
-- name: pallet-assets
+- name: pallet-assets-precompiles
   bump: minor
 - name: asset-hub-westend-runtime
   bump: minor

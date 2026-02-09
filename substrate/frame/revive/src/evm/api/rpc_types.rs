@@ -35,7 +35,7 @@ impl<Moment> DryRunConfig<Moment> {
 	pub fn new(timestamp_override: Option<Moment>) -> Self {
 		Self {
 			timestamp_override,
-			perform_balance_checks: None, // default value
+			perform_balance_checks: Some(true), // default value
 		}
 	}
 

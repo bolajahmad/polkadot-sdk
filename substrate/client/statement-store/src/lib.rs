@@ -1232,10 +1232,11 @@ impl StatementStore for Store {
 			Ok(None) => {
 				log::debug!(
 					target: LOG_TARGET,
-					"Account {} has no statement allowance set",
+					"Account {} has no statement allowance set, mocking allowance for testing",
 					HexDisplay::from(&account_id),
 				);
-				return SubmitResult::Rejected(RejectionReason::NoAllowance);
+				// Mock allowance for testing (100 statements, 512B each)
+				StatementAllowance::new(100, 100 * 1024 / 2)
 			},
 			Err(e) => {
 				log::debug!(

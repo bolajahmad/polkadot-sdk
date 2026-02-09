@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770642269422,
+  "lastUpdate": 1770644668475,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "diego2737@gmail.com",
-            "name": "Diego",
-            "username": "dimartiro"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "20510c488198e8ee72b241fd2d0f6d1784982734",
-          "message": "chore: Bump bounded-collections dep (#9004)\n\n# Description\n\nBump bounded-collections dep from `0.2.3` to `0.3.2` based on the latest\n[release](https://crates.io/crates/bounded-collections/0.3.2)\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Bastian Köcher <git@kchr.de>",
-          "timestamp": "2025-07-01T08:03:09Z",
-          "tree_id": "44744a795008b71ae5174e1747ef796272b08505",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/20510c488198e8ee72b241fd2d0f6d1784982734"
-        },
-        "date": 1751361614758,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.93399999999994,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.03391476206200002,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.044840166287999944,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.06579555231399994,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "skunert49@gmail.com",
+            "name": "Sebastian Kunert",
+            "username": "skunert"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "3a747b02ae0a5032dfb3bd9a74548af92e7d693e",
+          "message": "Omni-node: Support asset-hub-polkadot and simplify resolver logic (#10978)\n\npolkadot-omni-node binary failed to sync Asset Hub Polkadot with a\n\"BadSignature\" verification error. DefaultRuntimeResolver always assumed\nSr25519 for Aura consensus, but Asset Hub Polkadot uses Ed25519. When we\nintroduced omni-node, we planned for people to use polkadot-parachain\nfor system chains. But it does not really make sense to keep this\nfootgun, its too easy to forget that AHP is the only chain using\nEd25519, so now we support it.\n\nAlso unified the resolver logic between omni-node and\npolkadot-parachain. Previously we were populating a `LegacyRuntime`\nenum, but all the variants where never used. Lets kill it. If ever\nneeded, we can bring it back.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-09T12:27:50Z",
+          "tree_id": "128bda679b4e248f9b2d36db29f02a088ac3b77c",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3a747b02ae0a5032dfb3bd9a74548af92e7d693e"
+        },
+        "date": 1770644644859,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.048,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06348836189199991,
+            "unit": "seconds"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.038219204493999986,
             "unit": "seconds"
           }
         ]

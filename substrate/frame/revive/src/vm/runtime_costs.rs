@@ -308,9 +308,8 @@ impl<T: Config> Token<T> for RuntimeCosts {
 			PrecompileBase => T::WeightInfo::seal_call_precompile(0, 0),
 			PrecompileWithInfoBase => T::WeightInfo::seal_call_precompile(1, 0),
 			PrecompileDecode(len) => cost_args!(seal_call_precompile, 0, len),
-			CallTransferSurcharge { dust_transfer } => {
-				cost_args!(seal_call, 1, dust_transfer.into(), 0)
-			},
+			CallTransferSurcharge { dust_transfer } =>
+				cost_args!(seal_call, 1, dust_transfer.into(), 0),
 			CallInputCloned(len) => cost_args!(seal_call, 0, 0, len),
 			Instantiate { input_data_len, balance_transfer, dust_transfer } =>
 				T::WeightInfo::seal_instantiate(
@@ -344,7 +343,7 @@ impl<T: Config> Token<T> for RuntimeCosts {
 			Modexp(gas) => Weight::from_parts(gas.saturating_mul(WEIGHT_PER_GAS), 0),
 			Delegations(count) => T::WeightInfo::process_new_account_authorization(count),
 			DelegationRefunds(count) => T::WeightInfo::process_new_account_authorization(count)
-				.saturating_sub(T::WeightInfo::process_new_account_authorization(count)),
+				.saturating_sub(T::WeightInfo::process_existing_account_authorization(count)),
 		}
 	}
 }

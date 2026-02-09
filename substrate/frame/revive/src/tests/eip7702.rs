@@ -18,17 +18,30 @@
 //! Tests for EIP-7702: Set EOA Account Code
 
 use crate::{
-	evm::fees::InfoT,
+	evm::{eip7702::AuthorizationResult, fees::InfoT, AuthorizationListEntry},
 	storage::AccountInfo,
 	test_utils::builder::Contract,
 	tests::{builder, TestSigner, *},
-	Code, Config,
+	Code, Config, ExecConfig,
 };
 use frame_support::{
 	assert_ok,
 	traits::fungible::{Balanced, Mutate},
+	weights::Weight,
 };
 use sp_core::{H160, H256, U256};
+
+/// Helper to call process_authorizations with a funded origin and exec_config.
+fn test_process_authorizations(auths: &[AuthorizationListEntry]) -> AuthorizationResult {
+	let origin = <Test as Config>::AddressMapper::to_account_id(&H160::from([0xFF; 20]));
+	let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&origin, 10_000_000_000);
+	<Test as Config>::FeeInfo::deposit_txfee(
+		<<Test as Config>::Currency as Balanced<_>>::issue(10_000_000_000),
+	);
+	let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
+	crate::evm::eip7702::process_authorizations::<Test>(auths, &origin, &exec_config)
+		.expect("process_authorizations failed")
+}
 
 #[test]
 fn set_delegation_creates_indicator() {
@@ -153,7 +166,9 @@ fn valid_signature_is_verified_correctly() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth = signer.sign_authorization(chain_id, target, nonce);
 
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], chain_id);
+		let result = test_process_authorizations(&[auth]);
+		assert_eq!(result.existing_accounts, 1);
+		assert_eq!(result.new_accounts, 0);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target));
@@ -163,7 +178,6 @@ fn valid_signature_is_verified_correctly() {
 #[test]
 fn invalid_chain_id_rejects_authorization() {
 	ExtBuilder::default().build().execute_with(|| {
-		let correct_chain_id = U256::from(<Test as Config>::ChainId::get());
 		let wrong_chain_id = U256::from(999);
 		let target = H160::from([0x42; 20]);
 
@@ -178,7 +192,9 @@ fn invalid_chain_id_rejects_authorization() {
 		let auth = signer.sign_authorization(wrong_chain_id, target, nonce);
 
 		// Authorization with wrong chain_id should be skipped (not error)
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], correct_chain_id);
+		let result = test_process_authorizations(&[auth]);
+		assert_eq!(result.existing_accounts, 0);
+		assert_eq!(result.new_accounts, 0);
 
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
 	});
@@ -203,7 +219,9 @@ fn nonce_mismatch_rejects_authorization() {
 		let auth = signer.sign_authorization(chain_id, target, wrong_nonce);
 
 		// Authorization with wrong nonce should be skipped (not error)
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], chain_id);
+		let result = test_process_authorizations(&[auth]);
+		assert_eq!(result.existing_accounts, 0);
+		assert_eq!(result.new_accounts, 0);
 
 		assert!(!AccountInfo::<Test>::is_delegated(&signer.address));
 	});
@@ -232,7 +250,9 @@ fn multiple_authorizations_from_same_authority_first_wins() {
 		let auth2 = signer.sign_authorization(chain_id, target2, nonce);
 		let auth3 = signer.sign_authorization(chain_id, target3, nonce);
 
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth1, auth2, auth3], chain_id);
+		let result = test_process_authorizations(&[auth1, auth2, auth3]);
+		assert_eq!(result.existing_accounts, 1);
+		assert_eq!(result.new_accounts, 0);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		// First authorization wins since we process blindly
@@ -256,7 +276,9 @@ fn authorization_increments_nonce() {
 		let nonce_before = frame_system::Pallet::<Test>::account_nonce(&authority_id);
 		let auth = signer.sign_authorization(chain_id, target, U256::from(nonce_before));
 
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], chain_id);
+		let result = test_process_authorizations(&[auth]);
+		assert_eq!(result.existing_accounts, 1);
+		assert_eq!(result.new_accounts, 0);
 
 		let nonce_after = frame_system::Pallet::<Test>::account_nonce(&authority_id);
 		assert_eq!(nonce_after, nonce_before + 1);
@@ -266,7 +288,6 @@ fn authorization_increments_nonce() {
 #[test]
 fn chain_id_zero_accepts_any_chain() {
 	ExtBuilder::default().build().execute_with(|| {
-		let current_chain_id = U256::from(<Test as Config>::ChainId::get());
 		let target = H160::from([0x42; 20]);
 
 		let seed = H256::random();
@@ -279,7 +300,9 @@ fn chain_id_zero_accepts_any_chain() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth = signer.sign_authorization(U256::zero(), target, nonce);
 
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], current_chain_id);
+		let result = test_process_authorizations(&[auth]);
+		assert_eq!(result.existing_accounts, 1);
+		assert_eq!(result.new_accounts, 0);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target));
@@ -300,7 +323,9 @@ fn new_account_sets_delegation() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth = signer.sign_authorization(chain_id, target, nonce);
 
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], chain_id);
+		let result = test_process_authorizations(&[auth]);
+		assert_eq!(result.existing_accounts, 0);
+		assert_eq!(result.new_accounts, 1);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target));
@@ -323,13 +348,17 @@ fn clearing_delegation_with_zero_address() {
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth1 = signer.sign_authorization(chain_id, target, nonce);
 
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth1], chain_id);
+		let result1 = test_process_authorizations(&[auth1]);
+		assert_eq!(result1.existing_accounts, 1);
+		assert_eq!(result1.new_accounts, 0);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 
 		let new_nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 		let auth2 = signer.sign_authorization(chain_id, H160::zero(), new_nonce);
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth2], chain_id);
+		let result2 = test_process_authorizations(&[auth2]);
+		assert_eq!(result2.existing_accounts, 1);
+		assert_eq!(result2.new_accounts, 0);
 
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), None);
@@ -367,7 +396,9 @@ fn process_multiple_authorizations_from_different_signers() {
 		let auth2 = signer2.sign_authorization(chain_id, target, nonce2);
 		let auth3 = signer3.sign_authorization(chain_id, target, nonce3);
 
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth1, auth2, auth3], chain_id);
+		let result = test_process_authorizations(&[auth1, auth2, auth3]);
+		assert_eq!(result.existing_accounts, 2);
+		assert_eq!(result.new_accounts, 1);
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority1));
 		assert!(AccountInfo::<Test>::is_delegated(&authority2));

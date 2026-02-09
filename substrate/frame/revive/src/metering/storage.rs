@@ -409,12 +409,11 @@ where
 								self.total_deposit = self.total_deposit.saturating_sub(&amount);
 								last.state = ContractState::Terminated;
 							},
-							(ContractState::Terminated, ContractState::Terminated) => {
+							(ContractState::Terminated, ContractState::Terminated) =>
 								debug_assert!(
 									false,
 									"We never emit two terminates for the same contract."
-								)
-							},
+								),
 						}
 						continue;
 					}

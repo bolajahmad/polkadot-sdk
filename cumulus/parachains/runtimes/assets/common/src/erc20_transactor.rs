@@ -25,7 +25,7 @@ use pallet_revive::{
 		primitives::{Address, U256 as EU256},
 		sol_types::SolCall,
 	},
-	AddressMapper, ContractResult, ExecConfig, MomentOf, TransactionLimits, TransactionMeter,
+	AddressMapper, ContractResult, ExecConfig, MomentOf, TransactionLimits,
 };
 use sp_core::{Get, H160, H256, U256};
 use sp_runtime::Weight;
@@ -121,26 +121,15 @@ where
 		// We do this using the solidity ERC20 interface.
 		let data =
 			IERC20::transferCall { to: checking_address, value: EU256::from(amount) }.abi_encode();
-		let transaction_meter = match TransactionMeter::new(TransactionLimits::WeightAndDeposit {
-			weight_limit,
-			deposit_limit: StorageDepositLimit::get(),
-		}) {
-			Ok(transaction_meter) => transaction_meter,
-			Err(error) => {
-				tracing::debug!(
-					target: "xcm::transactor::erc20::withdraw",
-					?error,
-					"Failed to create transaction meter"
-				);
-				return Err(XcmError::FailedToTransactAsset("ERC20 contract execution errored"));
-			},
-		};
 		let ContractResult { result, weight_consumed, storage_deposit, .. } =
 			pallet_revive::Pallet::<T>::bare_call(
 				OriginFor::<T>::signed(who.clone()),
 				asset_id,
 				U256::zero(),
-				transaction_meter,
+				TransactionLimits::WeightAndDeposit {
+					weight_limit,
+					deposit_limit: StorageDepositLimit::get(),
+				},
 				data,
 				ExecConfig::new_substrate_tx(),
 			);
@@ -193,26 +182,15 @@ where
 		// We do this using the solidity ERC20 interface.
 		let data = IERC20::transferCall { to: address, value: EU256::from(amount) }.abi_encode();
 		let weight_limit = WeightLimit::get();
-		let transaction_meter = match TransactionMeter::new(TransactionLimits::WeightAndDeposit {
-			weight_limit,
-			deposit_limit: StorageDepositLimit::get(),
-		}) {
-			Ok(transaction_meter) => transaction_meter,
-			Err(error) => {
-				tracing::debug!(
-					target: "xcm::transactor::erc20::deposit",
-					?error,
-					"Failed to create transaction meter"
-				);
-				return Err(XcmError::FailedToTransactAsset("ERC20 contract execution errored"));
-			},
-		};
 		let ContractResult { result, weight_consumed, storage_deposit, .. } =
 			pallet_revive::Pallet::<T>::bare_call(
 				OriginFor::<T>::signed(TransfersCheckingAccount::get()),
 				asset_id,
 				U256::zero(),
-				transaction_meter,
+				TransactionLimits::WeightAndDeposit {
+					weight_limit,
+					deposit_limit: StorageDepositLimit::get(),
+				},
 				data,
 				ExecConfig::new_substrate_tx(),
 			);

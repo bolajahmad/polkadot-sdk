@@ -30,7 +30,7 @@ use alloc::{boxed::Box, vec::Vec};
 use codec::DecodeLimit;
 use frame_support::MAX_EXTRINSIC_DEPTH;
 use sp_core::{Get, U256};
-use sp_runtime::{transaction_validity::InvalidTransaction, SaturatedConversion};
+use sp_runtime::{transaction_validity::InvalidTransaction, SaturatedConversion, Saturating};
 
 /// Result of decoding an eth transaction into a dispatchable call.
 pub struct CallInfo<T: Config> {
@@ -257,9 +257,24 @@ impl GenericTransaction {
 
 		// the leftover we make available to the deposit collection system
 		let storage_deposit = eth_fee.checked_sub(tx_fee.into()).ok_or_else(|| {
-		log::error!(target: LOG_TARGET, "The eth_fee={eth_fee:?} is smaller than the tx_fee={tx_fee:?}. This is a bug.");
-		InvalidTransaction::Payment
-	})?.saturated_into();
+			log::error!(target: LOG_TARGET, "The eth_fee={eth_fee:?} is smaller than the tx_fee={tx_fee:?}. This is a bug.");
+			InvalidTransaction::Payment
+		})?.saturated_into();
+
+		// EIP-7702: Ensure enough storage deposit to cover ED for new accounts
+		// from authorizations (worst case: all authorizations create new accounts).
+		if !self.authorization_list.is_empty() {
+			let ed = <Pallet<T>>::min_balance();
+			let auth_ed_cost = ed.saturating_mul(self.authorization_list.len().saturated_into());
+			if storage_deposit < auth_ed_cost {
+				log::debug!(
+					target: LOG_TARGET,
+					"Not enough gas to cover ED for authorization accounts. \
+					storage_deposit={storage_deposit:?} required={auth_ed_cost:?}"
+				);
+				return Err(InvalidTransaction::Payment);
+			}
+		}
 
 		Ok(CallInfo {
 			call,

@@ -293,11 +293,6 @@ impl<T: Config, S: State> ResourceMeter<T, S> {
 		self.weight.adjust_weight(charged_amount, token);
 	}
 
-	/// Refund a weight token without a prior charge.
-	pub fn refund_weight<Tok: Token<T>>(&mut self, token: Tok) {
-		self.weight.refund_weight(token);
-	}
-
 	/// Synchronize meter state with PolkaVM executor's fuel consumption.
 	///
 	/// Maps the VM's internal fuel accounting to weight consumption:

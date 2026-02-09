@@ -192,15 +192,11 @@ impl<T: Config> AccountInfo<T> {
 	}
 
 	/// Loads the ContractInfo for a given address.
-	///
-	/// Returns the account's own ContractInfo for both contracts and delegated accounts.
-	/// Returns None for EOAs.
 	pub fn load_contract(address: &H160) -> Option<ContractInfo<T>> {
 		<AccountInfoOf<T>>::get(address)?.account_type.contract_info()
 	}
 
 	/// Insert a contract, existing dust if any will be unchanged.
-	/// Preserves Delegated status if the account is already delegated.
 	pub fn insert_contract(address: &H160, contract: ContractInfo<T>) {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {

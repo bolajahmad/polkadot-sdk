@@ -55,7 +55,6 @@ use frame_support::{
 	weights::{Weight, WeightMeter},
 };
 use frame_system::RawOrigin;
-use k256::ecdsa::SigningKey;
 use pallet_revive_uapi::{
 	pack_hi_lo,
 	precompiles::{storage::IStorage, system::ISystem},
@@ -68,6 +67,7 @@ use sp_consensus_babe::{
 	BABE_ENGINE_ID,
 };
 use sp_consensus_slots::Slot;
+use sp_core::{ecdsa::Pair as EcdsaPair, Pair as _};
 use sp_runtime::{generic::DigestItem, traits::Zero};
 
 /// How many runs we do per API benchmark.
@@ -133,29 +133,38 @@ mod benchmarks {
 	#[benchmark(pov_mode = Measured)]
 	fn process_new_account_authorization(n: Linear<0, 255>) -> Result<(), BenchmarkError> {
 		use crate::evm::eip7702;
-		use k256::ecdsa::SigningKey;
 		use sp_core::keccak_256;
 
 		let chain_id = U256::from(T::ChainId::get());
 		let target = H160::from_low_u64_be(100);
+		let caller: T::AccountId = whitelisted_caller();
+		T::Currency::set_balance(&caller, caller_funding::<T>());
+		<T as Config>::FeeInfo::deposit_txfee(
+			<T as Config>::Currency::issue(caller_funding::<T>()),
+		);
+		let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
 
 		let mut authorization_list = vec![];
 		for i in 0..n {
 			let key_material = [i as u8; 32];
-			let signing_key =
-				SigningKey::from_slice(&keccak_256(&key_material)).expect("valid key");
-			let signed_auth =
-				eip7702::sign_authorization(&signing_key, chain_id, target, U256::zero());
+			let pair =
+				EcdsaPair::from_seed_slice(&keccak_256(&key_material)).expect("valid key; qed");
+			let signed_auth = eip7702::sign_authorization(&pair, chain_id, target, U256::zero());
 			authorization_list.push(signed_auth);
 		}
 
-		let new_account_count;
+		let auth_result;
 		#[block]
 		{
-			new_account_count = eip7702::process_authorizations::<T>(&authorization_list, chain_id);
+			auth_result = eip7702::process_authorizations::<T>(
+				&authorization_list,
+				&caller,
+				&exec_config,
+			)
+			.expect("should succeed");
 		}
 
-		assert_eq!(new_account_count, n as u32, "All authorizations should be new");
+		assert_eq!(auth_result.new_accounts, n as u32, "All authorizations should be new");
 		Ok(())
 	}
 
@@ -165,34 +174,40 @@ mod benchmarks {
 	#[benchmark(pov_mode = Measured)]
 	fn process_existing_account_authorization(n: Linear<0, 255>) -> Result<(), BenchmarkError> {
 		use crate::evm::eip7702;
-		use k256::ecdsa::SigningKey;
 		use sp_core::keccak_256;
 
 		let chain_id = U256::from(T::ChainId::get());
 		let target = H160::from_low_u64_be(100);
+		let caller: T::AccountId = whitelisted_caller();
+		T::Currency::set_balance(&caller, caller_funding::<T>());
+		let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
 
 		let mut authorization_list = vec![];
 		for i in 0..n {
 			let key_material = [i as u8; 32];
-			let signing_key =
-				SigningKey::from_slice(&keccak_256(&key_material)).expect("valid key");
+			let pair =
+				EcdsaPair::from_seed_slice(&keccak_256(&key_material)).expect("valid key; qed");
 
-			let eth_address = eip7702::eth_address(&signing_key);
+			let eth_address = eip7702::eth_address(&pair);
 			let account_id = T::AddressMapper::to_account_id(&eth_address);
 			T::Currency::set_balance(&account_id, Pallet::<T>::min_balance());
 
-			let signed_auth =
-				eip7702::sign_authorization(&signing_key, chain_id, target, U256::zero());
+			let signed_auth = eip7702::sign_authorization(&pair, chain_id, target, U256::zero());
 			authorization_list.push(signed_auth);
 		}
 
-		let new_account_count;
+		let auth_result;
 		#[block]
 		{
-			new_account_count = eip7702::process_authorizations::<T>(&authorization_list, chain_id);
+			auth_result = eip7702::process_authorizations::<T>(
+				&authorization_list,
+				&caller,
+				&exec_config,
+			)
+			.expect("should succeed");
 		}
 
-		assert_eq!(new_account_count, 0u32);
+		assert_eq!(auth_result.new_accounts, 0u32);
 		Ok(())
 	}
 
@@ -2739,14 +2754,14 @@ mod benchmarks {
 	}
 
 	/// Helper function to create a test signer for finalize_block benchmark
-	fn create_test_signer<T: Config>() -> (T::AccountId, SigningKey, H160) {
+	fn create_test_signer<T: Config>() -> (T::AccountId, EcdsaPair, H160) {
 		use hex_literal::hex;
 		// dev::alith()
 		let signer_account_id = hex!("f24FF3a9CF04c71Dbc94D0b566f7A27B94566cac");
 		let signer_priv_key =
 			hex!("5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133");
 
-		let signer_key = SigningKey::from_bytes(&signer_priv_key.into()).expect("valid key");
+		let signer_key = EcdsaPair::from_seed_slice(&signer_priv_key).expect("valid key; qed");
 
 		let signer_address = H160::from_slice(&signer_account_id);
 		let signer_caller = T::AddressMapper::to_fallback_account_id(&signer_address);
@@ -2756,7 +2771,7 @@ mod benchmarks {
 
 	/// Helper function to create and sign a transaction for finalize_block benchmark
 	fn create_signed_transaction<T: Config>(
-		signer_key: &SigningKey,
+		signer_key: &EcdsaPair,
 		target_address: H160,
 		value: U256,
 		input_data: Vec<u8>,
@@ -2771,21 +2786,15 @@ mod benchmarks {
 		.into();
 
 		let hashed_payload = sp_io::hashing::keccak_256(&unsigned_tx.unsigned_payload());
-		let (signature, recovery_id) =
-			signer_key.sign_prehash_recoverable(&hashed_payload).expect("signing success");
-
-		let mut sig_bytes = [0u8; 65];
-		sig_bytes[..64].copy_from_slice(&signature.to_bytes());
-		sig_bytes[64] = recovery_id.to_byte();
-
-		let signed_tx = unsigned_tx.with_signature(sig_bytes);
+		let sig = signer_key.sign_prehashed(&hashed_payload);
+		let signed_tx = unsigned_tx.with_signature(sig.0);
 
 		signed_tx.signed_payload()
 	}
 
 	/// Helper function to generate common finalize_block benchmark setup
 	fn setup_finalize_block_benchmark<T>(
-	) -> Result<(Contract<T>, BalanceOf<T>, U256, SigningKey, BlockNumberFor<T>), BenchmarkError>
+	) -> Result<(Contract<T>, BalanceOf<T>, U256, EcdsaPair, BlockNumberFor<T>), BenchmarkError>
 	where
 		BalanceOf<T>: Into<U256> + TryFrom<U256>,
 		T: Config,

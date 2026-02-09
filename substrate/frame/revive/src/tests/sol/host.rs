@@ -235,15 +235,12 @@ fn extcodehash_works(fixture_type: FixtureType) {
 			expected: H256,
 		}
 
-		let delegated_eoa = create_delegated_eoa(&target_addr);
-
-		// delegated_eoa -> target_addr (contract)
-		// DJANGO -> delegated_eoa (another delegated account)
 		<Test as Config>::Currency::set_balance(&DJANGO, 100_000_000);
+		<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
+
+		let delegated_eoa = create_delegated_eoa(&target_addr);
 		let chained_delegated_eoa = create_delegated_eoa(&target_addr);
 		assert_ok!(AccountInfo::<Test>::set_delegation(&DJANGO_ADDR, chained_delegated_eoa,));
-
-		<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
 
 		let cases = vec![
 			TestCase { name: "regular contract", addr: host_addr, expected: host_code_hash },
@@ -264,7 +261,6 @@ fn extcodehash_works(fixture_type: FixtureType) {
 	});
 }
 
-/// Test Pallet::code() behavior for different account types
 #[test]
 fn pallet_code_works() {
 	ExtBuilder::default().build().execute_with(|| {

@@ -17,11 +17,9 @@
 
 use super::{deposit_limit, ETH_GAS_LIMIT, WEIGHT_LIMIT};
 use crate::{
-	address::AddressMapper,
-	evm::TransactionSigned,
-	metering::{TransactionLimits, TransactionMeter},
-	AccountIdOf, BalanceOf, Code, Config, ContractResult, ExecConfig, ExecReturnValue,
-	InstantiateReturnValue, OriginFor, Pallet, Weight, U256,
+	address::AddressMapper, evm::TransactionSigned, metering::TransactionLimits, AccountIdOf,
+	BalanceOf, Code, Config, ContractResult, ExecConfig, ExecReturnValue, InstantiateReturnValue,
+	OriginFor, Pallet, Weight, U256,
 };
 use alloc::{vec, vec::Vec};
 use frame_support::pallet_prelude::DispatchResultWithPostInfo;
@@ -216,7 +214,7 @@ builder!(
 		origin: OriginFor<T>,
 		dest: H160,
 		evm_value: U256,
-		transaction_meter: TransactionMeter<T>,
+		transaction_limits: TransactionLimits<T>,
 		data: Vec<u8>,
 		exec_config: ExecConfig<T>,
 	) -> ContractResult<ExecReturnValue, BalanceOf<T>>;
@@ -238,21 +236,13 @@ builder!(
 			origin,
 			dest,
 			evm_value: Default::default(),
-			transaction_meter: TransactionMeter::new(TransactionLimits::WeightAndDeposit {
+			transaction_limits: TransactionLimits::WeightAndDeposit {
 				weight_limit: WEIGHT_LIMIT,
 				deposit_limit: deposit_limit::<T>()
-			})
-			.expect("Default meter configuration is valid"),
+			},
 			data: vec![],
 			exec_config: ExecConfig::new_substrate_tx(),
 		}
-	}
-
-	/// Set the call's transaction limits and create a new transaction meter.
-	pub fn transaction_limits(mut self, limits: TransactionLimits<T>) -> Self {
-		self.transaction_meter =
-			TransactionMeter::new(limits).expect("Transaction limits should create a meter");
-		self
 	}
 );
 

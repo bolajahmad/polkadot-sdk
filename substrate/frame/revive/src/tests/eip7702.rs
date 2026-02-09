@@ -26,7 +26,7 @@ use crate::{
 };
 use frame_support::{
 	assert_ok,
-	traits::fungible::{Balanced, Mutate},
+	traits::fungible::{Balanced, Inspect, Mutate},
 	weights::Weight,
 };
 use sp_core::{H160, H256, U256};
@@ -330,6 +330,8 @@ fn new_account_sets_delegation() {
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target));
+		let balance = <<Test as Config>::Currency as Inspect<_>>::balance(&authority_id);
+		assert!(balance >= Pallet::<Test>::min_balance());
 	});
 }
 

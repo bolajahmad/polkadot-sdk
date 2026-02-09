@@ -558,7 +558,8 @@ where
 				let encoded = chunk.encode();
 				let bytes_to_send = encoded.len() as u64;
 
-				let _sent_latency_timer = self.metrics.as_ref().map(|m| m.sent_latency_seconds.start_timer());
+				let _sent_latency_timer =
+					self.metrics.as_ref().map(|m| m.sent_latency_seconds.start_timer());
 				let send_result = timeout(
 					SEND_TIMEOUT,
 					self.notification_service.send_async_notification(peer, encoded),

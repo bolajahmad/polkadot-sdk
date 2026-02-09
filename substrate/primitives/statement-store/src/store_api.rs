@@ -142,6 +142,7 @@ impl RejectionReason {
 			RejectionReason::ChannelPriorityTooLow { .. } => "channel_priority_too_low",
 			RejectionReason::AccountFull { .. } => "account_full",
 			RejectionReason::StoreFull => "store_full",
+			RejectionReason::NoAllowance => "no_allowance",
 		}
 	}
 }

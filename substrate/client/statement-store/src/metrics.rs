@@ -49,12 +49,22 @@ impl MetricsLink {
 		self.0.as_ref().as_ref().map(|m| m.submit_duration_seconds.start_timer())
 	}
 
-	pub fn start_validation_timer(&self) -> Option<HistogramTimer> {
-		self.0.as_ref().as_ref().map(|m| m.validation_duration_seconds.start_timer())
+	pub fn start_verify_signature_timer(&self) -> Option<HistogramTimer> {
+		self.0
+			.as_ref()
+			.as_ref()
+			.map(|m| m.verify_signature_duration_seconds.start_timer())
 	}
 
 	pub fn start_db_write_timer(&self) -> Option<HistogramTimer> {
 		self.0.as_ref().as_ref().map(|m| m.db_write_duration_seconds.start_timer())
+	}
+
+	pub fn start_check_expiration_timer(&self) -> Option<HistogramTimer> {
+		self.0
+			.as_ref()
+			.as_ref()
+			.map(|m| m.check_expiration_duration_seconds.start_timer())
 	}
 }
 
@@ -71,8 +81,11 @@ pub struct Metrics {
 	pub capacity_bytes: Gauge<U64>,
 	pub rejections: CounterVec<U64>,
 	pub submit_duration_seconds: Histogram,
-	pub validation_duration_seconds: Histogram,
+	pub verify_signature_duration_seconds: Histogram,
 	pub db_write_duration_seconds: Histogram,
+	pub check_expiration_duration_seconds: Histogram,
+	pub statements_expired_total: Counter<U64>,
+	pub expiration_accounts_checked: Histogram,
 }
 
 impl Metrics {
@@ -164,11 +177,11 @@ impl Metrics {
 				)?,
 				registry,
 			)?,
-			validation_duration_seconds: register(
+			verify_signature_duration_seconds: register(
 				Histogram::with_opts(
 					HistogramOpts::new(
-						"substrate_sub_statement_store_validation_duration_seconds",
-						"Time to validate a statement via runtime API",
+						"substrate_sub_statement_store_verify_signature_duration_seconds",
+						"Time to verify statement signature",
 					)
 					.buckets(vec![
 						0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0,
@@ -185,6 +198,35 @@ impl Metrics {
 					.buckets(vec![
 						0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0,
 					]),
+				)?,
+				registry,
+			)?,
+			check_expiration_duration_seconds: register(
+				Histogram::with_opts(
+					HistogramOpts::new(
+						"substrate_sub_statement_store_check_expiration_duration_seconds",
+						"Time to check and process statement expiration",
+					)
+					.buckets(vec![
+						0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0,
+					]),
+				)?,
+				registry,
+			)?,
+			statements_expired_total: register(
+				Counter::new(
+					"substrate_sub_statement_store_statements_expired_total",
+					"Total number of statements that expired and were removed",
+				)?,
+				registry,
+			)?,
+			expiration_accounts_checked: register(
+				Histogram::with_opts(
+					HistogramOpts::new(
+						"substrate_sub_statement_store_expiration_accounts_checked",
+						"Number of accounts checked per expiration run",
+					)
+					.buckets(vec![1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0]),
 				)?,
 				registry,
 			)?,

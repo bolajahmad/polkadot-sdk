@@ -806,6 +806,7 @@ impl Store {
 	// Statements are considered expired when their priority (which encodes the expiration
 	// timestamp in the upper 32 bits) is less than the current timestamp.
 	fn check_expiration(&self) {
+		let _timer = self.metrics.start_check_expiration_timer();
 		let current_time = self.timestamp();
 
 		let (needs_expiry, num_accounts_checked) = {
@@ -849,6 +850,12 @@ impl Store {
 			(needs_expiry, num_accounts_checked)
 		};
 
+		self.metrics.report(|metrics| {
+			metrics.expiration_accounts_checked.observe(num_accounts_checked as f64);
+		});
+
+		let mut successfully_expired = 0;
+
 		for hash in needs_expiry {
 			if let Err(e) = self.remove(&hash) {
 				log::debug!(
@@ -858,6 +865,7 @@ impl Store {
 					e
 				);
 			} else {
+				successfully_expired += 1;
 				log::trace!(
 					target: LOG_TARGET,
 					"Marked statement {:?} as expired",
@@ -865,6 +873,13 @@ impl Store {
 				);
 			}
 		}
+
+		if successfully_expired > 0 {
+			self.metrics.report(|metrics| {
+				metrics.statements_expired_total.inc_by(successfully_expired);
+			});
+		}
+
 		let mut index = self.index.write();
 		let new_len = index
 			.accounts_to_check_for_expiry_stmts
@@ -1178,7 +1193,7 @@ impl StatementStore for Store {
 				"Statement is already expired: {:?}",
 				HexDisplay::from(&hash),
 			);
-            self.metrics.report(|metrics| metrics.validations_invalid.inc());
+			self.metrics.report(|metrics| metrics.validations_invalid.inc());
 			return SubmitResult::Invalid(InvalidReason::AlreadyExpired);
 		}
 		let encoded_size = statement.encoded_size();
@@ -1221,9 +1236,9 @@ impl StatementStore for Store {
 			return SubmitResult::Invalid(InvalidReason::NoProof);
 		};
 
-        let _histogram_validation_start_timer = self.metrics.start_validation_timer();
+		let _histogram_verify_sig_timer = self.metrics.start_verify_signature_timer();
 
-        match statement.verify_signature() {
+		match statement.verify_signature() {
 			SignatureVerificationResult::Valid(_) => {},
 			SignatureVerificationResult::Invalid => {
 				log::debug!(
@@ -1253,7 +1268,7 @@ impl StatementStore for Store {
 			},
 		};
 
-        drop(_histogram_validation_start_timer);
+		drop(_histogram_verify_sig_timer);
 
 		let validation = match (self.read_allowance_fn)(
 			&account_id,
@@ -1312,7 +1327,7 @@ impl StatementStore for Store {
 				);
 				return SubmitResult::InternalError(Error::Db(e.to_string()));
 			}
-            drop(_histogram_db_write_start_timer);
+			drop(_histogram_db_write_start_timer);
 			self.subscription_manager.notify(statement);
 		} // Release index lock
 		self.metrics.report(|metrics| metrics.submitted_statements.inc());

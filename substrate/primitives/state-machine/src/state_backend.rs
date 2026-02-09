@@ -63,6 +63,29 @@ where
 	H::Out: Codec,
 	C: TrieCacheProvider<H> + Send + Sync,
 {
+	/// Create a new StateBackend from another one, adding a ProofRecorder.
+	pub fn new_with_recorder(backend: &StateBackend<S, H, C>) -> StateBackend<&S, H, &C> {
+		match &backend.inner {
+			InnerStateBackend::Trie(trie_backend) => {
+				let recorder_backend = TrieBackendBuilder::wrap(trie_backend)
+					.with_recorder(Default::default())
+					.build();
+				StateBackend { inner: InnerStateBackend::Trie(recorder_backend) }
+			},
+			InnerStateBackend::Nomt { db, maybe_overlays, .. } => {
+				let nomt_rwlock = ArcRwLockReadGuard::rwlock(db);
+				let recorder = ProofRecorder::<H>::new(BackendType::Nomt);
+
+				let nomt_backend = StateBackend::<&S, H, &C>::new_nomt_backend(
+					RwLock::read_arc(nomt_rwlock),
+					maybe_overlays.clone(),
+				);
+				nomt_backend.inject_nomt_recorder(recorder.as_nomt_recorder());
+				nomt_backend
+			},
+		}
+	}
+
 	/// Create a state backend builder.
 	pub fn new_trie_with_cache(storage: S, root: H::Out, cache: C) -> Self {
 		Self::Trie { storage, root, recorder: None, cache: Some(cache) }
@@ -204,30 +227,14 @@ where
 		}
 	}
 
-	// TODO: update to new 'inject' pattern.
-	// NOTE: this is only used by super::prove_read_on_backend where
-	// no modifications are expected, just reads.
-	// pub fn extract_proof(self) -> Option<StorageProof> {
-	// 	match self.inner {
-	// 		InnerStateBackend::Trie(trie_backend) =>
-	// 			trie_backend.extract_proof().map(|trie_proof| StorageProof::Trie(trie_proof)),
-	// 		InnerStateBackend::Nomt { .. } => {
-	// 			// NOTE: This code should be refectored, `self.storage_root` needs to fill the
-	// 			// read_recorder and thus is cannot be part of the above pattern matching
-	// 			// but must be extracted later.
-	// 			let (_new_root, _backend_transaction) =
-	// 				self.storage_root(core::iter::empty(), StateVersion::V1);
-	// 			// PANIC: The state has been alredy checked to be InnerStateBackend
-	// 			let InnerStateBackend::Nomt { read_recorder, .. } = self.inner else {
-	// 				unreachable!();
-	// 			};
-	// 			read_recorder
-	// 				.into_inner()
-	// 				.map(|recorder| recorder.drain_storage_proof())
-	// 				.map(|nomt_proof| StorageProof::Nomt(nomt_proof))
-	// 		},
-	// 	}
-	// }
+	pub fn get_recorder(self) -> Option<ProofRecorder<H>> {
+		match self.inner {
+			InnerStateBackend::Trie(trie_backend) =>
+				trie_backend.extract_recorder().map(ProofRecorder::Trie),
+			InnerStateBackend::Nomt { read_recorder, .. } =>
+				read_recorder.into_inner().map(ProofRecorder::Nomt),
+		}
+	}
 
 	fn trie(&self) -> Option<&TrieBackend<S, H, C>> {
 		match &self.inner {

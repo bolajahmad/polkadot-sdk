@@ -75,6 +75,26 @@ pub trait TrieCacheProvider<H: Hasher> {
 }
 
 #[cfg(feature = "std")]
+impl<'b, H: Hasher, T: TrieCacheProvider<H>> TrieCacheProvider<H> for &'b T {
+	type Cache<'a>
+		= <T as TrieCacheProvider<H>>::Cache<'a>
+	where
+		Self: 'a;
+
+	fn as_trie_db_cache(&self, storage_root: H::Out) -> Self::Cache<'_> {
+		(*self).as_trie_db_cache(storage_root)
+	}
+
+	fn as_trie_db_mut_cache(&self) -> Self::Cache<'_> {
+		(*self).as_trie_db_mut_cache()
+	}
+
+	fn merge<'a>(&'a self, other: Self::Cache<'a>, new_root: H::Out) {
+		(*self).merge(other, new_root)
+	}
+}
+
+#[cfg(feature = "std")]
 impl<H: Hasher> TrieCacheProvider<H> for LocalTrieCache<H> {
 	type Cache<'a>
 		= TrieCache<'a, H>
@@ -87,26 +107,6 @@ impl<H: Hasher> TrieCacheProvider<H> for LocalTrieCache<H> {
 
 	fn as_trie_db_mut_cache(&self) -> Self::Cache<'_> {
 		self.as_trie_db_mut_cache()
-	}
-
-	fn merge<'a>(&'a self, other: Self::Cache<'a>, new_root: H::Out) {
-		other.merge_into(self, new_root)
-	}
-}
-
-#[cfg(feature = "std")]
-impl<H: Hasher> TrieCacheProvider<H> for &LocalTrieCache<H> {
-	type Cache<'a>
-		= TrieCache<'a, H>
-	where
-		Self: 'a;
-
-	fn as_trie_db_cache(&self, storage_root: H::Out) -> Self::Cache<'_> {
-		(*self).as_trie_db_cache(storage_root)
-	}
-
-	fn as_trie_db_mut_cache(&self) -> Self::Cache<'_> {
-		(*self).as_trie_db_mut_cache()
 	}
 
 	fn merge<'a>(&'a self, other: Self::Cache<'a>, new_root: H::Out) {
@@ -401,6 +401,11 @@ where
 	/// This only returns `Some` when there was a recorder set.
 	pub fn extract_proof(mut self) -> Option<StorageProof> {
 		self.essence.recorder.take().and_then(|r| r.drain_storage_proof())
+	}
+
+	/// Extrate the [`ProofRecorder`]
+	pub fn extract_recorder(mut self) -> Option<R> {
+		self.essence.recorder.take()
 	}
 }
 

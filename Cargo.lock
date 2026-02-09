@@ -11132,6 +11132,7 @@ dependencies = [
 [[package]]
 name = "nomt"
 version = "1.0.0-preview"
+source = "git+https://github.com/thrumdev/enomt#039f7537f056a7a89ec91a9f8ef7f0f5a2ade357"
 dependencies = [
  "ahash",
  "anyhow",
@@ -11159,6 +11160,7 @@ dependencies = [
 [[package]]
 name = "nomt-core"
 version = "1.0.0-preview"
+source = "git+https://github.com/thrumdev/enomt#039f7537f056a7a89ec91a9f8ef7f0f5a2ade357"
 dependencies = [
  "arrayvec 0.7.6",
  "bitvec",
@@ -21038,6 +21040,7 @@ name = "sc-rpc-api"
 version = "0.33.0"
 dependencies = [
  "jsonrpsee",
+ "nomt-core",
  "parity-scale-codec",
  "sc-chain-spec",
  "sc-mixnet",

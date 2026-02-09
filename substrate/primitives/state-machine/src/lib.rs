@@ -843,19 +843,18 @@ mod execution {
 	{
 		let state_backend = backend.as_state_backend();
 
-		// TODO: update to new 'inject' pattern.
-		// let proving_backend = StateBackendBuilder::wrap_with_recorder(&state_backend);
+		let proving_backend = StateBackendBuilder::new_with_recorder(&state_backend);
 
-		// for key in keys.into_iter() {
-		// 	proving_backend
-		// 		.storage(key.as_ref())
-		// 		.map_err(|e| Box::new(e) as Box<dyn Error>)?;
-		// }
+		for key in keys.into_iter() {
+			proving_backend
+				.storage(key.as_ref())
+				.map_err(|e| Box::new(e) as Box<dyn Error>)?;
+		}
 
-		// Ok(proving_backend
-		// 	.extract_proof()
-		// 	.expect("A recorder was set and thus, a storage proof can be extracted; qed"))
-		todo!()
+		Ok(proving_backend
+			.get_recorder()
+			.expect("A recorder was set and thus, a storage proof can be extracted; qed")
+			.drain_storage_proof())
 	}
 
 	/// Generate storage read proof on pre-created trie backend.

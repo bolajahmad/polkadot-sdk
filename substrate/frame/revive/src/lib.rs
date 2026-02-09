@@ -1623,7 +1623,10 @@ impl<T: Config> Pallet<T> {
 		let exec_config =
 			ExecConfig::new_eth_tx(effective_gas_price, encoded_len, base_info.total_weight());
 		let auth_result = if !authorization_list.is_empty() {
-			evm::eip7702::process_authorizations::<T>(&authorization_list, &signer, &exec_config)?
+			evm::eip7702::process_authorizations::<T>(&authorization_list, &signer, &exec_config)
+				.inspect_err(|e| {
+					log::error!(target: LOG_TARGET, "process_authorizations failed: {e:?}. This is a bug: the transaction should have failed validation.");
+				})?
 		} else {
 			Default::default()
 		};

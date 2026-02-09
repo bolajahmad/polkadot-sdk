@@ -202,9 +202,9 @@ fn extcodesize_works(fixture_type: FixtureType) {
 			TestCase { name: "non-existent", addr: H160::from_low_u64_be(0xdead), expected: 0 },
 		];
 
-		for tc in cases {
-			let result = call_extcodesize(&host_addr, &tc.addr);
-			assert_eq!(result, tc.expected, "EXTCODESIZE for {} failed", tc.name);
+		for TestCase { name, addr, expected } in cases {
+			let result = call_extcodesize(&host_addr, &addr);
+			assert_eq!(result, expected, "EXTCODESIZE for {name} failed");
 		}
 	});
 }
@@ -254,9 +254,9 @@ fn extcodehash_works(fixture_type: FixtureType) {
 			},
 		];
 
-		for tc in cases {
-			let result = call_extcodehash(&host_addr, &tc.addr);
-			assert_eq!(result, tc.expected, "EXTCODEHASH for {} failed", tc.name);
+		for TestCase { name, addr, expected } in cases {
+			let result = call_extcodehash(&host_addr, &addr);
+			assert_eq!(result, expected, "EXTCODEHASH for {name} failed");
 		}
 	});
 }

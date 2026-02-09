@@ -2146,6 +2146,7 @@ impl<T: Config> StakingInterface for Pallet<T> {
 		}
 
 		fn set_current_era(era: EraIndex) {
+			ActiveEra::<T>::put(ActiveEraInfo { index: era, start: None });
 			CurrentEra::<T>::put(era);
 		}
 

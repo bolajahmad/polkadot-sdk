@@ -1743,7 +1743,9 @@ impl<T: Config> StakingInterface for Pallet<T> {
 		}
 
 		fn set_current_era(era: EraIndex) {
-			CurrentEra::<T>::put(era);
+			ActiveEra::<T>::put(ActiveEraInfo { index: era, start: None });
+			// Simulate prod behaviour where current era is always ahead of active era by 1.
+			CurrentEra::<T>::put(era.saturating_add(1));
 		}
 
 		fn max_exposure_page_size() -> Page {

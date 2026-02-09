@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770418496460,
+  "lastUpdate": 1770642201229,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "tsvetomir@parity.io",
-            "name": "Tsvetomir Dimitrov",
-            "username": "tdimitrov"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "6e3f91210275d8dc1ef98e1911cda870573d31f4",
-          "message": "Cleanup and improvements for `ControlledValidatorIndices` (#8896)\n\nImprovements for `ControlledValidatorIndices` from\nhttps://github.com/paritytech/polkadot-sdk/pull/8837:\n      - remove unneeded dependency\n- more readable implementations for `get` and\n`find_controlled_validator_indices`",
-          "timestamp": "2025-07-02T09:01:41Z",
-          "tree_id": "2e2ecc850e21e724983c6838b3f6ea2ca55be082",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/6e3f91210275d8dc1ef98e1911cda870573d31f4"
-        },
-        "date": 1751450798245,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.008854421680000092,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022787835886666667,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15802248858666668,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013314871193333334,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-distribution",
             "value": 0.006919665699999999,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "yrong1997@gmail.com",
+            "name": "Ron",
+            "username": "yrong"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "51c34ff0b984df85d44acd1837889c7a1ed80cf8",
+          "message": "Snowbridge: Describe the token location with the length field included to avoid collisions (#10771)\n\n### Context\n\nFor `GeneralKey`, two different XCM junctions that differ only in length\ncan produce the same description bytes, and therefore the same TokenId.\n\nWe do have several PNAs registered that could be affected—for example,\nBNC from the Bifrost team and ACA from the Acala team—where the tokens\nare represented using GeneralKey. However, these tokens are not\ncurrently in use; there have been no transfers and no tokens minted yet.\n\nAs a result, I believe simply re-registering these tokens should be\nsufficient, without requiring a runtime storage migration.\n\n---------\n\nCo-authored-by: Clara van Staden <claravanstaden64@gmail.com>\nCo-authored-by: Branislav Kontur <bkontur@gmail.com>",
+          "timestamp": "2026-02-09T11:53:46Z",
+          "tree_id": "5bb59a5e179698ca9158dd6683d97f44e60ae8d8",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/51c34ff0b984df85d44acd1837889c7a1ed80cf8"
+        },
+        "date": 1770642176670,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.02277777461999999,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14461200624,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.006968178433333332,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009525709146666641,
             "unit": "seconds"
           }
         ]

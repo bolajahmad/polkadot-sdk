@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770418461822,
+  "lastUpdate": 1770642167742,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "178801527+raymondkfcheung@users.noreply.github.com",
-            "name": "Raymond Cheung",
-            "username": "raymondkfcheung"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "b7a48fcfdcc38c4ac2799275d02991759ab18ab9",
-          "message": "Align parameters for `EventEmitter::emit_sent_event` (#9057)\n\nCorrected markdown and indentation for the `emit_sent_event` function\nparameters in the `EventEmitter` trait documentation for better\nreadability.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-02T10:06:47Z",
-          "tree_id": "f96377f6f5877c2360da59fe5e3694f7324c55ed",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/b7a48fcfdcc38c4ac2799275d02991759ab18ab9"
-        },
-        "date": 1751455064530,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.258390424466665,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19498879020000004,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12077026380000003,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "yrong1997@gmail.com",
+            "name": "Ron",
+            "username": "yrong"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "51c34ff0b984df85d44acd1837889c7a1ed80cf8",
+          "message": "Snowbridge: Describe the token location with the length field included to avoid collisions (#10771)\n\n### Context\n\nFor `GeneralKey`, two different XCM junctions that differ only in length\ncan produce the same description bytes, and therefore the same TokenId.\n\nWe do have several PNAs registered that could be affected—for example,\nBNC from the Bifrost team and ACA from the Acala team—where the tokens\nare represented using GeneralKey. However, these tokens are not\ncurrently in use; there have been no transfers and no tokens minted yet.\n\nAs a result, I believe simply re-registering these tokens should be\nsufficient, without requiring a runtime storage migration.\n\n---------\n\nCo-authored-by: Clara van Staden <claravanstaden64@gmail.com>\nCo-authored-by: Branislav Kontur <bkontur@gmail.com>",
+          "timestamp": "2026-02-09T11:53:46Z",
+          "tree_id": "5bb59a5e179698ca9158dd6683d97f44e60ae8d8",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/51c34ff0b984df85d44acd1837889c7a1ed80cf8"
+        },
+        "date": 1770642142934,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.199885942733331,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.11774120599999997,
             "unit": "seconds"
           }
         ]

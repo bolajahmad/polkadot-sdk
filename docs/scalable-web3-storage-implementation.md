@@ -238,7 +238,6 @@ pub struct Bucket<T: Config> {
     /// These are admin-controlled providers that:
     /// - Receive data directly from writers
     /// - Count toward min_providers for checkpoints
-    /// - Can be early-terminated by admin (with pay/burn)
     /// Stored inline for efficient checkpoint reads (one storage access).
     pub primary_providers: BoundedVec<T::AccountId, T::MaxPrimaryProviders>,
     /// Current canonical state
@@ -329,12 +328,10 @@ pub enum ProviderRole<T: Config> {
     /// Receives data directly from writers.
     /// - Admin-controlled (stored in bucket.primary_providers)
     /// - Count toward min_providers for checkpoints
-    /// - Can be early-terminated by admin
     Primary,
     /// Syncs data from other providers autonomously.
     /// - Permissionless (anyone can add)
     /// - Does NOT count toward min_providers
-    /// - Cannot be early-terminated (runs to expiry)
     /// - Receives per-sync payment from sync_balance
     Replica {
         /// Balance for per-sync payments (drawn down on each sync confirmation)
@@ -780,7 +777,6 @@ impl<T: Config> Pallet<T> {
     /// Creates a replica provider agreement:
     /// - Does NOT count toward min_providers for checkpoints
     /// - Syncs data autonomously from primaries or other replicas
-    /// - Cannot be early-terminated (runs to expiry)
     /// - Unlimited number of replicas per bucket
     /// 
     /// The requester becomes the agreement owner (can top up, transfer ownership).
@@ -915,14 +911,15 @@ impl<T: Config> Pallet<T> {
     /// **After expiry:** Owner can call within T::SettlementTimeout to settle.
     /// If owner doesn't act, provider can call claim_expired_agreement.
     /// 
-    /// **Before expiry (early termination):** Only admin can call, only for primary
-    /// providers. The full remaining payment is subject to the action (not pro-rated).
-    /// 
-    /// **Why early termination for primaries?**
-    /// Admin needs ability to remove hostile or misbehaving primary providers.
-    /// Without this, a malicious primary could hold the bucket hostage until expiry.
-    /// Primary providers are admin-controlled for write coordination; admin must
-    /// maintain control over who can accept writes.
+    /// **Should we have early termination for primaries?**
+    /// Admin could use ability to remove hostile or misbehaving primary
+    /// providers. Without this, a malicious primary could hold the bucket
+    /// hostage until expiry. Primary providers are admin-controlled for write
+    /// coordination; admin must maintain control over who can accept writes. I
+    /// think we can avoid this, by just having the number of allowed providers
+    /// high enough, to make this scenario highly unlikely. Alternatively, we
+    /// could enable early termination for primaries, but it should be
+    /// exceptional: Burn not pay & only if at capacity for example.
     /// 
     /// **Replicas cannot be early-terminated:** There's no use case, and allowing
     /// it would violate the principle of least surprise. A business checking on a
@@ -954,7 +951,6 @@ impl<T: Config> Pallet<T> {
     /// Creates a primary (admin-added) provider agreement:
     /// - Counts toward min_providers for checkpoints
     /// - Stored in bucket.primary_providers (limited to T::MaxPrimaryProviders)
-    /// - Can be early-terminated by admin
     /// 
     /// Fails if bucket has reached T::MaxPrimaryProviders limit.
     /// 
@@ -1219,7 +1215,7 @@ pub enum EndAction {
 pub enum RemovalReason {
     /// Provider was slashed for failing a challenge
     Slashed,
-    /// Admin terminated agreement early
+    /// Admin terminated agreement early - iff we end up wanting this - see previous comment.
     AdminTerminated,
     /// Agreement expired naturally
     Expired,

@@ -2145,7 +2145,7 @@ impl<T: Config> StakingInterface for Pallet<T> {
 			EraInfo::<T>::set_exposure(*current_era, stash, exposure);
 		}
 
-		fn set_current_era(era: EraIndex) {
+		fn set_era(era: EraIndex) {
 			ActiveEra::<T>::put(ActiveEraInfo { index: era, start: None });
 			CurrentEra::<T>::put(era);
 		}

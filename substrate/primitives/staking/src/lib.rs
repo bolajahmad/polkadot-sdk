@@ -329,8 +329,9 @@ pub trait StakingInterface {
 		exposures: Vec<(Self::AccountId, Self::Balance)>,
 	);
 
+	/// Benchmark helper to set both active and current era.
 	#[cfg(feature = "runtime-benchmarks")]
-	fn set_current_era(era: EraIndex);
+	fn set_era(era: EraIndex);
 }
 
 /// Set of low level apis to manipulate staking ledger.

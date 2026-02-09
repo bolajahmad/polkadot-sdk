@@ -177,7 +177,7 @@ pub mod pallet {
 		#[pallet::weight({
 			let dispatch_info = meta_tx.call.get_dispatch_info();
 			let extension_weight = meta_tx.extension.weight(&meta_tx.call);
-			let bare_call_weight = T::WeightInfo::bare_dispatch(4096); // 4KB
+			let bare_call_weight = T::WeightInfo::bare_dispatch(core::mem::size_of_val(&*meta_tx) as u32);
 			(
 				dispatch_info.call_weight
 					.saturating_add(extension_weight)
@@ -197,6 +197,8 @@ pub mod pallet {
 				info.extension_weight = meta_tx.extension.weight(&meta_tx.call);
 				info
 			};
+
+			let meta_tx_len = core::mem::size_of_val(&*meta_tx) as u32;
 
 			// dispatch the meta transaction.
 			let meta_dispatch_res = meta_tx
@@ -218,7 +220,7 @@ pub mod pallet {
 				.unwrap_or(info.total_weight());
 
 			Ok((
-				Some(T::WeightInfo::bare_dispatch(meta_tx_size as u32).saturating_add(meta_weight)),
+				Some(T::WeightInfo::bare_dispatch(meta_tx_len).saturating_add(meta_weight)),
 				true.into(),
 			)
 				.into())

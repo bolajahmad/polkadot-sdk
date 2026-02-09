@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770642201229,
+  "lastUpdate": 1770644603793,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "178801527+raymondkfcheung@users.noreply.github.com",
-            "name": "Raymond Cheung",
-            "username": "raymondkfcheung"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "b7a48fcfdcc38c4ac2799275d02991759ab18ab9",
-          "message": "Align parameters for `EventEmitter::emit_sent_event` (#9057)\n\nCorrected markdown and indentation for the `emit_sent_event` function\nparameters in the `EventEmitter` trait documentation for better\nreadability.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-02T10:06:47Z",
-          "tree_id": "f96377f6f5877c2360da59fe5e3694f7324c55ed",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/b7a48fcfdcc38c4ac2799275d02991759ab18ab9"
-        },
-        "date": 1751455088959,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.009232008106666748,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013349074873333332,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.02267321726,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15795198327333335,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.009525709146666641,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "skunert49@gmail.com",
+            "name": "Sebastian Kunert",
+            "username": "skunert"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "3a747b02ae0a5032dfb3bd9a74548af92e7d693e",
+          "message": "Omni-node: Support asset-hub-polkadot and simplify resolver logic (#10978)\n\npolkadot-omni-node binary failed to sync Asset Hub Polkadot with a\n\"BadSignature\" verification error. DefaultRuntimeResolver always assumed\nSr25519 for Aura consensus, but Asset Hub Polkadot uses Ed25519. When we\nintroduced omni-node, we planned for people to use polkadot-parachain\nfor system chains. But it does not really make sense to keep this\nfootgun, its too easy to forget that AHP is the only chain using\nEd25519, so now we support it.\n\nAlso unified the resolver logic between omni-node and\npolkadot-parachain. Previously we were populating a `LegacyRuntime`\nenum, but all the variants where never used. Lets kill it. If ever\nneeded, we can bring it back.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-09T12:27:50Z",
+          "tree_id": "128bda679b4e248f9b2d36db29f02a088ac3b77c",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3a747b02ae0a5032dfb3bd9a74548af92e7d693e"
+        },
+        "date": 1770644579762,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14549531547333336,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.022920372440000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007136931446666668,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009511352360000001,
             "unit": "seconds"
           }
         ]

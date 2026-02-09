@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770418564537,
+  "lastUpdate": 1770642269422,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "serban@parity.io",
-            "name": "Serban Iorga",
-            "username": "serban300"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "a51c31246a789078f6109428974a31e2af55e6b2",
-          "message": "XCMP and DMP improvements (#8860)\n\nRelated to https://github.com/paritytech/polkadot-sdk/issues/489\n\nThis PR changes the parachain receiving logic for XCMP and DMP by adding\nsome offchain processing before forwarding the messages to the parachain\n`set_validation_data` inherent. This enables us to relax the advancement\nrule.",
-          "timestamp": "2025-07-01T07:19:38Z",
-          "tree_id": "cbeb4c88307b11c741d5dcd44a9351ff7594f5cf",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/a51c31246a789078f6109428974a31e2af55e6b2"
-        },
-        "date": 1751358169905,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.94399999999995,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.03385093277000001,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.045146231265999974,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.06661524428199994,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "yrong1997@gmail.com",
+            "name": "Ron",
+            "username": "yrong"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "51c34ff0b984df85d44acd1837889c7a1ed80cf8",
+          "message": "Snowbridge: Describe the token location with the length field included to avoid collisions (#10771)\n\n### Context\n\nFor `GeneralKey`, two different XCM junctions that differ only in length\ncan produce the same description bytes, and therefore the same TokenId.\n\nWe do have several PNAs registered that could be affected—for example,\nBNC from the Bifrost team and ACA from the Acala team—where the tokens\nare represented using GeneralKey. However, these tokens are not\ncurrently in use; there have been no transfers and no tokens minted yet.\n\nAs a result, I believe simply re-registering these tokens should be\nsufficient, without requiring a runtime storage migration.\n\n---------\n\nCo-authored-by: Clara van Staden <claravanstaden64@gmail.com>\nCo-authored-by: Branislav Kontur <bkontur@gmail.com>",
+          "timestamp": "2026-02-09T11:53:46Z",
+          "tree_id": "5bb59a5e179698ca9158dd6683d97f44e60ae8d8",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/51c34ff0b984df85d44acd1837889c7a1ed80cf8"
+        },
+        "date": 1770642244753,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.036,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.038167602188,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06579555231399994,
             "unit": "seconds"
           }
         ]

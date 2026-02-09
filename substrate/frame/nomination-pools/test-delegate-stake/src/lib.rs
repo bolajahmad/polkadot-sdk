@@ -34,8 +34,7 @@ use pallet_nomination_pools::{
 	Event as PoolsEvent, LastPoolId, PoolMember, PoolMembers, PoolState,
 };
 use pallet_staking_async::{
-	AreNominatorsSlashable, Error as StakingError, Event as StakingEvent, Payee,
-	RewardDestination,
+	AreNominatorsSlashable, Error as StakingError, Event as StakingEvent, Payee, RewardDestination,
 };
 
 use pallet_delegated_staking::Event as DelegatedStakingEvent;
@@ -45,10 +44,7 @@ use sp_staking::{Agent, StakingInterface};
 
 /// Helper to assert the current active era.
 fn assert_active_era(expected: u32) {
-	assert_eq!(
-		pallet_staking_async::ActiveEra::<Runtime>::get().map(|e| e.index),
-		Some(expected)
-	);
+	assert_eq!(pallet_staking_async::ActiveEra::<Runtime>::get().map(|e| e.index), Some(expected));
 }
 
 #[test]

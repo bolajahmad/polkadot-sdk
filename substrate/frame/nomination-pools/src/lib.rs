@@ -3285,17 +3285,19 @@ pub mod pallet {
 			let bonded_pool =
 				BondedPool::<T>::get(member.pool_id).ok_or(Error::<T>::PoolNotFound)?;
 
-			// Apply any pending slash first
-			match Self::do_apply_slash(&who, None, false) {
-				Ok(_) => {},
+			// Apply any pending slash first. Track if we applied a slash so we can succeed
+			// even if there's no trapped balance afterward (applying slash is useful work).
+			let slash_applied = match Self::do_apply_slash(&who, None, false) {
+				Ok(_) => true,
 				Err(e) => {
 					let no_pending_slash: DispatchResult = Err(Error::<T>::NothingToSlash.into());
 					// NothingToSlash is expected and fine, continue. Any other error is defensive.
 					if Err(e) != no_pending_slash {
 						return Err(Error::<T>::Defensive(DefensiveError::SlashNotApplied).into());
 					}
+					false
 				}
-			}
+			};
 
 			// Re-fetch member after potential slash application
 			let member =
@@ -3312,23 +3314,29 @@ pub mod pallet {
 
 			// Calculate trapped amount: funds held but not accounted for in points
 			let trapped_amount = actual_balance.saturating_sub(expected_balance);
-			ensure!(!trapped_amount.is_zero(), Error::<T>::NoTrappedBalance);
 
-			// Release the trapped funds from delegation back to the member's free balance.
-			// Since these funds are not tracked in pool accounting (points), we can safely
-			// release them without affecting the pool's integrity.
-			T::StakeAdapter::member_withdraw(
-				Member::from(who.clone()),
-				Pool::from(bonded_pool.bonded_account()),
-				trapped_amount,
-				0,
-			)?;
+			// If there's trapped balance, release it
+			if !trapped_amount.is_zero() {
+				// Release the trapped funds from delegation back to the member's free balance.
+				// Since these funds are not tracked in pool accounting (points), we can safely
+				// release them without affecting the pool's integrity.
+				T::StakeAdapter::member_withdraw(
+					Member::from(who.clone()),
+					Pool::from(bonded_pool.bonded_account()),
+					trapped_amount,
+					0, // No slashing spans needed: these funds were never properly accounted for
+				)?;
 
-			Self::deposit_event(Event::<T>::TrappedBalanceClaimed {
-				member: who,
-				pool_id: member.pool_id,
-				amount: trapped_amount,
-			});
+				Self::deposit_event(Event::<T>::TrappedBalanceClaimed {
+					member: who.clone(),
+					pool_id: member.pool_id,
+					amount: trapped_amount,
+				});
+			}
+
+			// Succeed if we applied a slash OR claimed trapped balance.
+			// Fail only if we did neither (nothing useful was done).
+			ensure!(slash_applied || !trapped_amount.is_zero(), Error::<T>::NoTrappedBalance);
 
 			Ok(())
 		}

@@ -122,12 +122,13 @@ where
 			// Calculate the weight required based on the actual operation
 			let required = match &next_asset {
 				None => W::migrate_asset_step_finished(),
-				Some(asset_id) =>
+				Some(asset_id) => {
 					if pallet::Pallet::<T>::asset_index_of(asset_id).is_some() {
 						W::migrate_asset_step_skip()
 					} else {
 						W::migrate_asset_step_migrate()
-					},
+					}
+				},
 			};
 
 			// Try to consume the weight for this specific operation
@@ -189,10 +190,11 @@ where
 						Some(stored_id) if stored_id == *asset_id => {
 							migrated = migrated.saturating_add(1);
 						},
-						_ =>
+						_ => {
 							return Err(sp_runtime::TryRuntimeError::Other(
 								"Reverse mapping mismatch",
-							)),
+							))
+						},
 					}
 				},
 				None => {

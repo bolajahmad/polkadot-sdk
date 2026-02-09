@@ -112,7 +112,7 @@ impl CollationManager {
 		active_leaf: ActivatedLeaf,
 	) -> FatalResult<Self> {
 		let mut instance = Self {
-			implicit_view: ImplicitView::new(None),
+			implicit_view: ImplicitView::new(),
 			claim_queue_state: PerLeafClaimQueueState::new(),
 			per_relay_parent: HashMap::new(),
 			blocked_from_seconding: HashMap::new(),
@@ -220,7 +220,7 @@ impl CollationManager {
 		for leaf in added.iter() {
 			let Some(allowed_ancestry) = self
 				.implicit_view
-				.known_allowed_relay_parents_under(leaf, None)
+				.known_allowed_relay_parents_under(leaf)
 				.map(|v| v.to_vec())
 			else {
 				continue;
@@ -352,7 +352,7 @@ impl CollationManager {
 		for leaf in leaves {
 			let free_slots = self.claim_queue_state.free_slots(&leaf);
 			let Some(allowed_parents) =
-				self.implicit_view.known_allowed_relay_parents_under(&leaf, None)
+				self.implicit_view.known_allowed_relay_parents_under(&leaf)
 			else {
 				continue;
 			};
@@ -1386,7 +1386,7 @@ mod tests {
 		};
 
 		let new_collation_manager_instance = || CollationManager {
-			implicit_view: ImplicitView::new(None),
+			implicit_view: ImplicitView::new(),
 			claim_queue_state: PerLeafClaimQueueState::new(),
 			per_relay_parent: HashMap::from([(relay_parent, PerRelayParent::new(0, CoreIndex(0)))]),
 			blocked_from_seconding: HashMap::new(),

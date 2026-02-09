@@ -19,7 +19,8 @@ use codec::{Decode, DecodeAll, Encode};
 use cumulus_primitives_core::{
 	relay_chain,
 	relay_chain::{UMPSignal, UMP_SEPARATOR},
-	ClaimQueueOffset, CoreInfo, CoreSelector, ParachainBlockData, PersistedValidationData,
+	BundleInfo, ClaimQueueOffset, CoreInfo, CoreSelector, CumulusDigestItem, ParaId,
+	ParachainBlockData, PersistedValidationData,
 };
 use cumulus_test_client::{
 	generate_extrinsic, generate_extrinsic_with_pair,
@@ -213,6 +214,11 @@ fn build_multiple_blocks_with_witness(
 			sproof_builder.clone(),
 			timestamp,
 			ignored_nodes.clone(),
+			Some(vec![CumulusDigestItem::BundleInfo(BundleInfo {
+				index: i as u8,
+				maybe_last: i as u32 + 1 == num_blocks,
+			})
+			.to_digest_item()]),
 		);
 
 		persisted_validation_data = Some(p_v_data);
@@ -810,4 +816,103 @@ fn validate_block_rejects_huge_header_single_block() {
 			dbg!(String::from_utf8(output.stderr).unwrap()).contains("exceeds MAX_HEAD_DATA_SIZE")
 		);
 	}
+}
+
+#[test]
+fn validate_block_with_max_ump_messages_and_4_blocks_per_pov() {
+	sp_tracing::try_init_simple();
+
+	let blocks_per_pov = 4;
+	let max_per_candidate = 100;
+	let (client, parent_head) = create_elastic_scaling_test_client();
+
+	let mut sproof_builder =
+		RelayStateSproofBuilder { current_slot: 1.into(), ..Default::default() };
+	sproof_builder.host_config.max_upward_message_num_per_candidate = max_per_candidate;
+	sproof_builder.host_config.max_upward_message_size = 256;
+	sproof_builder.host_config.max_upward_queue_count = blocks_per_pov * max_per_candidate;
+	sproof_builder.host_config.max_upward_queue_size = blocks_per_pov * max_per_candidate;
+	sproof_builder.relay_dispatch_queue_remaining_capacity =
+		Some((blocks_per_pov * max_per_candidate, blocks_per_pov * max_per_candidate));
+
+	let TestBlockData { block, validation_data } = build_multiple_blocks_with_witness(
+		&client,
+		parent_head.clone(),
+		sproof_builder,
+		blocks_per_pov,
+		|i| {
+			vec![generate_extrinsic_with_pair(
+				&client,
+				Charlie.into(),
+				TestPalletCall::send_n_upward_messages { n: max_per_candidate },
+				Some(i),
+			)]
+		},
+	);
+
+	let header = block.blocks().last().unwrap().header().clone();
+	let result = call_validate_block_validation_result(
+		test_runtime::elastic_scaling_500ms::WASM_BINARY
+			.expect("You need to build the WASM binaries to run the tests!"),
+		parent_head,
+		block,
+		validation_data.relay_parent_storage_root,
+	)
+	.expect("Calls `validate_block`");
+
+	let res_header = Header::decode(&mut &result.head_data.0[..]).expect("Decodes `Header`.");
+	assert_eq!(header, res_header);
+
+	let ump_count = result.upward_messages.iter().take_while(|m| **m != UMP_SEPARATOR).count();
+	assert_eq!(ump_count, max_per_candidate as usize);
+}
+
+#[test]
+fn validate_block_with_max_hrmp_messages_and_4_blocks_per_pov() {
+	sp_tracing::try_init_simple();
+
+	let blocks_per_pov = 4;
+	let max_per_candidate = 100;
+	let recipient = ParaId::from(300);
+	let (client, parent_head) = create_elastic_scaling_test_client();
+
+	let mut sproof_builder =
+		RelayStateSproofBuilder { current_slot: 1.into(), ..Default::default() };
+	sproof_builder.host_config.hrmp_max_message_num_per_candidate = max_per_candidate;
+	sproof_builder.para_id = ParaId::from(100);
+
+	let channel = sproof_builder.upsert_outbound_channel(recipient);
+	channel.max_capacity = blocks_per_pov;
+	channel.max_total_size = blocks_per_pov * max_per_candidate * 256;
+	channel.max_message_size = 256;
+
+	let TestBlockData { block, validation_data } = build_multiple_blocks_with_witness(
+		&client,
+		parent_head.clone(),
+		sproof_builder,
+		blocks_per_pov,
+		|i| {
+			vec![generate_extrinsic_with_pair(
+				&client,
+				Charlie.into(),
+				TestPalletCall::queue_hrmp_messages { n: max_per_candidate, recipient },
+				Some(i),
+			)]
+		},
+	);
+
+	let header = block.blocks().last().unwrap().header().clone();
+	let result = call_validate_block_validation_result(
+		test_runtime::elastic_scaling_500ms::WASM_BINARY
+			.expect("You need to build the WASM binaries to run the tests!"),
+		parent_head,
+		block,
+		validation_data.relay_parent_storage_root,
+	)
+	.expect("Calls `validate_block`");
+
+	let res_header = Header::decode(&mut &result.head_data.0[..]).expect("Decodes `Header`.");
+	assert_eq!(header, res_header);
+
+	assert_eq!(result.horizontal_messages.len(), max_per_candidate as usize);
 }

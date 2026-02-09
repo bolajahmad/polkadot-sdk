@@ -39,10 +39,8 @@
 //!
 //! Setup the transaction extension:
 #![doc = docify::embed!("src/block_weight/mock.rs", tx_extension_setup)]
-//!
 //! Setting up `MaximumBlockWeight`:
 #![doc = docify::embed!("src/block_weight/mock.rs", max_block_weight_setup)]
-//!
 //! Registering of the `PreInherents` hook:
 #![doc = docify::embed!("src/block_weight/mock.rs", pre_inherents_setup)]
 //! # Weight per context

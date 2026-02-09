@@ -25,6 +25,7 @@ pub const TEST_RUNTIME_UPGRADE_KEY: &[u8] = b"+test_runtime_upgrade_key+";
 pub mod pallet {
 	use crate::test_pallet::TEST_RUNTIME_UPGRADE_KEY;
 	use alloc::vec;
+	use cumulus_primitives_core::{ParaId, XcmpMessageSource};
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
@@ -37,6 +38,22 @@ pub mod pallet {
 	/// A simple storage map for testing purposes.
 	#[pallet::storage]
 	pub type TestMap<T: Config> = StorageMap<_, Twox64Concat, u32, (), ValueQuery>;
+
+	/// Pending outbound HRMP messages queued by test extrinsics.
+	#[pallet::storage]
+	pub type PendingOutboundHrmpMessages<T: Config> =
+		StorageValue<_, alloc::vec::Vec<(ParaId, alloc::vec::Vec<u8>)>, ValueQuery>;
+
+	impl<T: Config> XcmpMessageSource for Pallet<T> {
+		fn take_outbound_messages(
+			maximum_channels: usize,
+		) -> alloc::vec::Vec<(ParaId, alloc::vec::Vec<u8>)> {
+			PendingOutboundHrmpMessages::<T>::mutate(|messages| {
+				let to_take = messages.len().min(maximum_channels);
+				messages.drain(..to_take).collect()
+			})
+		}
+	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
@@ -103,6 +120,25 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn remove_value_from_map(_: OriginFor<T>, key: u32) -> DispatchResult {
 			TestMap::<T>::remove(key);
+			Ok(())
+		}
+
+		/// Directly sets `n` small UMP messages in `PendingUpwardMessages`.
+		#[pallet::weight(0)]
+		pub fn send_n_upward_messages(_: OriginFor<T>, n: u32) -> DispatchResult {
+			let messages: alloc::vec::Vec<_> = (0..n).map(|i| vec![(i % 256) as u8]).collect();
+			cumulus_pallet_parachain_system::PendingUpwardMessages::<T>::put(messages);
+			Ok(())
+		}
+
+		/// Queues `n` small HRMP messages to `recipient`.
+		#[pallet::weight(0)]
+		pub fn queue_hrmp_messages(_: OriginFor<T>, n: u32, recipient: ParaId) -> DispatchResult {
+			PendingOutboundHrmpMessages::<T>::mutate(|messages| {
+				for i in 0..n {
+					messages.push((recipient, vec![(i % 256) as u8]));
+				}
+			});
 			Ok(())
 		}
 	}

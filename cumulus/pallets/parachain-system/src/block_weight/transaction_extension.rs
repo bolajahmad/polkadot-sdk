@@ -270,9 +270,10 @@ where
 
 			match mode {
 				// If the previous mode was already `FullCore`, we are fine.
-				BlockWeightMode::<Config>::FullCore { .. } =>
+				BlockWeightMode::<Config>::FullCore { .. } => {
 					Config::WeightInfo::block_weight_tx_extension_max_weight()
-						.saturating_sub(Config::WeightInfo::block_weight_tx_extension_full_core()),
+						.saturating_sub(Config::WeightInfo::block_weight_tx_extension_full_core())
+				},
 				BlockWeightMode::<Config>::FractionOfCore { .. } => {
 					let digest = frame_system::Pallet::<Config>::digest();
 					let is_above_limit =

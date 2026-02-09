@@ -84,6 +84,7 @@ pub trait InitBlockBuilder {
 		relay_sproof_builder: RelayStateSproofBuilder,
 		timestamp: u64,
 		ignored_nodes: ProofRecorderIgnoredNodes<Block>,
+		extra_pre_digests: Option<Vec<DigestItem>>,
 	) -> BlockBuilderAndSupportData<'_>;
 
 	/// Init a specific block builder that works for the test runtime.
@@ -241,6 +242,7 @@ impl InitBlockBuilder for Client {
 		relay_sproof_builder: RelayStateSproofBuilder,
 		timestamp: u64,
 		ignored_nodes: ProofRecorderIgnoredNodes<Block>,
+		extra_pre_digests: Option<Vec<DigestItem>>,
 	) -> BlockBuilderAndSupportData<'_> {
 		init_block_builder(
 			self,
@@ -248,7 +250,7 @@ impl InitBlockBuilder for Client {
 			validation_data,
 			relay_sproof_builder,
 			Some(timestamp),
-			None,
+			extra_pre_digests,
 			Some(ignored_nodes),
 		)
 	}

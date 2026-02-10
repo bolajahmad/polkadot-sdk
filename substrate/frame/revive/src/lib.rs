@@ -1833,13 +1833,12 @@ impl<T: Config> Pallet<T> {
 			.expect("Rollback shouldn't error out");
 			(gas_limit, eth_transact_result)
 		});
-		let (gas_limit, first_dry_run_result) = match dry_run_results {
+		let (gas_limit, ..) = match dry_run_results {
 			[(gas_limit, Ok(dry_run_result)), (_, Err(..))] |
 			[.., (gas_limit, Ok(dry_run_result))] => (gas_limit, dry_run_result),
 			[(_, Err(err)), (_, Err(..))] => return Err(err),
 		};
 		log::trace!(target: LOG_TARGET, "eth_estimate_gas first dry run succeeded with gas_limit={gas_limit}");
-		low = first_dry_run_result.eth_gas - U256::one();
 		high = gas_limit;
 
 		while low + U256::one() < high {
@@ -1854,10 +1853,15 @@ impl<T: Config> Pallet<T> {
 					)
 				})?;
 			if error_ratio <= U256::from(15) {
+				log::trace!(
+					target: LOG_TARGET,
+					"eth_estimate_gas finished due to error ratio being less than 1.5% high={}",
+					high
+				);
 				break;
 			}
 
-			let midpoint = high
+			let mut midpoint = high
 				.checked_sub(low)
 				.and_then(|value| value.checked_div(U256::from(2)))
 				.and_then(|value| value.checked_add(low))
@@ -1865,12 +1869,13 @@ impl<T: Config> Pallet<T> {
 					EthTransactError::Message(
 						"failed to calculate midpoint in gas estimation".into(),
 					)
-				})?
-				.min(low.checked_mul(U256::from(2)).ok_or_else(|| {
-					EthTransactError::Message(
-						"failed to calculate midpoint in gas estimation".into(),
-					)
-				})?);
+				})?;
+
+			if let Some(other_midpoint) = low.checked_mul(U256::from(2)) {
+				if other_midpoint != U256::zero() {
+					midpoint = midpoint.min(other_midpoint)
+				}
+			};
 
 			let mut transaction = tx.clone();
 			transaction.gas = Some(midpoint);

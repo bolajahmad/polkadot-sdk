@@ -1833,12 +1833,25 @@ impl<T: Config> Pallet<T> {
 			.expect("Rollback shouldn't error out");
 			(gas_limit, eth_transact_result)
 		});
-		let (gas_limit, ..) = match dry_run_results {
-			[(gas_limit, Ok(dry_run_result)), (_, Err(..))] |
-			[.., (gas_limit, Ok(dry_run_result))] => (gas_limit, dry_run_result),
+		let (gas_limit, first_dry_run_result) = match dry_run_results {
+			[(gas_limit1, Ok(dry_run_result1)), (gas_limit2, Ok(dry_run_result2))] => {
+				if dry_run_result2.eth_gas >= gas_limit2 {
+					(gas_limit1, dry_run_result1)
+				} else {
+					(gas_limit2, dry_run_result2)
+				}
+			},
+			[(gas_limit, Ok(dry_run_result)), (_, Err(_))] |
+			[(_, Err(_)), (gas_limit, Ok(dry_run_result))] => (gas_limit, dry_run_result),
 			[(_, Err(err)), (_, Err(..))] => return Err(err),
 		};
-		log::trace!(target: LOG_TARGET, "eth_estimate_gas first dry run succeeded with gas_limit={gas_limit}");
+		log::trace!(
+			target: LOG_TARGET,
+			"eth_estimate_gas first dry run succeeded with gas_limit={} consumed={}",
+			gas_limit,
+			first_dry_run_result.eth_gas
+		);
+		low = first_dry_run_result.eth_gas;
 		high = gas_limit;
 
 		while low + U256::one() < high {
@@ -1899,16 +1912,8 @@ impl<T: Config> Pallet<T> {
 			}
 		}
 
-		// Adding a 2% margin to the gas estimate.
-		let gas_estimate = high
-			.checked_div(U256::from(10))
-			.and_then(|margin| high.checked_add(margin))
-			.ok_or_else(|| {
-				EthTransactError::Message("failed to add a margin to the gas estimate".into())
-			})?;
-		log::trace!(target: LOG_TARGET, "eth_estimate_gas completed and added margin. high={high} gas_estimate={gas_estimate}");
-
-		Ok(gas_estimate)
+		log::trace!(target: LOG_TARGET, "eth_estimate_gas completed. high={high}");
+		Ok(high)
 	}
 
 	/// Dry-run Ethereum calls.

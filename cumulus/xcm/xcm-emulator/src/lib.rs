@@ -94,6 +94,10 @@ use xcm_simulator::helpers::TopicIdTracker;
 
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
+/// Relay chain slot duration in milliseconds (6 seconds).
+/// This is used to calculate timestamps and derive parachain slots from relay chain slots.
+pub const RELAY_CHAIN_SLOT_DURATION_MILLIS: u64 = 6000;
+
 thread_local! {
 	/// Downward messages, each message is: `(to_para_id, [(relay_block_number, msg)])`
 	#[allow(clippy::type_complexity)]
@@ -688,15 +692,21 @@ macro_rules! decl_test_parachains {
 
 				fn new_block() {
 					use $crate::{
-						Dispatchable, Chain, Convert, TestExt, Zero, AdditionalInherentCode
+						Dispatchable, Chain, Convert, TestExt, Zero, AdditionalInherentCode,
+						RELAY_CHAIN_SLOT_DURATION_MILLIS
 					};
 
 					let para_id = Self::para_id().into();
 
 					Self::ext_wrapper(|| {
-						// Increase Relay Chain block number
+						let slot_duration = $crate::pallet_aura::Pallet::<$runtime::Runtime>::slot_duration();
+
+						let relay_blocks_per_para_block =
+							(slot_duration / RELAY_CHAIN_SLOT_DURATION_MILLIS).max(1) as u32;
+
+						// Increase Relay Chain block number by relay_blocks_per_para_block
 						let mut relay_block_number = N::relay_block_number();
-						relay_block_number += 1;
+						relay_block_number += relay_blocks_per_para_block;
 						N::set_relay_block_number(relay_block_number);
 
 						// Initialize a new Parachain block
@@ -712,7 +722,6 @@ macro_rules! decl_test_parachains {
 
 						// Initialze `System`.
 						let digest = <Self as Parachain>::DigestProvider::convert((block_number, relay_block_number));
-						let slot_duration = $crate::pallet_aura::Pallet::<$runtime::Runtime>::slot_duration();
 						<Self as Chain>::System::initialize(&block_number, &parent_head_data.hash(), &digest);
 
 						// Process `on_initialize` for all pallets except `System`.
@@ -724,9 +733,7 @@ macro_rules! decl_test_parachains {
 
 					// 1. inherent: pallet_timestamp::Call::set (we expect the parachain has `pallet_timestamp`)
 					let timestamp_set: <Self as Chain>::RuntimeCall = $crate::TimestampCall::set {
-						// We need to satisfy `pallet_timestamp::on_finalize`.
-						// The timestamp must match the relay chain slot since Aura uses the relay chain slot from the digest.
-					now: relay_block_number as u64 * slot_duration,
+						now: relay_block_number as u64 * RELAY_CHAIN_SLOT_DURATION_MILLIS,
 					}.into();
 					$crate::assert_ok!(
 						timestamp_set.dispatch(<Self as Chain>::RuntimeOrigin::none())

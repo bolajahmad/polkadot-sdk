@@ -146,9 +146,9 @@ mod benchmarks {
 
 		let mut authorization_list = vec![];
 		for i in 0..n {
-			let key_material = [i as u8; 32];
+			let key_material = keccak_256(&(i as u32).to_le_bytes());
 			let pair =
-				EcdsaPair::from_seed_slice(&keccak_256(&key_material)).expect("valid key; qed");
+				EcdsaPair::from_seed_slice(&key_material).expect("valid key; qed");
 			let signed_auth = eip7702::sign_authorization(&pair, chain_id, target, U256::zero());
 			authorization_list.push(signed_auth);
 		}
@@ -181,9 +181,9 @@ mod benchmarks {
 
 		let mut authorization_list = vec![];
 		for i in 0..n {
-			let key_material = [i as u8; 32];
+			let key_material = keccak_256(&(i as u32).to_le_bytes());
 			let pair =
-				EcdsaPair::from_seed_slice(&keccak_256(&key_material)).expect("valid key; qed");
+				EcdsaPair::from_seed_slice(&key_material).expect("valid key; qed");
 
 			let eth_address = eip7702::eth_address(&pair);
 			let account_id = T::AddressMapper::to_account_id(&eth_address);

@@ -572,6 +572,171 @@ fn test_runtime_delegation_resolution() {
 	});
 }
 
+/// Re-delegation to a different target preserves the same trie_id (storage persists).
+///
+/// Per EIP-7702, storage is keyed by the delegated address, not the target.
+/// This means switching from target A to target B retains target A's storage
+/// in the same child trie. The spec recommends ERC-7201 namespaced storage to
+/// avoid layout collisions.
+#[test]
+fn redelegation_preserves_storage() {
+	use alloy_core::sol_types::SolCall;
+	use pallet_revive_fixtures::{compile_module_with_type, Counter, FixtureType};
+
+	let (counter_code, _) = compile_module_with_type("Counter", FixtureType::Solc).unwrap();
+
+	ExtBuilder::default().build().execute_with(|| {
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&ALICE, 100_000_000);
+
+		// Deploy two Counter instances as delegation targets
+		let counter_a =
+			builder::bare_instantiate(Code::Upload(counter_code.clone())).build_and_unwrap_contract();
+		let counter_b = builder::bare_instantiate(Code::Upload(counter_code))
+			.salt(Some([1; 32]))
+			.build_and_unwrap_contract();
+
+		// Alice delegates to Counter A and writes storage
+		AccountInfo::<Test>::set_delegation(&ALICE_ADDR, counter_a.addr);
+
+		let result = builder::bare_call(ALICE_ADDR)
+			.data(
+				Counter::setNumberCall { newNumber: 42u64 }
+					.abi_encode(),
+			)
+			.build_and_unwrap_result();
+		assert!(!result.did_revert());
+
+		// Verify storage was written
+		let result = builder::bare_call(ALICE_ADDR)
+			.data(Counter::numberCall {}.abi_encode())
+			.build_and_unwrap_result();
+		assert_eq!(
+			Counter::numberCall::abi_decode_returns(&result.data).unwrap(),
+			42u64
+		);
+
+		// Re-delegate to Counter B (same ABI, same storage layout)
+		AccountInfo::<Test>::set_delegation(&ALICE_ADDR, counter_b.addr);
+
+		// Storage from Counter A should still be accessible since the trie_id is
+		// derived from the delegated address, not the target
+		let result = builder::bare_call(ALICE_ADDR)
+			.data(Counter::numberCall {}.abi_encode())
+			.build_and_unwrap_result();
+		assert_eq!(
+			Counter::numberCall::abi_decode_returns(&result.data).unwrap(),
+			42u64,
+			"Storage should persist across re-delegation"
+		);
+
+		// Counter B's increment should work on the same storage
+		let result = builder::bare_call(ALICE_ADDR)
+			.data(Counter::incrementCall {}.abi_encode())
+			.build_and_unwrap_result();
+		assert!(!result.did_revert());
+
+		let result = builder::bare_call(ALICE_ADDR)
+			.data(Counter::numberCall {}.abi_encode())
+			.build_and_unwrap_result();
+		assert_eq!(
+			Counter::numberCall::abi_decode_returns(&result.data).unwrap(),
+			43u64,
+			"Increment via new target should work on persisted storage"
+		);
+	});
+}
+
+/// dry_run_eth_transact with authorization list processes delegations and
+/// includes the ED cost for new accounts in the gas estimate.
+#[test]
+fn dry_run_with_authorization_list() {
+	ExtBuilder::default().build().execute_with(|| {
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&ALICE, 100_000_000_000);
+
+		let target_contract = builder::bare_instantiate(Code::Upload(dummy_evm_contract()))
+			.build_and_unwrap_contract();
+
+		let chain_id = U256::from(<Test as Config>::ChainId::get());
+		let seed = H256::from([0xAA; 32]);
+		let signer = TestSigner::new(&seed.0);
+
+		let authority_id = <Test as Config>::AddressMapper::to_account_id(&signer.address);
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 100_000_000);
+
+		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
+		let auth = signer.sign_authorization(chain_id, target_contract.addr, nonce);
+
+		// Dry run without authorization list
+		let baseline = crate::Pallet::<Test>::dry_run_eth_transact(
+			crate::GenericTransaction {
+				from: Some(ALICE_ADDR),
+				to: Some(target_contract.addr),
+				..Default::default()
+			},
+			Default::default(),
+		);
+		assert_ok!(&baseline);
+
+		// Dry run with authorization list
+		let with_auth = crate::Pallet::<Test>::dry_run_eth_transact(
+			crate::GenericTransaction {
+				from: Some(ALICE_ADDR),
+				to: Some(target_contract.addr),
+				authorization_list: vec![auth],
+				..Default::default()
+			},
+			Default::default(),
+		);
+		assert_ok!(&with_auth);
+
+		// The gas estimate with auth should be >= baseline since it includes ED cost
+		let baseline_gas = baseline.unwrap().eth_gas;
+		let auth_gas = with_auth.unwrap().eth_gas;
+		assert!(
+			auth_gas >= baseline_gas,
+			"Auth gas ({auth_gas}) should be >= baseline gas ({baseline_gas})"
+		);
+
+		// The delegation should have been applied during dry run
+		assert!(AccountInfo::<Test>::is_delegated(&signer.address));
+	});
+}
+
+/// Verify that a transaction with insufficient gas for authorization ED costs fails.
+///
+/// The pre-validation in `into_call` checks that the gas budget can cover the
+/// existential deposit for worst-case new accounts. A tiny gas limit with
+/// authorizations should be rejected.
+#[test]
+fn authorization_ed_gas_check() {
+	ExtBuilder::default().build().execute_with(|| {
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&ALICE, 100_000_000_000);
+
+		let target_contract = builder::bare_instantiate(Code::Upload(dummy_evm_contract()))
+			.build_and_unwrap_contract();
+
+		let chain_id = U256::from(<Test as Config>::ChainId::get());
+		let seed = H256::from([0xBB; 32]);
+		let signer = TestSigner::new(&seed.0);
+		let nonce = U256::zero();
+		let auth = signer.sign_authorization(chain_id, target_contract.addr, nonce);
+
+		// Dry run with a gas limit too small to cover ED for the authorization
+		let result = crate::Pallet::<Test>::dry_run_eth_transact(
+			crate::GenericTransaction {
+				from: Some(ALICE_ADDR),
+				to: Some(target_contract.addr),
+				gas: Some(U256::from(21_000u64)),
+				authorization_list: vec![auth],
+				..Default::default()
+			},
+			Default::default(),
+		);
+
+		assert!(result.is_err(), "Should reject when gas can't cover ED for auth accounts");
+	});
+}
+
 /// Test that delegation chains are not followed during execution (EIP-7702 spec)
 ///
 /// Per EIP-7702: "In case a delegation indicator points to another delegation,
@@ -613,12 +778,12 @@ fn delegation_chain_does_not_execute() {
 		// Case 1: Calling Alice executes the contract - setNumber(42) should work
 		let result = builder::bare_call(ALICE_ADDR)
 			.data(
-				Counter::setNumberCall { newNumber: alloy_core::primitives::U256::from(42) }
+				Counter::setNumberCall { newNumber: 42u64 }
 					.abi_encode(),
 			)
 			.build_and_unwrap_result();
 		assert!(!result.did_revert(), "calling Alice should execute Counter code");
-		assert_eq!(read_number(), alloy_core::primitives::U256::from(42));
+		assert_eq!(read_number(), 42u64);
 
 		// Case 2: A contract can delegatecall to Alice and execute the code
 		let caller_contract =
@@ -638,7 +803,7 @@ fn delegation_chain_does_not_execute() {
 		let decoded = Caller::delegateCall::abi_decode_returns(&result.data).unwrap();
 		assert!(decoded.success, "delegatecall to Alice should succeed");
 		// delegatecall modifies the caller's storage, not Alice's
-		assert_eq!(read_number(), alloy_core::primitives::U256::from(42));
+		assert_eq!(read_number(), 42u64);
 
 		// Case 3: Bob delegates to Alice (chain: Bob -> Alice -> Counter)
 		// Calling Bob should NOT execute code because chains are not followed
@@ -646,7 +811,7 @@ fn delegation_chain_does_not_execute() {
 
 		let result = builder::bare_call(BOB_ADDR)
 			.data(
-				Counter::setNumberCall { newNumber: alloy_core::primitives::U256::from(99) }
+				Counter::setNumberCall { newNumber: 99u64 }
 					.abi_encode(),
 			)
 			.build_and_unwrap_result();
@@ -654,6 +819,6 @@ fn delegation_chain_does_not_execute() {
 		assert!(!result.did_revert(), "call to Bob should not revert (treated as EOA transfer)");
 		assert!(result.data.is_empty(), "call to Bob should return empty (no code executed)");
 		// Alice's number should be unchanged
-		assert_eq!(read_number(), alloy_core::primitives::U256::from(42));
+		assert_eq!(read_number(), 42u64);
 	});
 }

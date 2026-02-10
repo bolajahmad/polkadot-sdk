@@ -36,10 +36,34 @@ use pallet_revive::precompiles::{
 	AddressMapper, AddressMatcher, Error, Ext, Precompile, RuntimeCosts, H160, H256,
 };
 
+// ERC20Permit interface extension (EIP-2612)
+// Note: The permit pallet provides the storage and EIP-712 signature verification.
+// To use permit functionality, create a Solidity wrapper contract that calls
+// pallet-assets do_approve_transfer after verifying the permit signature using
+// the permit pallet functions.
+alloy::sol! {
+	interface IERC20Permit {
+		function permit(
+			address owner,
+			address spender,
+			uint256 value,
+			uint256 deadline,
+			uint8 v,
+			bytes32 r,
+			bytes32 s
+		) external;
+
+		function nonces(address owner) external view returns (uint256);
+
+		function DOMAIN_SEPARATOR() external view returns (bytes32);
+	}
+}
+
 pub mod foreign_assets;
 pub mod migration;
 #[cfg(feature = "runtime-benchmarks")]
 pub(crate) mod migration_benchmarks;
+pub mod permit;
 pub mod weights;
 
 #[cfg(test)]
@@ -49,10 +73,13 @@ mod migration_tests;
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
+mod permit_tests;
+#[cfg(test)]
 mod tests;
 
 pub use foreign_assets::{pallet, pallet::Config as ForeignAssetsConfig, ForeignAssetId};
 pub use migration::{MigrateForeignAssetPrecompileMappings, MigrationState};
+pub use permit::{pallet::Config as PermitConfig, PERMIT_TYPEHASH};
 
 /// Mean of extracting the asset id from the precompile address.
 pub trait AssetIdExtractor {

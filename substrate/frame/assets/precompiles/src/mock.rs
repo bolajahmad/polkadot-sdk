@@ -18,7 +18,7 @@
 //! Tests mock for `pallet-assets-freezer`.
 
 pub use super::*;
-use frame_support::{derive_impl, traits::AsEnsureOriginWithArg};
+use frame_support::{derive_impl, parameter_types, traits::AsEnsureOriginWithArg};
 use sp_runtime::BuildStorage;
 
 #[frame_support::runtime]
@@ -45,6 +45,8 @@ mod runtime {
 	pub type Revive = pallet_revive;
 	#[runtime::pallet_index(22)]
 	pub type ForeignAssets = super::foreign_assets;
+	#[runtime::pallet_index(23)]
+	pub type Permit = super::permit;
 }
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -69,6 +71,14 @@ impl pallet_assets::Config for Test {
 
 impl foreign_assets::pallet::Config for Test {
 	type ForeignAssetId = u32;
+}
+
+parameter_types! {
+	pub const ChainId: u64 = 1; // Ethereum mainnet chain ID for testing
+}
+
+impl permit::pallet::Config for Test {
+	type ChainId = ChainId;
 }
 
 #[derive_impl(pallet_revive::config_preludes::TestDefaultConfig)]

@@ -781,31 +781,33 @@ pub mod pallet {
 			let inheritor = friend_group.inheritor;
 			let inheritance_order = friend_group.inheritance_order;
 
-			let previous_inheritor = match Inheritor::<T>::get(&lost) {
+			match Inheritor::<T>::get(&lost) {
 				None => {
 					let ticket = Self::inheritor_ticket(&caller)?;
 					Inheritor::<T>::insert(&lost, (inheritance_order, &inheritor, ticket));
-					None
+					Self::deposit_event(Event::<T>::AttemptFinished {
+						lost,
+						friend_group_index: attempt_index,
+						inheritor,
+						previous_inheritor: None,
+					});
 				},
 				// new recovery has a lower inheritance order, we replace the existing inheritor
 				Some((old_order, old_inheritor, ticket)) if inheritance_order < old_order => {
 					let ticket = ticket.update(&caller, Self::inheritor_footprint())?;
 					Inheritor::<T>::insert(&lost, (inheritance_order, &inheritor, ticket));
-					Some(old_inheritor)
+					Self::deposit_event(Event::<T>::AttemptFinished {
+						lost,
+						friend_group_index: attempt_index,
+						inheritor,
+						previous_inheritor: Some(old_inheritor),
+					});
 				},
 				Some(_) => {
 					// The existing inheritor stays since an equal or worse inheritor contested.
-					// We do not treat this as a poke but just do nothing.
-					None
+					// The attempt is consumed but no event is emitted since nothing changed.
 				},
 			};
-
-			Self::deposit_event(Event::<T>::AttemptFinished {
-				lost,
-				friend_group_index: attempt_index,
-				inheritor,
-				previous_inheritor,
-			});
 
 			Ok(())
 		}

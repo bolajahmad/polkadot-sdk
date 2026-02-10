@@ -810,3 +810,114 @@ fn delegation_chain_does_not_execute() {
 		assert_eq!(read_number(), 42u64);
 	});
 }
+
+/// SELFDESTRUCT on a delegated account transfers the account's balance to the
+/// beneficiary but does NOT remove the delegation indicator or affect the
+/// original contract. Per EIP-6780, selfdestruct only clears the account when
+/// called in the same transaction as creation, which is not the case here.
+///
+/// Test flow:
+/// 1. Deploy Terminate contract
+/// 2. Fund Alice and delegate her to the Terminate contract
+/// 3. Call destroy(beneficiary) on Alice — runs in Alice's context
+/// 4. Verify: Alice balance → 0, beneficiary received funds
+/// 5. Verify: delegation indicator survives (eth_getCode still returns 0xef0100||addr)
+/// 6. Verify: original contract code unaffected
+/// 7. Verify: delegation still functional (echo(42) returns 42)
+#[test]
+fn selfdestruct_on_delegated_account() {
+	use alloy_core::sol_types::{SolCall, SolConstructor};
+	use pallet_revive_fixtures::{compile_module_with_type, FixtureType, Terminate};
+
+	let (code, _) = compile_module_with_type("Terminate", FixtureType::Solc).unwrap();
+
+	ExtBuilder::default().build().execute_with(|| {
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&ALICE, 100_000_000);
+
+		// Deploy the Terminate contract (skip=true to not selfdestruct in constructor)
+		let contract = builder::bare_instantiate(Code::Upload(code))
+			.constructor_data(
+				Terminate::constructorCall {
+					skip: true,
+					method: 0,
+					beneficiary: H160::zero().0.into(),
+				}
+				.abi_encode(),
+			)
+			.build_and_unwrap_contract();
+
+		// Fund Alice and delegate her to the Terminate contract
+		let alice_balance = 5_000_000u64;
+		let alice_id = <Test as Config>::AddressMapper::to_account_id(&ALICE_ADDR);
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&alice_id, alice_balance);
+		AccountInfo::<Test>::set_delegation(&ALICE_ADDR, contract.addr);
+		assert!(AccountInfo::<Test>::is_delegated(&ALICE_ADDR));
+
+		// Beneficiary must exist (has at least ED) so the selfdestruct balance
+		// transfer doesn't need to charge ED from the origin (which is Alice
+		// herself in the delegated case).
+		let beneficiary = DJANGO_ADDR;
+		let beneficiary_id = <Test as Config>::AddressMapper::to_account_id(&beneficiary);
+		let min_balance = Contracts::min_balance();
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&beneficiary_id, min_balance);
+
+		// Save contract code before selfdestruct for later comparison
+		let contract_code_before = crate::Pallet::<Test>::code(&contract.addr);
+		assert!(!contract_code_before.is_empty());
+
+		// Step 2: Call destroy(beneficiary) on Alice — selfdestruct runs in Alice's context
+		let result = builder::bare_call(ALICE_ADDR)
+			.data(
+				Terminate::terminateCall {
+					method: 2, // METHOD_SYSCALL = selfdestruct opcode
+					beneficiary: beneficiary.0.into(),
+				}
+				.abi_encode(),
+			)
+			.build_and_unwrap_result();
+		assert!(!result.did_revert(), "selfdestruct should succeed");
+
+		// Check balances — Alice's balance transferred to beneficiary.
+		// EIP-6780: selfdestruct only sends balance, doesn't delete account
+		// (account was not created in this transaction).
+		let beneficiary_balance_after = <Test as Config>::Currency::free_balance(&beneficiary_id);
+		assert!(
+			beneficiary_balance_after > min_balance,
+			"beneficiary should have received funds"
+		);
+
+		// Step 4: Delegation indicator survives selfdestruct
+		assert!(
+			AccountInfo::<Test>::is_delegated(&ALICE_ADDR),
+			"delegation should survive selfdestruct"
+		);
+		assert_eq!(
+			AccountInfo::<Test>::get_delegation_target(&ALICE_ADDR),
+			Some(contract.addr),
+			"delegation target should be unchanged"
+		);
+
+		// eth_getCode(alice) should still return the delegation indicator
+		let mut expected_code = vec![0xef, 0x01, 0x00];
+		expected_code.extend_from_slice(contract.addr.as_bytes());
+		assert_eq!(crate::Pallet::<Test>::code(&ALICE_ADDR), expected_code);
+
+		// Step 5: Original contract is completely unaffected
+		let contract_code_after = crate::Pallet::<Test>::code(&contract.addr);
+		assert_eq!(
+			contract_code_before, contract_code_after,
+			"original contract code should be unchanged"
+		);
+
+		// Step 6: Delegation still functional — echo(42) returns 42
+		// Fund Alice again so we can make a call
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&alice_id, 1_000_000);
+		let expected = alloy_core::primitives::U256::from(42u64);
+		let result = builder::bare_call(ALICE_ADDR)
+			.data(Terminate::echoCall { value: expected }.abi_encode())
+			.build_and_unwrap_result();
+		assert!(!result.did_revert(), "delegation should still be functional after selfdestruct");
+		let returned = Terminate::echoCall::abi_decode_returns(&result.data).unwrap();
+		assert_eq!(returned, expected, "echo should return 42");
+	});
+}

@@ -238,6 +238,9 @@ impl<T: Config> AccountInfo<T> {
 	/// Per EIP-7702, only creates ContractInfo if target is a Contract.
 	/// If target is delegated or EOA, contract_info is None (no chain following).
 	/// Existing contract_info (deposit accounting) is preserved across re-delegations.
+	///
+	/// Note: the target's `code_hash` is snapshotted at delegation time. This is fine
+	/// because `set_code` (the only way to change a contract's code) requires root.
 	pub fn set_delegation(address: &H160, target: H160) {
 		let target_code_hash =
 			<AccountInfoOf<T>>::get(&target).and_then(|info| match info.account_type {

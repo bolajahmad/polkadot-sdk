@@ -252,14 +252,33 @@ impl<T: Config> AccountInfo<T> {
 	/// Per EIP-7702, only creates ContractInfo if target is a Contract.
 	/// If target is delegated or EOA, contract_info is None (no chain following).
 	pub fn set_delegation(address: &H160, target: H160) {
-		let contract_info =
+		let target_code_hash =
 			<AccountInfoOf<T>>::get(&target).and_then(|info| match info.account_type {
-				AccountType::Contract(c) =>
-					Some(ContractInfo::<T>::new_for_delegation(address, c.code_hash)),
+				AccountType::Contract(c) => Some(c.code_hash),
 				_ => None,
 			});
 
 		AccountInfoOf::<T>::mutate(address, |account| {
+			let contract_info = match target_code_hash {
+				Some(code_hash) => {
+					// Preserve existing ContractInfo if re-delegating
+					let existing =
+						account.as_ref().and_then(|a| match &a.account_type {
+							AccountType::Delegated { contract_info: Some(c), .. } =>
+								Some(c.clone()),
+							_ => None,
+						});
+					Some(match existing {
+						Some(mut info) => {
+							info.code_hash = code_hash;
+							info
+						},
+						None => ContractInfo::<T>::new_for_delegation(address, code_hash),
+					})
+				},
+				None => None,
+			};
+
 			if let Some(account) = account {
 				account.account_type = AccountType::Delegated { target, contract_info };
 			} else {

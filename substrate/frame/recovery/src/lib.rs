@@ -498,6 +498,8 @@ pub mod pallet {
 		TooManyFriendsNeeded,
 		/// The number of friends needed is zero.
 		NoFriendsNeeded,
+		/// The friends of a friend group are not sorted or not unique.
+		FriendsNotSortedOrUnique,
 	}
 
 	#[pallet::view_functions]
@@ -963,14 +965,15 @@ impl<T: Config> Pallet<T> {
 		mut friend_groups: Vec<FriendGroupOf<T>>,
 	) -> Result<FriendGroupsOf<T>, Error<T>> {
 		for friend_group in &mut friend_groups {
-			ensure!(
+			ensure!(!friend_group.friends.is_empty(), Error::<T>::NoFriends);
+			// cannot contain the lost account itself
+			ensure!(!friend_group.friends.contains(&lost), Error::<T>::LostAccountInFriendGroup);
+			ensure!(friend_group.friends.windows(2).all(|w| w[0] < w[1]), Error::<T>::FriendsNotSortedOrUnique);
+						ensure!(
 				friend_group.friends_needed as usize <= friend_group.friends.len(),
 				Error::<T>::TooManyFriendsNeeded
 			);
 			ensure!(friend_group.friends_needed > 0, Error::<T>::NoFriendsNeeded);
-			ensure!(!friend_group.friends.is_empty(), Error::<T>::NoFriends);
-			// cannot contain the lost account itself
-			ensure!(!friend_group.friends.contains(&lost), Error::<T>::LostAccountInFriendGroup);
 		}
 
 		friend_groups.try_into().map_err(|_| Error::<T>::TooManyFriendGroups)

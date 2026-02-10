@@ -44,18 +44,6 @@ fn test_process_authorizations(auths: &[AuthorizationListEntry]) -> Authorizatio
 }
 
 #[test]
-fn set_delegation_creates_indicator() {
-	ExtBuilder::default().build().execute_with(|| {
-		let eoa = H160::from([0x11; 20]);
-		let target = H160::from([0x22; 20]);
-
-		AccountInfo::<Test>::set_delegation(&eoa, target);
-		assert!(AccountInfo::<Test>::is_delegated(&eoa));
-		assert_eq!(AccountInfo::<Test>::get_delegation_target(&eoa), Some(target));
-	});
-}
-
-#[test]
 fn clear_delegation_restores_eoa() {
 	ExtBuilder::default().build().execute_with(|| {
 		let authority = H160::from([0x11; 20]);
@@ -128,25 +116,6 @@ fn eip3607_rejects_regular_contract_originating_transactions() {
 
 		let origin = RuntimeOrigin::signed(account_id);
 		assert!(Contracts::ensure_non_contract_if_signed(&origin).is_err());
-	});
-}
-
-#[test]
-fn multiple_delegations_last_one_wins() {
-	ExtBuilder::default().build().execute_with(|| {
-		let eoa = H160::from([0x11; 20]);
-		let target1 = H160::from([0x22; 20]);
-		let target2 = H160::from([0x33; 20]);
-		let target3 = H160::from([0x44; 20]);
-
-		AccountInfo::<Test>::set_delegation(&eoa, target1);
-		assert_eq!(AccountInfo::<Test>::get_delegation_target(&eoa), Some(target1));
-
-		AccountInfo::<Test>::set_delegation(&eoa, target2);
-		assert_eq!(AccountInfo::<Test>::get_delegation_target(&eoa), Some(target2));
-
-		AccountInfo::<Test>::set_delegation(&eoa, target3);
-		assert_eq!(AccountInfo::<Test>::get_delegation_target(&eoa), Some(target3));
 	});
 }
 
@@ -412,19 +381,13 @@ fn process_multiple_authorizations_from_different_signers() {
 	});
 }
 
-/// Runtime test: Set authorization via eth_call
+/// Runtime test: Set and clear authorization via eth_call
 ///
-/// This test verifies that an EOA can successfully delegate to a contract
-/// by creating an EIP-7702 transaction and dispatching it through eth_call.
-///
-/// Test flow:
-/// 1. Create a test signer (EOA) and a target contract
-/// 2. Fund the EOA and initialize it in storage
-/// 3. Sign an authorization tuple delegating to the target contract
-/// 4. Create an eth_call with the authorization list
-/// 5. Dispatch the call and verify delegation is set
+/// This test verifies that an EOA can delegate to a contract via EIP-7702
+/// authorization list, and then clear its delegation by setting the
+/// authorization address to 0x0 (zero address).
 #[test]
-fn test_runtime_set_authorization() {
+fn test_runtime_set_and_clear_authorization() {
 	ExtBuilder::default().build().execute_with(|| {
 		let chain_id = U256::from(<Test as Config>::ChainId::get());
 
@@ -441,56 +404,8 @@ fn test_runtime_set_authorization() {
 		let authority_id = <Test as Config>::AddressMapper::to_account_id(&authority);
 		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 100_000_000);
 
+		// Set delegation
 		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-		let auth = signer.sign_authorization(chain_id, target_contract.addr, nonce);
-
-		let result = builder::eth_call_with_authorization_list(target_contract.addr)
-			.authorization_list(vec![auth])
-			.eth_gas_limit(crate::test_utils::ETH_GAS_LIMIT.into())
-			.build();
-
-		assert_ok!(result);
-		assert!(AccountInfo::<Test>::is_delegated(&authority));
-		assert_eq!(
-			AccountInfo::<Test>::get_delegation_target(&authority),
-			Some(target_contract.addr)
-		);
-
-		let new_nonce = frame_system::Pallet::<Test>::account_nonce(&authority_id);
-		assert_eq!(new_nonce, 1);
-	});
-}
-
-/// Runtime test: Clear authorization via eth_call
-///
-/// This test verifies that an EOA can clear its delegation by setting
-/// the authorization address to 0x0 (zero address).
-///
-/// Test flow:
-/// 1. Set up an EOA with delegation to a contract (same as test above)
-/// 2. Create a new authorization with address = 0x0
-/// 3. Dispatch eth_call with the clearing authorization
-/// 4. Verify delegation is cleared and account is back to EOA state
-#[test]
-fn test_runtime_clear_authorization() {
-	ExtBuilder::default().build().execute_with(|| {
-		let chain_id = U256::from(<Test as Config>::ChainId::get());
-
-		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&ALICE, 100_000_000);
-		<Test as Config>::FeeInfo::deposit_txfee(<Test as Config>::Currency::issue(10_000_000_000));
-
-		let seed = H256::random();
-		let signer = TestSigner::new(&seed.0);
-		let authority = signer.address;
-
-		let target_contract = builder::bare_instantiate(Code::Upload(dummy_evm_contract()))
-			.build_and_unwrap_contract();
-
-		let authority_id = <Test as Config>::AddressMapper::to_account_id(&authority);
-		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 100_000_000);
-
-		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-
 		let auth1 = signer.sign_authorization(chain_id, target_contract.addr, nonce);
 		let result1 = builder::eth_call_with_authorization_list(target_contract.addr)
 			.authorization_list(vec![auth1])
@@ -498,9 +413,14 @@ fn test_runtime_clear_authorization() {
 			.build();
 		assert_ok!(result1);
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
+		assert_eq!(
+			AccountInfo::<Test>::get_delegation_target(&authority),
+			Some(target_contract.addr)
+		);
+		assert_eq!(frame_system::Pallet::<Test>::account_nonce(&authority_id), 1);
 
+		// Clear delegation via zero address
 		let new_nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-
 		let auth2 = signer.sign_authorization(chain_id, H160::zero(), new_nonce);
 		let result2 = builder::eth_call_with_authorization_list(target_contract.addr)
 			.authorization_list(vec![auth2])
@@ -510,7 +430,6 @@ fn test_runtime_clear_authorization() {
 
 		assert!(!AccountInfo::<Test>::is_delegated(&authority));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), None);
-
 		assert!(!AccountInfo::<Test>::is_contract(&authority));
 	});
 }

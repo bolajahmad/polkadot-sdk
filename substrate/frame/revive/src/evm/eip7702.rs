@@ -33,7 +33,7 @@ use sp_core::{Get, H160, U256};
 use sp_runtime::SaturatedConversion;
 
 /// EIP-7702: Magic value for authorization signature message
-pub const EIP7702_MAGIC: u8 = 0x05;
+const EIP7702_MAGIC: u8 = 0x05;
 
 /// Result of processing EIP-7702 authorization tuples.
 #[derive(Default, Debug, PartialEq, Eq)]

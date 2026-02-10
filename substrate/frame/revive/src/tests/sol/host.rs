@@ -189,8 +189,8 @@ fn extcodesize_works(fixture_type: FixtureType) {
 		<Test as Config>::Currency::set_balance(&CHARLIE, 100_000_000);
 		let delegated_eoa = create_delegated_eoa(&target_addr);
 
-		struct TestCase<'a> {
-			name: &'a str,
+		struct TestCase {
+			name: &'static str,
 			addr: H160,
 			expected: u64,
 		}
@@ -229,8 +229,8 @@ fn extcodehash_works(fixture_type: FixtureType) {
 		let host_code_hash = test_utils::get_contract(&host_addr).code_hash;
 		let target_code_hash = test_utils::get_contract(&target_addr).code_hash;
 
-		struct TestCase<'a> {
-			name: &'a str,
+		struct TestCase {
+			name: &'static str,
 			addr: H160,
 			expected: H256,
 		}
@@ -284,8 +284,8 @@ fn pallet_code_works() {
 			Empty,
 		}
 
-		struct TestCase<'a> {
-			name: &'a str,
+		struct TestCase {
+			name: &'static str,
 			addr: H160,
 			expected: Expected,
 		}
@@ -316,21 +316,9 @@ fn pallet_code_works() {
 					assert_eq!(code, expected, "Pallet::code for {name} failed");
 				},
 				Expected::Delegated(target) => {
-					assert_eq!(
-						code.len(),
-						23,
-						"Delegation indicator for {name} should be 23 bytes",
-					);
-					assert_eq!(
-						&code[0..3],
-						&[0xef, 0x01, 0x00],
-						"Delegation prefix for {name} wrong",
-					);
-					assert_eq!(
-						&code[3..23],
-						target.as_bytes(),
-						"Delegation target for {name} wrong",
-					);
+					let mut expected = vec![0xef, 0x01, 0x00];
+					expected.extend_from_slice(target.as_bytes());
+					assert_eq!(code, expected, "Pallet::code for {name} failed");
 				},
 				Expected::Empty => {
 					assert!(code.is_empty(), "Pallet::code for {name} should be empty");

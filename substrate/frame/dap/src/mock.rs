@@ -18,8 +18,10 @@
 //! Test mock for the DAP pallet.
 
 use crate::{self as pallet_dap, Config};
-use frame_support::{derive_impl, parameter_types, PalletId};
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
+use frame_support::{
+	derive_impl, parameter_types, sp_runtime::traits::AccountIdConversion, PalletId,
+};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 type AccountId = u128;
@@ -43,10 +45,12 @@ impl frame_system::Config for Test {
 #[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
 impl pallet_balances::Config for Test {
 	type AccountStore = System;
+	type ExistentialDeposit = ExistentialDeposit;
 }
 
 parameter_types! {
 	pub const DapPalletId: PalletId = PalletId(*b"dap/buff");
+	pub const ExistentialDeposit: u64 = 10;
 }
 
 /// Simple test EraPayout implementation.
@@ -67,15 +71,16 @@ impl Config for Test {
 	type BudgetOrigin = frame_system::EnsureRoot<AccountId>;
 }
 
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-	pallet_balances::GenesisConfig::<Test> {
-		balances: vec![(1, 100), (2, 200), (3, 300)],
-		..Default::default()
+pub fn new_test_ext(fund_buffer: bool) -> sp_io::TestExternalities {
+	let mut balances = vec![(1, 100), (2, 200), (3, 300)];
+
+	if fund_buffer {
+		let buffer: u64 = DapPalletId::get().into_account_truncating();
+		balances.push((buffer, ExistentialDeposit::get()));
 	}
-	.assimilate_storage(&mut t)
-	.unwrap();
-	crate::pallet::GenesisConfig::<Test>::default()
+
+	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+	pallet_balances::GenesisConfig::<Test> { balances, ..Default::default() }
 		.assimilate_storage(&mut t)
 		.unwrap();
 	t.into()

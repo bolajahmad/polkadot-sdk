@@ -394,10 +394,12 @@ pub struct KeysMessageToXcm;
 impl sp_runtime::traits::Convert<rc_client::KeysMessage<AccountId>, Xcm<()>> for KeysMessageToXcm {
 	fn convert(msg: rc_client::KeysMessage<AccountId>) -> Xcm<()> {
 		let encoded_call = match msg {
-			rc_client::KeysMessage::SetKeys { stash, keys } =>
-				RelayChainRuntimePallets::AhClient(AhClientCalls::SetKeys { stash, keys }).encode(),
-			rc_client::KeysMessage::PurgeKeys { stash } =>
-				RelayChainRuntimePallets::AhClient(AhClientCalls::PurgeKeys { stash }).encode(),
+			rc_client::KeysMessage::SetKeys { stash, keys } => {
+				RelayChainRuntimePallets::AhClient(AhClientCalls::SetKeys { stash, keys }).encode()
+			},
+			rc_client::KeysMessage::PurgeKeys { stash } => {
+				RelayChainRuntimePallets::AhClient(AhClientCalls::PurgeKeys { stash }).encode()
+			},
 		};
 		rc_client::build_transact_xcm(encoded_call)
 	}
@@ -517,7 +519,7 @@ impl pallet_delegated_staking::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type PalletId = DelegatedStakingPalletId;
 	type Currency = Balances;
-	type OnSlash = ();
+	type OnSlash = Dap;
 	type SlashRewardFraction = SlashRewardFraction;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type CoreStaking = Staking;

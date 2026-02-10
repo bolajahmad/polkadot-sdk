@@ -132,7 +132,7 @@ impl<T: Config> Pallet<T> {
 		})?;
 
 		match Ledger::<T>::get(controller) {
-			Some(ledger) =>
+			Some(ledger) => {
 				if ledger.stash != *stash {
 					Ok(LedgerIntegrityState::Corrupted)
 				} else {
@@ -141,7 +141,8 @@ impl<T: Config> Pallet<T> {
 					} else {
 						Ok(LedgerIntegrityState::Ok)
 					}
-				},
+				}
+			},
 			None => Ok(LedgerIntegrityState::CorruptedKilled),
 		}
 	}
@@ -1753,7 +1754,9 @@ impl<T: Config> StakingInterface for Pallet<T> {
 	}
 
 	fn current_era() -> EraIndex {
-		CurrentEra::<T>::get().unwrap_or(Zero::zero())
+		// Named current_era for legacy interface compatibility, but returns active_era.
+		// Active era should be used for all non-election staking logic.
+		Rotator::<T>::active_era()
 	}
 
 	fn stake(who: &Self::AccountId) -> Result<Stake<BalanceOf<T>>, DispatchError> {
@@ -2008,9 +2011,11 @@ impl<T: Config> Pallet<T> {
 				// if stash == controller, it means that the ledger has migrated to
 				// post-controller. If no migration happened, we expect that the (stash,
 				// controller) pair has only one associated ledger.
+				{
 					if stash != controller {
 						count_double += 1;
-					},
+					}
+				},
 				(None, None) => {
 					count_none += 1;
 				},

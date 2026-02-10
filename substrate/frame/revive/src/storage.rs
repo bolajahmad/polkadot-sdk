@@ -249,14 +249,11 @@ impl<T: Config> AccountInfo<T> {
 	/// Marks the account as delegated to the target address.
 	/// Per EIP-7702, only creates ContractInfo if target is a Contract.
 	/// If target is delegated or EOA, contract_info is None (no chain following).
-	pub fn set_delegation(address: &H160, target: H160) -> Result<(), DispatchError> {
+	pub fn set_delegation(address: &H160, target: H160) {
 		let contract_info =
 			<AccountInfoOf<T>>::get(&target).and_then(|info| match info.account_type {
-				AccountType::Contract(c) => {
-					let account_id = T::AddressMapper::to_account_id(address);
-					let nonce = frame_system::Pallet::<T>::account_nonce(&account_id);
-					ContractInfo::<T>::new_for_delegation(address, nonce, c.code_hash).ok()
-				},
+				AccountType::Contract(c) =>
+					Some(ContractInfo::<T>::new_for_delegation(address, c.code_hash)),
 				_ => None,
 			});
 
@@ -269,8 +266,7 @@ impl<T: Config> AccountInfo<T> {
 					dust: 0,
 				});
 			}
-			Ok(())
-		})
+		});
 	}
 
 	/// EIP-7702: Clear delegation indicator, resetting account to EOA
@@ -280,12 +276,7 @@ impl<T: Config> AccountInfo<T> {
 	pub fn clear_delegation(address: &H160) {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {
-				if let AccountType::Delegated { contract_info, .. } = &account.account_type {
-					if let Some(info) = contract_info {
-						if info.storage_items > 0 {
-							ContractInfo::<T>::queue_trie_for_deletion(info.trie_id.clone());
-						}
-					}
+				if let AccountType::Delegated { .. } = &account.account_type {
 					account.account_type = AccountType::EOA;
 				}
 			}
@@ -332,28 +323,18 @@ impl<T: Config> ContractInfo<T> {
 	/// Constructs a new contract info for a delegated account (EIP-7702).
 	///
 	/// Delegated accounts have their own child trie for storage but use the code hash
-	/// of the target contract they delegate to. The immutable data length is always 0
-	/// because delegated accounts use the target's immutable data.
-	///
-	/// This returns an `Err` if the address already has a contract.
-	pub fn new_for_delegation(
-		address: &H160,
-		nonce: T::Nonce,
-		target_code_hash: sp_core::H256,
-	) -> Result<Self, DispatchError> {
-		if <AccountInfo<T>>::is_contract(address) {
-			return Err(Error::<T>::DuplicateContract.into());
-		}
-
+	/// of the target contract they delegate to. The trie_id is derived solely from the
+	/// address so that storage persists across re-delegations to different targets.
+	pub fn new_for_delegation(address: &H160, target_code_hash: sp_core::H256) -> Self {
 		let trie_id = {
-			let buf = ("bcontract_trie_v1", address, nonce).using_encoded(T::Hashing::hash);
+			let buf = ("delegated_trie_v1", address).using_encoded(T::Hashing::hash);
 			buf.as_ref()
 				.to_vec()
 				.try_into()
 				.expect("Runtime uses a reasonable hash size. Hence sizeof(T::Hash) <= 128; qed")
 		};
 
-		let contract = Self {
+		Self {
 			trie_id,
 			code_hash: target_code_hash,
 			storage_bytes: 0,
@@ -361,11 +342,8 @@ impl<T: Config> ContractInfo<T> {
 			storage_byte_deposit: Zero::zero(),
 			storage_item_deposit: Zero::zero(),
 			storage_base_deposit: Zero::zero(),
-			// Delegated accounts always use the target's immutable data
 			immutable_data_len: 0,
-		};
-
-		Ok(contract)
+		}
 	}
 
 	/// Associated child trie unique id is built from the hash part of the trie id.

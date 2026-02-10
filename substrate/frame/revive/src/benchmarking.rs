@@ -129,9 +129,9 @@ mod benchmarks {
 
 	// Benchmark for processing N EIP-7702 authorizations with empty accounts
 	// This measures the overhead of processing the authorization list
-	// Parameter `n`: number of authorizations to process (0 to 255 as per EIP-7702)
+	// Parameter `n`: number of authorizations to process
 	#[benchmark(pov_mode = Measured)]
-	fn process_new_account_authorization(n: Linear<0, 255>) -> Result<(), BenchmarkError> {
+	fn process_new_account_authorization(n: Linear<0, 1000>) -> Result<(), BenchmarkError> {
 		use crate::evm::eip7702;
 		use sp_core::keccak_256;
 

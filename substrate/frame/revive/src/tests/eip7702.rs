@@ -49,7 +49,7 @@ fn set_delegation_creates_indicator() {
 		let eoa = H160::from([0x11; 20]);
 		let target = H160::from([0x22; 20]);
 
-		assert_ok!(AccountInfo::<Test>::set_delegation(&eoa, target));
+		AccountInfo::<Test>::set_delegation(&eoa, target);
 		assert!(AccountInfo::<Test>::is_delegated(&eoa));
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&eoa), Some(target));
 	});
@@ -61,7 +61,7 @@ fn clear_delegation_restores_eoa() {
 		let authority = H160::from([0x11; 20]);
 		let target = H160::from([0x22; 20]);
 
-		assert_ok!(AccountInfo::<Test>::set_delegation(&authority, target));
+		AccountInfo::<Test>::set_delegation(&authority, target);
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
 
 		AccountInfo::<Test>::clear_delegation(&authority);
@@ -76,10 +76,10 @@ fn delegation_can_be_updated() {
 		let target1 = H160::from([0x22; 20]);
 		let target2 = H160::from([0x33; 20]);
 
-		assert_ok!(AccountInfo::<Test>::set_delegation(&authority, target1));
+		AccountInfo::<Test>::set_delegation(&authority, target1);
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target1));
 
-		assert_ok!(AccountInfo::<Test>::set_delegation(&authority, target2));
+		AccountInfo::<Test>::set_delegation(&authority, target2);
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target2));
 
 		assert!(AccountInfo::<Test>::is_delegated(&authority));
@@ -110,7 +110,7 @@ fn eip3607_allows_delegated_accounts_to_originate_transactions() {
 		let authority_id = <Test as Config>::AddressMapper::to_account_id(&authority);
 		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 1_000_000);
 
-		assert_ok!(AccountInfo::<Test>::set_delegation(&authority, target));
+		AccountInfo::<Test>::set_delegation(&authority, target);
 
 		let origin = RuntimeOrigin::signed(authority_id.clone());
 		assert_ok!(Contracts::ensure_non_contract_if_signed(&origin));
@@ -139,13 +139,13 @@ fn multiple_delegations_last_one_wins() {
 		let target2 = H160::from([0x33; 20]);
 		let target3 = H160::from([0x44; 20]);
 
-		assert_ok!(AccountInfo::<Test>::set_delegation(&eoa, target1));
+		AccountInfo::<Test>::set_delegation(&eoa, target1);
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&eoa), Some(target1));
 
-		assert_ok!(AccountInfo::<Test>::set_delegation(&eoa, target2));
+		AccountInfo::<Test>::set_delegation(&eoa, target2);
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&eoa), Some(target2));
 
-		assert_ok!(AccountInfo::<Test>::set_delegation(&eoa, target3));
+		AccountInfo::<Test>::set_delegation(&eoa, target3);
 		assert_eq!(AccountInfo::<Test>::get_delegation_target(&eoa), Some(target3));
 	});
 }
@@ -599,7 +599,7 @@ fn delegation_chain_does_not_execute() {
 			builder::bare_instantiate(Code::Upload(counter_code)).build_and_unwrap_contract();
 
 		// Alice delegates to the Counter contract
-		assert_ok!(AccountInfo::<Test>::set_delegation(&ALICE_ADDR, counter.addr));
+		AccountInfo::<Test>::set_delegation(&ALICE_ADDR, counter.addr);
 
 		// Helper to read Alice's number storage slot
 		let read_number = || {
@@ -642,7 +642,7 @@ fn delegation_chain_does_not_execute() {
 
 		// Case 3: Bob delegates to Alice (chain: Bob -> Alice -> Counter)
 		// Calling Bob should NOT execute code because chains are not followed
-		assert_ok!(AccountInfo::<Test>::set_delegation(&BOB_ADDR, ALICE_ADDR));
+		AccountInfo::<Test>::set_delegation(&BOB_ADDR, ALICE_ADDR);
 
 		let result = builder::bare_call(BOB_ADDR)
 			.data(

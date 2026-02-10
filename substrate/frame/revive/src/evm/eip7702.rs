@@ -98,10 +98,7 @@ pub fn process_authorizations<T: Config>(
 		if auth.address.is_zero() {
 			AccountInfo::<T>::clear_delegation(&authority);
 		} else {
-			if let Err(e) = AccountInfo::<T>::set_delegation(&authority, auth.address) {
-				log::debug!(target: LOG_TARGET, "Failed to set delegation for {authority:?}: {e:?}");
-				continue;
-			}
+			AccountInfo::<T>::set_delegation(&authority, auth.address);
 		}
 
 		frame_system::Pallet::<T>::inc_account_nonce(&account_id);
@@ -124,7 +121,7 @@ fn recover_authority(auth: &AuthorizationListEntry) -> Result<H160, ()> {
 /// Sign an authorization entry
 ///
 /// This is a helper function for benchmarks and tests.
-#[cfg(feature = "runtime-benchmarks")]
+#[cfg(any(feature = "runtime-benchmarks", test))]
 pub fn sign_authorization(
 	pair: &sp_core::ecdsa::Pair,
 	chain_id: U256,
@@ -152,7 +149,7 @@ pub fn sign_authorization(
 /// Derive the Ethereum address from a signing key.
 ///
 /// This is a helper function for benchmarks and tests.
-#[cfg(feature = "runtime-benchmarks")]
+#[cfg(any(feature = "runtime-benchmarks", test))]
 pub fn eth_address(pair: &sp_core::ecdsa::Pair) -> H160 {
 	let msg = [0u8; 32];
 	let sig = pair.sign_prehashed(&msg);

@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770733782219,
+  "lastUpdate": 1770752946259,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "178801527+raymondkfcheung@users.noreply.github.com",
-            "name": "Raymond Cheung",
-            "username": "raymondkfcheung"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "b7a48fcfdcc38c4ac2799275d02991759ab18ab9",
-          "message": "Align parameters for `EventEmitter::emit_sent_event` (#9057)\n\nCorrected markdown and indentation for the `emit_sent_event` function\nparameters in the `EventEmitter` trait documentation for better\nreadability.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-02T10:06:47Z",
-          "tree_id": "f96377f6f5877c2360da59fe5e3694f7324c55ed",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/b7a48fcfdcc38c4ac2799275d02991759ab18ab9"
-        },
-        "date": 1751455137677,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 127.93799999999993,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.03401944467199999,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04493810347799994,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.06474695777399991,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "94772640+snowmead@users.noreply.github.com",
+            "name": "Michael Assaf",
+            "username": "snowmead"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "fbddee8faabeadef47a375c71c1a8a11274e4e0d",
+          "message": "Add `DecodeWithMemTracking` derive to `CompactProof` (#11028)\n\n# Description\n\nAdd `DecodeWithMemTracking` derive to `CompactProof` in\n`substrate/primitives/trie/src/storage_proof.rs`.\n\n`StorageProof` already derived `DecodeWithMemTracking` but\n`CompactProof` in the same file was missed.\n\n## Integration\n\nNo integration changes required for downstream projects. `CompactProof`\nnow implements `DecodeWithMemTracking`, which is a strictly additive\ntrait implementation. Existing code using `CompactProof` will continue\nto work as before.\n\n## Review Notes\n\nSingle-line change adding `DecodeWithMemTracking` to the derive macro\nlist on `CompactProof`:\n\n```diff\n-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, TypeInfo)]\n+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]\n pub struct CompactProof {\n     pub encoded_nodes: Vec<Vec<u8>>,\n }\n```\n\n`CompactProof` only contains `Vec<Vec<u8>>`, which already implements\n`DecodeWithMemTracking`, so the derive works without any manual\nimplementation.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-10T18:41:06Z",
+          "tree_id": "8454baf6ec660756950140fb84b8400668568743",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/fbddee8faabeadef47a375c71c1a8a11274e4e0d"
+        },
+        "date": 1770752921008,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.058,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.038560086618000006,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06860241233399987,
             "unit": "seconds"
           }
         ]

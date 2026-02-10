@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770723812739,
+  "lastUpdate": 1770733747387,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "4211399+ordian@users.noreply.github.com",
-            "name": "ordian",
-            "username": "ordian"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "87a8fb03886485c6e0f5125ddfc7211ca9947803",
-          "message": "dispute-coordinator: handle race with offchain disabling (#9050)\n\nFixes a potential race with off-chain disabling when we learned about\ndisablement after importing a dispute from that validator.\n\nI think there's no need to handle startup to do deactivation. This will\nbe only relevant for when a node upgrades to the release with a fix and\nwriting a migration for that seems like an overkill since this scenario\nis very low probability.",
-          "timestamp": "2025-07-02T11:38:00Z",
-          "tree_id": "80d69b0fb439b35bd22fb88d94e7e7bfa85f0efa",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/87a8fb03886485c6e0f5125ddfc7211ca9947803"
-        },
-        "date": 1751460108697,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 52938,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 63627.590000000004,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.926588701260032,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.00001961225,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.3875195860900007,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.8962067553500095,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.37476580572,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.46931839398002173,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.3177541062525804,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.0000192478,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.0000192478,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.00001961225,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005449720059999999,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.412641528199999,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.38068691186,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting-parallel/approval-voting-parallel-2",
             "value": 2.754172544579999,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a20ac9bd4fedd78da159fa4bbd8452dc8c17ec4b",
+          "message": "xcm-emulator: advance relay block number by relay_blocks_per_para_block (#11031)\n\nAfter `AuraDigestProvider` was introduced, emulated integration tests\nfor parachains with `slot_duration != relay_slot_duration` (e.g. 12s\nPolkadot/Kusama chains) panic because `FixedVelocityConsensusHook`\nderives a parachain slot that doesn't match `CurrentSlot`.\nFix by advancing the relay block number by `slot_duration /\nRELAY_CHAIN_SLOT_DURATION_MILLIS` per parachain block (instead of always\n+1), and computing the aura digest slot inline using both durations.\nThis removes the `DigestProvider` associated type from the `Parachain`\ntrait and the `AuraDigestProvider` struct — the emulator now handles the\ndigest automatically.\nDownstream users must remove `DigestProvider: AuraDigestProvider,` from\ntheir `decl_test_parachains!` invocations.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-10T13:18:35Z",
+          "tree_id": "e5cf27b46ffd198010768292a5ca63d9fbc31f35",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a20ac9bd4fedd78da159fa4bbd8452dc8c17ec4b"
+        },
+        "date": 1770733722017,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 63629.31,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 52946.09999999999,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.662741483389999,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.00002010596,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.00001890882,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.892534215910052,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3422234811199956,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8098365195800552,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.685190172600001,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.710337551980002,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.417862215503029,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.6763529651099995,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.00001890882,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.00002010596,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.00585204213,
             "unit": "seconds"
           }
         ]

@@ -1,0 +1,42 @@
+title: '[Pool] Claim trapped balance'
+doc:
+- audience: Todo
+  description: |-
+    closes https://github.com/paritytech/polkadot-sdk/issues/10993
+
+    ## Context
+    The staking pallet tracks two types of eras:
+    - Active Era
+    - Planning Era (this is the era that is being planned)
+
+    Planning Era was historically called CurrentEra and its storage is still named CurrentEra, which adds to confusion. Ideally, Planning Era should only be used for validator election logic, but this was unfortunately not the case - we mixed usages throughout the codebase. (https://github.com/paritytech/polkadot-sdk/pull/10986 fixes this with StakingInterface only exposing ActiveEra going forward.)
+
+    Staking-async pallet was using Active Era for unbonding and withdrawals, while nomination pools were using Planning Era.
+
+    What happened in #10993: pools dissolved points (issued in return for held DOTs) for the Planning Era, while staking only unlocked chunks up to the Active Era (where Planning Era = Active Era + 1). This caused more points to be burned than DOTs returned to the user.
+
+    The DOTs remained locked in the pool member's account but became trapped. That is, the user doesn't have enough points to claim them.
+
+    ## Changes
+
+    New Extrinsic: claim_trapped_balance
+    Added to the nomination pools pallet. Permissionless - anyone can call it for any member. When a user has trapped balance, this will:
+    - Apply any pending slash for the member first
+    - Calculate trapped amount by checking actual held balance vs expected balance from points
+    - Release trapped funds instantly if present.
+    - Emits TrappedBalanceClaimed is successful.
+    - Returns `NoTrappedBalance` error if unsuccessful.
+    -  If there is no trapped balance but a pending slash exists, the extrinsic still succeeds. This is intentional - applying pending slashes is useful work that should be persisted.
+crates:
+- name: pallet-nomination-pools
+  bump: major
+- name: pallet-nomination-pools-benchmarking
+  bump: major
+- name: pallet-staking-async
+  bump: major
+- name: pallet-staking
+  bump: major
+- name: sp-staking
+  bump: major
+- name: pallet-fast-unstake
+  bump: major

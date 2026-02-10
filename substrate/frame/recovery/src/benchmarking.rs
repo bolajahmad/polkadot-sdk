@@ -138,12 +138,31 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn revoke_inheritor() {
+		let lost: T::AccountId = whitelisted_caller();
+		let depositor: T::AccountId = account("depositor", 0, SEED);
+
+		fund_account::<T>(&lost);
+		fund_account::<T>(&depositor);
+
+		let ticket = Pallet::<T>::inheritor_ticket(&depositor).unwrap();
+		Inheritor::<T>::insert(
+			&lost,
+			(0u32, &account::<T::AccountId>("inheritor", 0, SEED), ticket),
+		);
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(lost.clone()));
+
+		assert_last_event::<T>(Event::<T>::InheritorRevoked { lost }.into());
+	}
+
+	#[benchmark]
 	fn set_friend_groups() {
 		let lost: T::AccountId = whitelisted_caller();
 		fund_account::<T>(&lost);
 
-		let old_friend_groups =
-			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0);
+		let old_friend_groups = setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0);
 		let new_friend_groups =
 			create_friend_groups::<T>(T::MaxFriendsPerConfig::get(), 1).into_inner();
 
@@ -163,8 +182,7 @@ mod benchmarks {
 		fund_account::<T>(&lost);
 
 		let friend_groups =
-			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0)
-				.into_inner();
+			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0).into_inner();
 
 		crate::pallet::Pallet::<T>::set_friend_groups(
 			RawOrigin::Signed(lost.clone()).into(),
@@ -190,8 +208,7 @@ mod benchmarks {
 		fund_account::<T>(&lost);
 
 		let friend_groups =
-			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0)
-				.into_inner();
+			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0).into_inner();
 		crate::pallet::Pallet::<T>::set_friend_groups(
 			RawOrigin::Signed(lost.clone()).into(),
 			friend_groups,
@@ -230,8 +247,7 @@ mod benchmarks {
 
 		// Friend groups have order 0, which is lower than existing order 1
 		let friend_groups =
-			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0)
-				.into_inner();
+			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0).into_inner();
 		crate::pallet::Pallet::<T>::set_friend_groups(
 			RawOrigin::Signed(lost.clone()).into(),
 			friend_groups,
@@ -275,8 +291,7 @@ mod benchmarks {
 		fund_account::<T>(&initiator);
 
 		let friend_groups =
-			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0)
-				.into_inner();
+			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0).into_inner();
 		crate::pallet::Pallet::<T>::set_friend_groups(
 			RawOrigin::Signed(lost.clone()).into(),
 			friend_groups,
@@ -308,8 +323,7 @@ mod benchmarks {
 		fund_account::<T>(&initiator);
 
 		let friend_groups =
-			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0)
-				.into_inner();
+			setup_friend_groups::<T>(&lost, T::MaxFriendsPerConfig::get(), 0).into_inner();
 		crate::pallet::Pallet::<T>::set_friend_groups(
 			RawOrigin::Signed(lost.clone()).into(),
 			friend_groups,

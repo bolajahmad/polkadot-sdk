@@ -47,6 +47,7 @@ use core::marker::PhantomData;
 /// Weight functions needed for `pallet_recovery`.
 pub trait WeightInfo {
 	fn control_inherited_account() -> Weight;
+	fn revoke_inheritor() -> Weight;
 	fn set_friend_groups() -> Weight;
 	fn initiate_attempt() -> Weight;
 	fn approve_attempt() -> Weight;
@@ -71,6 +72,21 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Minimum execution time: 33_460_000 picoseconds.
 		Weight::from_parts(33_900_000, 3997)
 			.saturating_add(T::DbWeight::get().reads(3_u64))
+	}
+	/// Storage: `Recovery::Inheritor` (r:1 w:1)
+	/// Proof: `Recovery::Inheritor` (`max_values`: None, `max_size`: Some(117), added: 2592, mode: `MaxEncodedLen`)
+	/// Storage: `Balances::Holds` (r:1 w:1)
+	/// Proof: `Balances::Holds` (`max_values`: None, `max_size`: Some(535), added: 3010, mode: `MaxEncodedLen`)
+	/// Storage: `System::Account` (r:1 w:1)
+	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
+	fn revoke_inheritor() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `487`
+		//  Estimated: `4000`
+		// Minimum execution time: 75_880_000 picoseconds.
+		Weight::from_parts(75_880_000, 4000)
+			.saturating_add(T::DbWeight::get().reads(3_u64))
+			.saturating_add(T::DbWeight::get().writes(3_u64))
 	}
 	/// Storage: `Recovery::Attempt` (r:1 w:0)
 	/// Proof: `Recovery::Attempt` (`max_values`: None, `max_size`: Some(164), added: 2639, mode: `MaxEncodedLen`)
@@ -185,6 +201,21 @@ impl WeightInfo for () {
 		// Minimum execution time: 33_460_000 picoseconds.
 		Weight::from_parts(33_900_000, 3997)
 			.saturating_add(RocksDbWeight::get().reads(3_u64))
+	}
+	/// Storage: `Recovery::Inheritor` (r:1 w:1)
+	/// Proof: `Recovery::Inheritor` (`max_values`: None, `max_size`: Some(117), added: 2592, mode: `MaxEncodedLen`)
+	/// Storage: `Balances::Holds` (r:1 w:1)
+	/// Proof: `Balances::Holds` (`max_values`: None, `max_size`: Some(535), added: 3010, mode: `MaxEncodedLen`)
+	/// Storage: `System::Account` (r:1 w:1)
+	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
+	fn revoke_inheritor() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `487`
+		//  Estimated: `4000`
+		// Minimum execution time: 75_880_000 picoseconds.
+		Weight::from_parts(75_880_000, 4000)
+			.saturating_add(RocksDbWeight::get().reads(3_u64))
+			.saturating_add(RocksDbWeight::get().writes(3_u64))
 	}
 	/// Storage: `Recovery::Attempt` (r:1 w:0)
 	/// Proof: `Recovery::Attempt` (`max_values`: None, `max_size`: Some(164), added: 2639, mode: `MaxEncodedLen`)

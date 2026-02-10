@@ -153,10 +153,8 @@ impl<AccountId: Clone + Eq, Footprint, C: Consideration<AccountId, Footprint>>
 		new_fp: impl Into<Option<Footprint>>,
 	) -> Result<Self, DispatchError> {
 		let fp = new_fp.into();
-		if *new_depositor != self.depositor || fp.is_none() {
-			if let Some(ticket) = self.ticket {
-				ticket.drop(&self.depositor)?;
-			}
+		if let Some(ticket) = self.ticket {
+			ticket.drop(&self.depositor)?;
 		}
 
 		let ticket = if let Some(fp) = fp {

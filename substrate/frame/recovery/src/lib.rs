@@ -36,26 +36,26 @@
 //!
 //! ## Scenario: Recovering a lost account
 //!
-//! Story of how the user Alice user loses access and is recovered by her friends.
+//! Story of how the user Alice loses access and is recovered by her friends.
 //!
 //! 1. Alice uses the recovery pallet to configure one or more friends groups:
 //!   - Alice picks a suitable `inheritor` account that will inherit the access to her account for
 //!     each friend group. This could be a multisig.
-//!   - Alice configures all groups with via `set_friend_groups`.
+//!   - Alice configures all groups via `set_friend_groups`.
 //! 2. Alice loses access to her account and becomes a `lost` account.
 //! 3. Any member (aka `initiator`) of Alice's friend groups become aware of the situation and
 //!    starts a recovery `attempt` via `initiate_attempt`.
 //! 4. The friend group self-organizes and one-by-one approve the ongoing attempt via
 //!    `approve_attempt`.
-//! 5. Exactly `friends_needed` friends approve the attempt (further approvals will fail since they are
-//!    useless).
+//! 5. Exactly `friends_needed` friends approve the attempt (further approvals will fail since they
+//!    are useless).
 //! 6. Any account finishes the attempt via `finish_attempt` after at least *inheritance delay*
 //!    blocks since the initiation have passed.
 //! 7. Alice's account is now officially `recovered` and accessible by the `inheritor` account.
 //! 8. The `inheritor` may call `control_inherited_account` at any point to transfer Alice's funds
 //!    to her new account.
 //!
-//! ## Scenario: Multiple friend group try to recover an account
+//! ## Scenario: Multiple friend groups try to recover an account
 //!
 //! Alice may have configured multiple friend groups that all try to recover her account at the same
 //! time. This can lead to a conflict of which friend group should eventually inherit the access.
@@ -190,8 +190,7 @@ pub type FriendGroupIndex = u32;
 pub type InheritanceOrder = u32;
 
 /// A `FriendGroup` for a specific `Config`.
-pub type FriendGroupOf<T> =
-	FriendGroup<ProvidedBlockNumberOf<T>, AccountIdFor<T>, FriendsOf<T>>;
+pub type FriendGroupOf<T> = FriendGroup<ProvidedBlockNumberOf<T>, AccountIdFor<T>, FriendsOf<T>>;
 
 /// Collection of friend groups of a lost account.
 pub type FriendGroupsOf<T> = BoundedVec<FriendGroupOf<T>, ConstU32<MAX_GROUPS_PER_ACCOUNT>>;
@@ -203,7 +202,18 @@ pub type ApprovalBitfield<MaxFriends> = Bitfield<MaxFriends>;
 pub type ApprovalBitfieldOf<T> = ApprovalBitfield<<T as Config>::MaxFriendsPerConfig>;
 
 /// An attempt to recover an account.
-#[derive(Clone, Eq, PartialEq, Encode, Decode, Default, Debug, TypeInfo, MaxEncodedLen)]
+#[derive(
+	Clone,
+	Eq,
+	PartialEq,
+	Encode,
+	Decode,
+	Default,
+	Debug,
+	TypeInfo,
+	MaxEncodedLen,
+	DecodeWithMemTracking,
+)]
 pub struct Attempt<ProvidedBlockNumber, ApprovalBitfield, AccountId> {
 	/// Index of the friend group that initiated the attempt.
 	///
@@ -228,24 +238,6 @@ pub struct Attempt<ProvidedBlockNumber, ApprovalBitfield, AccountId> {
 	/// Each bit corresponds to a friend in the `friend_group.friends` that has approved the
 	/// attempt.
 	pub approvals: ApprovalBitfield,
-}
-
-impl<ProvidedBlockNumber, ApprovalBitfield, AccountId>
-	Attempt<ProvidedBlockNumber, ApprovalBitfield, AccountId>
-where
-	ProvidedBlockNumber: CheckedAdd,
-{
-	/// Calculate the earliest block when the attempt can be canceled.
-	///
-	/// This is the last approval block plus the cancel delay from the friend group. Returns None if
-	/// overflow occurs.
-	pub fn cancelable_at<Friends>(
-		&self,
-		friend_groups: &[FriendGroup<ProvidedBlockNumber, AccountId, Friends>],
-	) -> Option<ProvidedBlockNumber> {
-		let fg = friend_groups.get(self.friend_group_index as usize)?;
-		self.last_approval_block.checked_add(&fg.cancel_delay)
-	}
 }
 
 /// Attempt to recover an account.
@@ -395,7 +387,7 @@ pub mod pallet {
 		#[codec(index = 2)]
 		InheritorStorage,
 
-		/// Deposit for the security deposit of a recovery attempt.
+		/// Security deposit for a recovery attempt.
 		#[codec(index = 3)]
 		SecurityDeposit,
 	}
@@ -409,7 +401,7 @@ pub mod pallet {
 			friend_group_index: FriendGroupIndex,
 			friend: T::AccountId,
 		},
-		/// A recovery attempt was canceled by the lost account.
+		/// A recovery attempt was canceled by either the lost account or the initiator.
 		AttemptCanceled {
 			lost: T::AccountId,
 			friend_group_index: FriendGroupIndex,
@@ -421,21 +413,31 @@ pub mod pallet {
 			friend_group_index: FriendGroupIndex,
 			initiator: T::AccountId,
 		},
-		/// A recovery attempt was finished by a friend.
+		/// A recovery attempt was finished.
 		AttemptFinished {
 			lost: T::AccountId,
 			friend_group_index: FriendGroupIndex,
 			inheritor: T::AccountId,
 			previous_inheritor: Option<T::AccountId>,
 		},
+		/// A recovery attempt was discarded because the account was already recovered by a
+		/// friend group with equal or lower inheritance order.
+		///
+		/// The attempt is consumed (removed from storage) and its deposits are released, but
+		/// the existing inheritor remains unchanged.
+		AttemptDiscarded {
+			lost: T::AccountId,
+			friend_group_index: FriendGroupIndex,
+			existing_inheritor: T::AccountId,
+		},
 		/// A recovery attempt was slashed by the lost account.
 		///
 		/// The initiator will lose their security deposit.
 		AttemptSlashed { lost: T::AccountId, friend_group_index: FriendGroupIndex },
-		/// The friend groups of a lost account were changed.
-		///
-		/// This will not interrupt any ongoing recovery attempts.
+		/// The friend groups of an account have been changed.
 		FriendGroupsChanged { lost: T::AccountId, old_friend_groups: FriendGroupsOf<T> },
+		/// The inheritor of a lost account was revoked by the lost account.
+		InheritorRevoked { lost: T::AccountId },
 		/// A recovered account was controlled by its inheritor.
 		///
 		/// Check the `call_result` to see if it was successful.
@@ -459,7 +461,7 @@ pub mod pallet {
 		HasOngoingAttempts,
 		/// The lost account cannot be a friend of itself.
 		LostAccountInFriendGroup,
-		/// The account was already recovered by a friend group with lower inheritance order.
+		/// The account was already recovered by a group with lower or equal inheritance order.
 		LowerOrderRecovered,
 		/// This account does not have any friend groups.
 		NoFriendGroups,
@@ -549,7 +551,10 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// Allows the inheritor of a recovered account to control it.
 		#[pallet::call_index(0)]
-		#[pallet::weight(T::WeightInfo::control_inherited_account())]
+		#[pallet::weight({
+			let di = call.get_dispatch_info();
+			(T::WeightInfo::control_inherited_account().saturating_add(di.call_weight), di.class)
+		})]
 		pub fn control_inherited_account(
 			origin: OriginFor<T>,
 			recovered: AccountIdLookupOf<T>,
@@ -580,9 +585,28 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Revoke the inheritor of the calling (lost) account.
+		///
+		/// This removes the inheritor entry and refunds the inheritor deposit. Can only be called
+		/// by the lost account itself after it regains access.
+		#[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::revoke_inheritor())]
+		pub fn revoke_inheritor(origin: OriginFor<T>) -> DispatchResult {
+			let lost = ensure_signed(origin)?;
+
+			let (_order, _inheritor, ticket) =
+				Inheritor::<T>::take(&lost).ok_or(Error::<T>::NoInheritor)?;
+
+			let _: Result<(), DispatchError> = ticket.try_drop().defensive();
+
+			Self::deposit_event(Event::<T>::InheritorRevoked { lost });
+
+			Ok(())
+		}
+
 		/// Set the friend groups of the calling account before it lost access.
 		///
-		/// This does not impact or cancel any ongoing recovery attempts. The friends of each group
+		/// Cannot be used while there are ongoing recovery attempts. The friends of each group
 		/// MUST be sorted and unique. Trying to insert two friend groups with the same set of
 		/// friends will result in an error.
 		///
@@ -637,10 +661,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Attempt to recover a lost account by a friend with the given friend group.
-		///
-		/// The friend group is passed in as witness to ensure that the recoverer is not operating
-		/// on stale friend group data and is making wrong assumptions.
+		/// Attempt to recover a lost account by a friend within the given friend group.
 		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::initiate_attempt())]
 		pub fn initiate_attempt(
@@ -740,7 +761,7 @@ pub mod pallet {
 		pub fn finish_attempt(
 			origin: OriginFor<T>,
 			lost: AccountIdLookupOf<T>,
-			attempt_index: u32,
+			attempt_index: FriendGroupIndex,
 		) -> DispatchResult {
 			let caller = ensure_signed(origin)?;
 			let lost = T::Lookup::lookup(lost)?;
@@ -803,16 +824,21 @@ pub mod pallet {
 						previous_inheritor: Some(old_inheritor),
 					});
 				},
-				Some(_) => {
-					// The existing inheritor stays since an equal or worse inheritor contested.
-					// The attempt is consumed but no event is emitted since nothing changed.
+				Some((_, existing_inheritor, _)) => {
+					// The existing inheritor stays since an equal or lower order inheritor
+					// already recovered the account.
+					Self::deposit_event(Event::<T>::AttemptDiscarded {
+						lost,
+						friend_group_index: attempt_index,
+						existing_inheritor,
+					});
 				},
 			};
 
 			Ok(())
 		}
 
-		/// The initiator or the lost account can cancel an attempt at any moment.
+		/// The lost account can cancel an attempt at any moment but the initiator after a delay.
 		///
 		/// This will release the security deposit back to the initiator. The cancel delay must be
 		/// respected if the initiator calls it to prevent it from front-running the lost account
@@ -955,7 +981,10 @@ impl<T: Config> Pallet<T> {
 			ensure!(!friend_group.friends.is_empty(), Error::<T>::NoFriends);
 			// cannot contain the lost account itself
 			ensure!(!friend_group.friends.contains(&lost), Error::<T>::LostAccountInFriendGroup);
-			ensure!(friend_group.friends.windows(2).all(|w| w[0] < w[1]), Error::<T>::FriendsNotSortedOrUnique);
+			ensure!(
+				friend_group.friends.windows(2).all(|w| w[0] < w[1]),
+				Error::<T>::FriendsNotSortedOrUnique
+			);
 			ensure!(
 				friend_group.friends_needed as usize <= friend_group.friends.len(),
 				Error::<T>::TooManyFriendsNeeded

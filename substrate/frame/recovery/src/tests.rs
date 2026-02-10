@@ -1156,6 +1156,99 @@ fn set_friend_groups_too_many_groups_fails() {
 	});
 }
 
+/// Regression: `IdentifiedConsideration::update` must not leak the old deposit when the depositor
+/// is unchanged.
+#[test]
+fn finish_attempt_same_caller_does_not_leak_inheritor_deposit() {
+	new_test_ext().execute_with(|| {
+		let fg0 = FriendGroupOf::<T> {
+			friends: friends([BOB, CHARLIE, DAVE]),
+			friends_needed: 2,
+			inheritor: FERDIE,
+			inheritance_delay: 10,
+			inheritance_order: 1,
+			cancel_delay: 10,
+		};
+		let fg1 = FriendGroupOf::<T> {
+			friends: friends([BOB, EVE]),
+			friends_needed: 2,
+			inheritor: DAVE,
+			inheritance_delay: 10,
+			inheritance_order: 0,
+			cancel_delay: 10,
+		};
+		assert_ok!(Recovery::set_friend_groups(signed(ALICE), vec![fg0, fg1]));
+
+		assert_ok!(Recovery::initiate_attempt(signed(BOB), ALICE, 0));
+		assert_ok!(Recovery::initiate_attempt(signed(BOB), ALICE, 1));
+
+		assert_ok!(Recovery::approve_attempt(signed(BOB), ALICE, 0));
+		assert_ok!(Recovery::approve_attempt(signed(CHARLIE), ALICE, 0));
+
+		assert_ok!(Recovery::approve_attempt(signed(BOB), ALICE, 1));
+		assert_ok!(Recovery::approve_attempt(signed(EVE), ALICE, 1));
+
+		frame_system::Pallet::<T>::set_block_number(11);
+
+		// BOB finishes group 0 (order 1)
+		assert_ok!(Recovery::finish_attempt(signed(BOB), ALICE, 0));
+		assert_eq!(Recovery::inheritor(ALICE), Some(FERDIE));
+		assert_inheritor_deposit(BOB, 14);
+
+		// BOB finishes group 1 (order 0) — replaces inheritor, same depositor
+		assert_ok!(Recovery::finish_attempt(signed(BOB), ALICE, 1));
+		assert_eq!(Recovery::inheritor(ALICE), Some(DAVE));
+		assert_inheritor_deposit(BOB, 14);
+	});
+}
+
+/// Revoking the inheritor works when called by the lost account.
+#[test]
+fn revoke_inheritor_works() {
+	new_test_ext().execute_with(|| {
+		// Set up an inheritor for ALICE
+		let ticket = Recovery::inheritor_ticket(&EVE).unwrap();
+		Inheritor::<T>::insert(ALICE, (0, &FERDIE, ticket));
+
+		assert_eq!(Recovery::inheritor(ALICE), Some(FERDIE));
+		assert_inheritor_deposit(EVE, 14);
+
+		// Alice revokes the inheritor
+		assert_ok!(Recovery::revoke_inheritor(signed(ALICE)));
+
+		// Storage cleared
+		assert_eq!(Recovery::inheritor(ALICE), None);
+		// Deposit refunded
+		assert_inheritor_deposit(EVE, 0);
+		// Event emitted
+		assert_last_event(Event::<T>::InheritorRevoked { lost: ALICE });
+	});
+}
+
+/// Revoking when no inheritor exists fails.
+#[test]
+fn revoke_inheritor_no_inheritor_fails() {
+	new_test_ext().execute_with(|| {
+		assert_noop!(Recovery::revoke_inheritor(signed(ALICE)), Error::<T>::NoInheritor);
+	});
+}
+
+/// Non-lost account cannot revoke someone else's inheritor.
+#[test]
+fn revoke_inheritor_not_lost_account_fails() {
+	new_test_ext().execute_with(|| {
+		let ticket = Recovery::inheritor_ticket(&EVE).unwrap();
+		Inheritor::<T>::insert(ALICE, (0, &FERDIE, ticket));
+
+		// BOB tries to revoke ALICE's inheritor - no such extrinsic parameter, so
+		// BOB calling revoke_inheritor only affects BOB's own entry (which doesn't exist).
+		assert_noop!(Recovery::revoke_inheritor(signed(BOB)), Error::<T>::NoInheritor);
+
+		// ALICE's inheritor is unchanged
+		assert_eq!(Recovery::inheritor(ALICE), Some(FERDIE));
+	});
+}
+
 /// Finishing an attempt when an equal-or-higher order inheritor already exists does not replace it.
 ///
 /// Both groups initiate before any inheritor exists. The lower-order group finishes first,
@@ -1201,6 +1294,11 @@ fn finish_attempt_higher_order_does_not_replace() {
 
 		// Group 1 finishes — DAVE does NOT replace FERDIE since order 1 >= order 0
 		assert_ok!(Recovery::finish_attempt(signed(BOB), ALICE, 1));
+		assert_last_event(Event::<T>::AttemptDiscarded {
+			lost: ALICE,
+			friend_group_index: 1,
+			existing_inheritor: FERDIE,
+		});
 		assert_eq!(Recovery::inheritor(ALICE), Some(FERDIE));
 		assert!(can_control_account(FERDIE, ALICE));
 		assert!(!can_control_account(DAVE, ALICE));

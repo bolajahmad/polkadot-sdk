@@ -49,7 +49,8 @@ use cumulus_client_consensus_relay_chain::Verifier as RelayChainVerifier;
 use cumulus_client_parachain_inherent::MockValidationDataInherentDataProvider;
 use cumulus_client_service::CollatorSybilResistance;
 use cumulus_primitives_core::{
-	relay_chain::ValidationCode, CollectCollationInfo, GetParachainInfo, ParaId, TargetBlockRate, RelayParentOffsetApi,
+	relay_chain::ValidationCode, CollectCollationInfo, GetParachainInfo, ParaId,
+	RelayParentOffsetApi, TargetBlockRate,
 };
 use cumulus_relay_chain_interface::{OverseerHandle, RelayChainInterface};
 use futures::{prelude::*, FutureExt};

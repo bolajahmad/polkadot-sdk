@@ -60,7 +60,7 @@ async fn block_bundling_pov_recovery() -> Result<(), anyhow::Error> {
 		.await?;
 
 	if !result.success() {
-		return Err(anyhow!("Consensus hook failed at {}: {:?}", collator.name(), result))
+		return Err(anyhow!("Consensus hook failed at {}: {:?}", collator.name(), result));
 	}
 
 	// Wait (up to 10 seconds) until pattern occurs more than 35 times
@@ -83,7 +83,7 @@ async fn block_bundling_pov_recovery() -> Result<(), anyhow::Error> {
 		return Err(anyhow!(
 			"Failed importing blocks using PoV recovery by {}: {result:?}",
 			recovery_target.name()
-		))
+		));
 	}
 
 	log::info!("Test finished successfully");

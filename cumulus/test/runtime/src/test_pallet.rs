@@ -81,7 +81,7 @@ pub mod pallet {
 					tracing::info!("Consuming 1s of weight :)");
 					// We have enough capacity, consume the flag and register the weight
 					ScheduleWeightRegistration::<T>::kill();
-					return weight_to_register
+					return weight_to_register;
 				}
 			}
 
@@ -318,7 +318,7 @@ pub mod pallet {
 		) -> ValidateResult<Self::Val, T::RuntimeCall> {
 			if let Some(call) = call.is_sub_type() {
 				match call {
-					Call::use_more_weight_than_announced { must_be_first_block_in_core } =>
+					Call::use_more_weight_than_announced { must_be_first_block_in_core } => {
 						if {
 							let digest = frame_system::Pallet::<T>::digest();
 
@@ -344,7 +344,8 @@ pub mod pallet {
 							Err(TransactionValidityError::Invalid(
 								InvalidTransaction::ExhaustsResources,
 							))
-						},
+						}
+					},
 					_ => Ok((Default::default(), (), origin)),
 				}
 			} else {

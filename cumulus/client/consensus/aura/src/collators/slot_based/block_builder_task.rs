@@ -382,11 +382,27 @@ where
 					},
 				};
 
-			let blocks_per_core = (number_of_blocks / cores.total_cores()).max(1);
+			// In total we want to have at max `number_of_blocks` cores to use.
+			cores.truncate_cores(number_of_blocks);
+			let raw_blocks_per_core = (number_of_blocks / cores.total_cores()).max(1);
+			let mut left_over_blocks = number_of_blocks % cores.total_cores();
+			let blocks_per_cores = (0..cores.total_cores())
+				.into_iter()
+				.map(|_| {
+					// We distribute the left over blocks across the cores.
+					raw_blocks_per_core +
+						if left_over_blocks > 1 {
+							left_over_blocks -= 1;
+							1
+						} else {
+							0
+						}
+				})
+				.collect::<Vec<_>>();
 
 			tracing::debug!(
 				target: crate::LOG_TARGET,
-				%blocks_per_core,
+				?blocks_per_cores,
 				core_indices = ?cores.core_indices(),
 				"Core configuration",
 			);
@@ -395,7 +411,7 @@ where
 			let mut pov_parent_hash = initial_parent.hash;
 			let block_time = Duration::from_secs(6) / number_of_blocks;
 
-			loop {
+			for blocks_per_core in blocks_per_cores {
 				let time_for_core = slot_time.time_left() / cores.cores_left();
 
 				match build_collation_for_core(BuildCollationParams {
@@ -543,7 +559,7 @@ where
 		// If we have more than 3 blocks in total, aka a block time which is less than 2s, we are
 		// going to skip the last block. Otherwise, when running with 3 blocks, we are just
 		// adjusting the authoring duration below.
-		let skip_last_block_in_slot = total_number_of_blocks > 3 && is_last_block_in_core;
+		let skip_last_block_in_slot = total_number_of_blocks > 3 && is_last_core_in_parachain_slot;
 		// We require that the next node has imported our last block before it can start building
 		// the next block. To ensure that the next node is able to do so, we are skipping the last
 		// block in the parachain slot. In the future this can be removed again.
@@ -886,6 +902,11 @@ impl Cores {
 	/// Returns the total number of cores.
 	pub fn total_cores(&self) -> u32 {
 		self.core_indices.len() as u32
+	}
+
+	/// Truncate `cores` to `max_cores`.
+	pub fn truncate_cores(&mut self, max_cores: u32) {
+		self.core_indices.truncate(max_cores as usize);
 	}
 
 	/// Returns the number of cores left.

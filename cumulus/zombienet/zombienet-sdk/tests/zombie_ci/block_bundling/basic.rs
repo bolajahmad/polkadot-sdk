@@ -92,14 +92,14 @@ async fn block_bundling_basic() -> Result<(), anyhow::Error> {
 
 	let (Some(full_best), Some(best)) = join!(full_best_blocks.next(), collator_best_blocks.next())
 	else {
-		return Err(anyhow!("Failed to get a best block from the full node and the collator"))
+		return Err(anyhow!("Failed to get a best block from the full node and the collator"));
 	};
 
 	let diff = full_best?.number().abs_diff(best?.number());
 	if diff > 12 {
 		return Err(anyhow!(
 			"Best block difference between full node and collator of {diff} is too big!"
-		))
+		));
 	}
 
 	log::info!("Test finished successfully");
@@ -118,12 +118,12 @@ fn wait_for_block_and_restart_node(node: NetworkNode) -> JoinHandle<Result<(), a
 
 		loop {
 			let Some(block) = best_blocks.next().await.transpose()? else {
-				return Err(anyhow!("Node stopped before reaching the block to restart"))
+				return Err(anyhow!("Node stopped before reaching the block to restart"));
 			};
 
 			if block.number() >= 13 {
 				log::info!("Full node has imported block `13`, going to restart it");
-				return node.restart(None).await
+				return node.restart(None).await;
 			}
 		}
 	})

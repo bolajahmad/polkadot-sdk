@@ -317,8 +317,9 @@ impl CumulusDigestItem {
 		let encoded = self.encode();
 
 		match self {
-			Self::RelayParent(_) | Self::UseFullCore =>
-				DigestItem::Consensus(CUMULUS_CONSENSUS_ID, encoded),
+			Self::RelayParent(_) | Self::UseFullCore => {
+				DigestItem::Consensus(CUMULUS_CONSENSUS_ID, encoded)
+			},
 			_ => DigestItem::PreRuntime(CUMULUS_CONSENSUS_ID, encoded),
 		}
 	}
@@ -406,7 +407,7 @@ impl CumulusDigestItem {
 				let Ok(CumulusDigestItem::BlockBundleInfo(bundle_info)) =
 					CumulusDigestItem::decode_all(&mut &val[..])
 				else {
-					return None
+					return None;
 				};
 
 				Some(bundle_info)
@@ -423,7 +424,7 @@ impl CumulusDigestItem {
 					let Ok(CumulusDigestItem::UseFullCore) =
 						CumulusDigestItem::decode_all(&mut &val[..])
 					else {
-						return None
+						return None;
 					};
 
 					Some(true)

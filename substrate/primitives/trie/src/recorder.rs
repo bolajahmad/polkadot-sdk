@@ -450,7 +450,7 @@ impl<'a, H: Hasher> trie_db::TrieRecorder<H::Out> for TrieRecorder<'a, H> {
 						?hash,
 						"Ignoring node",
 					);
-					return
+					return;
 				}
 
 				inner.accessed_nodes.entry(hash).or_insert_with(|| {

@@ -71,8 +71,9 @@ pub fn load_proof_size_recording<H: Encode, B: AuxStore>(
 
 	match version {
 		None => Ok(None),
-		Some(PROOF_SIZE_RECORDING_CURRENT_VERSION) =>
-			load_decode(backend, proof_size_recording_key(block_hash).as_slice()),
+		Some(PROOF_SIZE_RECORDING_CURRENT_VERSION) => {
+			load_decode(backend, proof_size_recording_key(block_hash).as_slice())
+		},
 		Some(other) => Err(ClientError::Backend(format!(
 			"Unsupported proof size recording DB version: {:?}",
 			other

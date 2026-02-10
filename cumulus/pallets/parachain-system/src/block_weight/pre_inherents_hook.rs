@@ -57,7 +57,7 @@ where
 
 			crate::BlockWeightMode::<Config>::put(new_mode);
 
-			return
+			return;
 		}
 
 		let is_first_block_in_core = is_first_block_in_core::<Config>().unwrap_or(false);

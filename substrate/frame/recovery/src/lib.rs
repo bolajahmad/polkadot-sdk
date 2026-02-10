@@ -590,7 +590,7 @@ pub mod pallet {
 		/// An `FriendGroupsChanged` event is emitted only when the new friends groups differed from
 		/// the old ones.
 		#[pallet::call_index(2)]
-		#[pallet::weight(T::WeightInfo::set_friend_groups(friend_groups.len() as u32))]
+		#[pallet::weight(T::WeightInfo::set_friend_groups())]
 		pub fn set_friend_groups(
 			origin: OriginFor<T>,
 			friend_groups: Vec<FriendGroupOf<T>>,

@@ -47,7 +47,7 @@ use core::marker::PhantomData;
 /// Weight functions needed for `pallet_recovery`.
 pub trait WeightInfo {
 	fn control_inherited_account() -> Weight;
-	fn set_friend_groups(f: u32, ) -> Weight;
+	fn set_friend_groups() -> Weight;
 	fn initiate_attempt() -> Weight;
 	fn approve_attempt() -> Weight;
 	fn finish_attempt() -> Weight;
@@ -76,15 +76,12 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Proof: `Recovery::Attempt` (`max_values`: None, `max_size`: Some(164), added: 2639, mode: `MaxEncodedLen`)
 	/// Storage: `Recovery::FriendGroups` (r:1 w:1)
 	/// Proof: `Recovery::FriendGroups` (`max_values`: None, `max_size`: Some(9281), added: 11756, mode: `MaxEncodedLen`)
-	/// The range of component `f` is `[1, 16]`.
-	fn set_friend_groups(f: u32, ) -> Weight {
+	fn set_friend_groups() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `1397 + f * (512 ±0)`
+		//  Measured:  `9569`
 		//  Estimated: `12746`
 		// Minimum execution time: 39_360_000 picoseconds.
-		Weight::from_parts(39_503_231, 12746)
-			// Standard Error: 4_614
-			.saturating_add(Weight::from_parts(773_588, 0).saturating_mul(f.into()))
+		Weight::from_parts(51_879_639, 12746)
 			.saturating_add(T::DbWeight::get().reads(2_u64))
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
@@ -193,15 +190,12 @@ impl WeightInfo for () {
 	/// Proof: `Recovery::Attempt` (`max_values`: None, `max_size`: Some(164), added: 2639, mode: `MaxEncodedLen`)
 	/// Storage: `Recovery::FriendGroups` (r:1 w:1)
 	/// Proof: `Recovery::FriendGroups` (`max_values`: None, `max_size`: Some(9281), added: 11756, mode: `MaxEncodedLen`)
-	/// The range of component `f` is `[1, 16]`.
-	fn set_friend_groups(f: u32, ) -> Weight {
+	fn set_friend_groups() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `1397 + f * (512 ±0)`
+		//  Measured:  `9569`
 		//  Estimated: `12746`
 		// Minimum execution time: 39_360_000 picoseconds.
-		Weight::from_parts(39_503_231, 12746)
-			// Standard Error: 4_614
-			.saturating_add(Weight::from_parts(773_588, 0).saturating_mul(f.into()))
+		Weight::from_parts(51_879_639, 12746)
 			.saturating_add(RocksDbWeight::get().reads(2_u64))
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}

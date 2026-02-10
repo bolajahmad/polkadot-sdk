@@ -496,6 +496,8 @@ pub mod pallet {
 		TooManyFriendGroups,
 		/// The number of friends needed is greater than the number of friends.
 		TooManyFriendsNeeded,
+		/// The number of friends needed is zero.
+		NoFriendsNeeded,
 	}
 
 	#[pallet::view_functions]
@@ -965,6 +967,7 @@ impl<T: Config> Pallet<T> {
 				friend_group.friends_needed as usize <= friend_group.friends.len(),
 				Error::<T>::TooManyFriendsNeeded
 			);
+			ensure!(friend_group.friends_needed > 0, Error::<T>::NoFriendsNeeded);
 			ensure!(!friend_group.friends.is_empty(), Error::<T>::NoFriends);
 			// cannot contain the lost account itself
 			ensure!(!friend_group.friends.contains(&lost), Error::<T>::LostAccountInFriendGroup);

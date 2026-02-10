@@ -859,6 +859,7 @@ impl AuthorizationListEntry {
 		let s_bytes = self.s.to_big_endian();
 		signature[..32].copy_from_slice(&r_bytes);
 		signature[32..64].copy_from_slice(&s_bytes);
+		debug_assert!(self.y_parity <= U256::from(1u8), "y_parity should be 0 or 1");
 		signature[64] = self.y_parity.low_u32() as u8;
 		signature
 	}

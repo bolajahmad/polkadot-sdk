@@ -223,7 +223,9 @@ impl<T: Config> AccountInfo<T> {
 					AccountType::Contract(ref mut info) => *info = contract_info,
 					AccountType::Delegated { contract_info: ref mut info, .. } =>
 						*info = Some(contract_info),
-					AccountType::EOA => {},
+					AccountType::EOA => {
+						log::error!(target: crate::LOG_TARGET, "update_contract_info called on EOA {address:?}");
+					},
 				}
 			}
 		});
@@ -269,10 +271,11 @@ impl<T: Config> AccountInfo<T> {
 		});
 	}
 
-	/// EIP-7702: Clear delegation indicator, resetting account to EOA
+	/// EIP-7702: Clear delegation indicator, resetting account to EOA.
 	///
-	/// If the delegated account has accumulated storage, its child trie is queued
-	/// for deletion.
+	/// Per EIP-7702, storage is **not** cleaned up here. The child trie persists so
+	/// that a future re-delegation can access the same storage. Callers that want a
+	/// clean slate should clear storage via a delegate contract before revoking.
 	pub fn clear_delegation(address: &H160) {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {

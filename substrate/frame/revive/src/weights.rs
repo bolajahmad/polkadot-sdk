@@ -73,7 +73,6 @@ use core::marker::PhantomData;
 pub trait WeightInfo {
 	fn on_process_deletion_queue_batch() -> Weight;
 	fn on_initialize_per_trie_key(k: u32, ) -> Weight;
-	fn validate_authorization() -> Weight;
 	fn process_new_account_authorization(_n: u32) -> Weight { Default::default() }
 	fn process_existing_account_authorization(_n: u32) -> Weight { Default::default() }
 	fn call_with_pvm_code_per_byte(c: u32, ) -> Weight;
@@ -206,13 +205,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes((1_u64).saturating_mul(k.into())))
 			.saturating_add(Weight::from_parts(0, 70).saturating_mul(k.into()))
 	}
-	fn validate_authorization() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `636`
-		//  Estimated: `0`
-		// Minimum execution time: 61_957_000 picoseconds.
-		Weight::from_parts(63_360_000, 0)
-	}
+
 	/// Storage: `Revive::AccountInfoOf` (r:2 w:1)
 	/// Proof: `Revive::AccountInfoOf` (`max_values`: None, `max_size`: Some(247), added: 2722, mode: `Measured`)
 	/// Storage: `Revive::OriginalAccount` (r:2 w:0)
@@ -1502,13 +1495,7 @@ impl WeightInfo for () {
 			.saturating_add(RocksDbWeight::get().writes((1_u64).saturating_mul(k.into())))
 			.saturating_add(Weight::from_parts(0, 70).saturating_mul(k.into()))
 	}
-	fn validate_authorization() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `636`
-		//  Estimated: `0`
-		// Minimum execution time: 61_957_000 picoseconds.
-		Weight::from_parts(63_360_000, 0)
-	}
+
 	/// Storage: `Revive::AccountInfoOf` (r:2 w:1)
 	/// Proof: `Revive::AccountInfoOf` (`max_values`: None, `max_size`: Some(247), added: 2722, mode: `Measured`)
 	/// Storage: `Revive::OriginalAccount` (r:2 w:0)

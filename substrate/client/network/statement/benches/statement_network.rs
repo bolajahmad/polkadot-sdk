@@ -211,7 +211,7 @@ fn build_handler(
 
 	let (queue_sender, queue_receiver) = async_channel::bounded::<(
 		Statement,
-		futures::channel::oneshot::Sender<sp_statement_store::SubmitResult>,
+		futures::channel::oneshot::Sender<(sp_statement_store::SubmitResult, std::time::Duration)>,
 	)>(MAX_PENDING_STATEMENTS);
 
 	let network = TestNetwork::new();
@@ -233,8 +233,9 @@ fn build_handler(
 				let task = receiver.recv().await;
 				match task {
 					Ok((statement, completion)) => {
+						let start = std::time::Instant::now();
 						let result = store.submit(statement, StatementSource::Network);
-						let _ = completion.send(result);
+						let _ = completion.send((result, start.elapsed()));
 					},
 					Err(_) => return,
 				}

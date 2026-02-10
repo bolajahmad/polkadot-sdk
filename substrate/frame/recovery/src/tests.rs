@@ -148,6 +148,94 @@ fn set_friend_groups_no_friends_fails() {
 	});
 }
 
+/// Setting a friend group with `friends_needed` of zero fails.
+#[test]
+fn set_friend_groups_zero_friends_needed_fails() {
+	new_test_ext().execute_with(|| {
+		let fg = FriendGroupOf::<T> {
+			friends: friends([BOB, CHARLIE, DAVE]),
+			friends_needed: 0,
+			inheritor: FERDIE,
+			inheritance_delay: 10,
+			inheritance_order: 0,
+			cancel_delay: 10,
+		};
+
+		assert_noop!(
+			Recovery::set_friend_groups(signed(ALICE), vec![fg]),
+			Error::<T>::NoFriendsNeeded
+		);
+	});
+}
+
+/// Setting a friend group with unsorted friends fails.
+#[test]
+fn set_friend_groups_unsorted_friends_fails() {
+	new_test_ext().execute_with(|| {
+		let fg = FriendGroupOf::<T> {
+			friends: friends([CHARLIE, BOB, DAVE]),
+			friends_needed: 2,
+			inheritor: FERDIE,
+			inheritance_delay: 10,
+			inheritance_order: 0,
+			cancel_delay: 10,
+		};
+
+		assert_noop!(
+			Recovery::set_friend_groups(signed(ALICE), vec![fg]),
+			Error::<T>::FriendsNotSortedOrUnique
+		);
+	});
+}
+
+/// Setting a friend group with duplicate friends fails.
+#[test]
+fn set_friend_groups_duplicate_friends_fails() {
+	new_test_ext().execute_with(|| {
+		let fg = FriendGroupOf::<T> {
+			friends: friends([BOB, BOB, DAVE]),
+			friends_needed: 2,
+			inheritor: FERDIE,
+			inheritance_delay: 10,
+			inheritance_order: 0,
+			cancel_delay: 10,
+		};
+
+		assert_noop!(
+			Recovery::set_friend_groups(signed(ALICE), vec![fg]),
+			Error::<T>::FriendsNotSortedOrUnique
+		);
+	});
+}
+
+/// Setting two friend groups with the same set of friends fails.
+#[test]
+fn set_friend_groups_duplicate_groups_fails() {
+	new_test_ext().execute_with(|| {
+		let fg1 = FriendGroupOf::<T> {
+			friends: friends([BOB, CHARLIE, DAVE]),
+			friends_needed: 2,
+			inheritor: FERDIE,
+			inheritance_delay: 10,
+			inheritance_order: 0,
+			cancel_delay: 10,
+		};
+		let fg2 = FriendGroupOf::<T> {
+			friends: friends([BOB, CHARLIE, DAVE]),
+			friends_needed: 1,
+			inheritor: EVE,
+			inheritance_delay: 5,
+			inheritance_order: 1,
+			cancel_delay: 5,
+		};
+
+		assert_noop!(
+			Recovery::set_friend_groups(signed(ALICE), vec![fg1, fg2]),
+			Error::<T>::DuplicateFriendGroups
+		);
+	});
+}
+
 /// Can remove all friend groups also with deposits.
 #[test]
 fn set_friend_groups_remove_works() {
@@ -229,7 +317,7 @@ fn set_friend_groups_max_groups_works() {
 	new_test_ext().execute_with(|| {
 		let friend_groups: Vec<_> = (0..10u8)
 			.map(|i| FriendGroupOf::<T> {
-				friends: friends([BOB, CHARLIE]),
+				friends: friends([BOB, 10 + i as u64]),
 				friends_needed: 1,
 				inheritor: FERDIE,
 				inheritance_delay: 10,

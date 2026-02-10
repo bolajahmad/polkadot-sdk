@@ -29,8 +29,8 @@
 //! - `inheritor`: An account that is inheriting access to a lost account after recovery.
 //! - `attempt`: An attempt to recover a lost account by an initiator.
 //! - `order`: The level of trust that an account has in a friend group.
-//! - `deposit`: The amount that friends of this group needs to reserve to initiate an attempt.
-//! - `threshold`: The number of friends that need to approve an attempt.
+//! - `deposit`: An amount of currency that needs to be held for allocating on-chain storage.
+//! - `friends_needed`: The number of friends that need to approve an attempt.
 //! - `inheritance delay`: How long an attempt will be delayed before it can succeed.
 //! - `provided block`: The blocks that are *provided* by the `T::BlockNumberProvider`.
 //!
@@ -47,7 +47,7 @@
 //!    starts a recovery `attempt` via `initiate_attempt`.
 //! 4. The friend group self-organizes and one-by-one approve the ongoing attempt via
 //!    `approve_attempt`.
-//! 5. Exactly `threshold` friends approve the attempt (further approvals will fail since they are
+//! 5. Exactly `friends_needed` friends approve the attempt (further approvals will fail since they are
 //!    useless).
 //! 6. Any account finishes the attempt via `finish_attempt` after at least *inheritance delay*
 //!    blocks since the initiation have passed.
@@ -81,7 +81,7 @@
 //!
 //! ## Data Structures
 //!
-//! The pallet has three storage items, see the in-code docs [`FriendGroups`], [`Attempts`] and
+//! The pallet has three storage items, see the in-code docs [`FriendGroups`], [`Attempt`] and
 //! [`Inheritor`]. Storage items may contain deposit "tickets" or similar noise and should therefore
 //! not be read directly but only through the API.
 //!
@@ -136,7 +136,7 @@ pub type FriendsOf<T> =
 	BoundedVec<<T as frame_system::Config>::AccountId, <T as Config>::MaxFriendsPerConfig>;
 pub type HashOf<T> = <T as frame_system::Config>::Hash;
 
-/// Configuration for recovering an account.
+/// Group of friends that can initiate a recovery attempt for a specific lost account.
 #[derive(
 	Clone,
 	Eq,
@@ -239,7 +239,7 @@ where
 	///
 	/// This is the last approval block plus the cancel delay from the friend group. Returns None if
 	/// overflow occurs.
-	pub fn cancelable_at<Balance, Friends>(
+	pub fn cancelable_at<Friends>(
 		&self,
 		friend_groups: &[FriendGroup<ProvidedBlockNumber, AccountId, Friends>],
 	) -> Option<ProvidedBlockNumber> {
@@ -278,7 +278,7 @@ pub mod pallet {
 			+ GetDispatchInfo
 			+ From<frame_system::Call<Self>>;
 
-		/// The overarching freeze reason.
+		/// The overarching hold reason.
 		type RuntimeHoldReason: Parameter
 			+ Member
 			+ MaxEncodedLen
@@ -479,16 +479,10 @@ pub mod pallet {
 		NotFriendGroup,
 		/// The caller is not the inheritor of the lost account.
 		NotInheritor,
-		/// The recovery attempt is not yet unlocked.
-		NotUnlocked,
 		/// The cancel delay since the last approval or initialization has not yet passed.
 		NotYetCancelable,
 		/// The inheritance delay of this attempt has not yet passed.
 		NotYetInheritable,
-		/// Only the lost account can slash an attempt.
-		OnlyLostCanSlash,
-		/// Too many concurrent recovery attempts for this recoverer.
-		TooManyAttempts,
 		/// Too many friend groups.
 		TooManyFriendGroups,
 		/// The number of friends needed is greater than the number of friends.
@@ -497,6 +491,8 @@ pub mod pallet {
 		NoFriendsNeeded,
 		/// The friends of a friend group are not sorted or not unique.
 		FriendsNotSortedOrUnique,
+		/// Two friend groups have the same set of friends.
+		DuplicateFriendGroups,
 	}
 
 	#[pallet::view_functions]
@@ -588,8 +584,8 @@ pub mod pallet {
 		/// Set the friend groups of the calling account before it lost access.
 		///
 		/// This does not impact or cancel any ongoing recovery attempts. The friends of each group
-		/// will be sorted before being stored. Trying to insert two friend groups with the same set
-		/// of friends will result in an error.
+		/// MUST be sorted and unique. Trying to insert two friend groups with the same set of
+		/// friends will result in an error.
 		///
 		/// An `FriendGroupsChanged` event is emitted only when the new friends groups differed from
 		/// the old ones.
@@ -640,8 +636,7 @@ pub mod pallet {
 		/// Attempt to recover a lost account by a friend with the given friend group.
 		///
 		/// The friend group is passed in as witness to ensure that the recoverer is not operating
-		/// on stale friend group data and is making wrong assumptions about the delay or deposit
-		/// amounts.
+		/// on stale friend group data and is making wrong assumptions.
 		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::initiate_attempt())]
 		pub fn initiate_attempt(
@@ -971,6 +966,15 @@ impl<T: Config> Pallet<T> {
 				Error::<T>::TooManyFriendsNeeded
 			);
 			ensure!(friend_group.friends_needed > 0, Error::<T>::NoFriendsNeeded);
+		}
+
+		for i in 0..friend_groups.len() {
+			for j in (i + 1)..friend_groups.len() {
+				ensure!(
+					friend_groups[i].friends != friend_groups[j].friends,
+					Error::<T>::DuplicateFriendGroups
+				);
+			}
 		}
 
 		friend_groups.try_into().map_err(|_| Error::<T>::TooManyFriendGroups)

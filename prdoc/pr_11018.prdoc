@@ -12,14 +12,14 @@ doc:
     -  If there is no trapped balance but a pending slash exists, the extrinsic still succeeds. This is intentional - applying pending slashes is useful work that should be persisted.
 crates:
 - name: pallet-nomination-pools
-  bump: major
+  bump: minor
 - name: pallet-nomination-pools-benchmarking
-  bump: major
+  bump: patch
 - name: pallet-staking-async
-  bump: major
+  bump: patch
 - name: pallet-staking
-  bump: major
+  bump: patch
 - name: sp-staking
-  bump: major
+  bump: minor
 - name: pallet-fast-unstake
-  bump: major
+  bump: patch

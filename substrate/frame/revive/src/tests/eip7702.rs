@@ -589,8 +589,8 @@ fn redelegation_preserves_storage() {
 		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&ALICE, 100_000_000);
 
 		// Deploy two Counter instances as delegation targets
-		let counter_a =
-			builder::bare_instantiate(Code::Upload(counter_code.clone())).build_and_unwrap_contract();
+		let counter_a = builder::bare_instantiate(Code::Upload(counter_code.clone()))
+			.build_and_unwrap_contract();
 		let counter_b = builder::bare_instantiate(Code::Upload(counter_code))
 			.salt(Some([1; 32]))
 			.build_and_unwrap_contract();
@@ -599,10 +599,7 @@ fn redelegation_preserves_storage() {
 		AccountInfo::<Test>::set_delegation(&ALICE_ADDR, counter_a.addr);
 
 		let result = builder::bare_call(ALICE_ADDR)
-			.data(
-				Counter::setNumberCall { newNumber: 42u64 }
-					.abi_encode(),
-			)
+			.data(Counter::setNumberCall { newNumber: 42u64 }.abi_encode())
 			.build_and_unwrap_result();
 		assert!(!result.did_revert());
 
@@ -610,10 +607,7 @@ fn redelegation_preserves_storage() {
 		let result = builder::bare_call(ALICE_ADDR)
 			.data(Counter::numberCall {}.abi_encode())
 			.build_and_unwrap_result();
-		assert_eq!(
-			Counter::numberCall::abi_decode_returns(&result.data).unwrap(),
-			42u64
-		);
+		assert_eq!(Counter::numberCall::abi_decode_returns(&result.data).unwrap(), 42u64);
 
 		// Re-delegate to Counter B (same ABI, same storage layout)
 		AccountInfo::<Test>::set_delegation(&ALICE_ADDR, counter_b.addr);
@@ -777,10 +771,7 @@ fn delegation_chain_does_not_execute() {
 
 		// Case 1: Calling Alice executes the contract - setNumber(42) should work
 		let result = builder::bare_call(ALICE_ADDR)
-			.data(
-				Counter::setNumberCall { newNumber: 42u64 }
-					.abi_encode(),
-			)
+			.data(Counter::setNumberCall { newNumber: 42u64 }.abi_encode())
 			.build_and_unwrap_result();
 		assert!(!result.did_revert(), "calling Alice should execute Counter code");
 		assert_eq!(read_number(), 42u64);
@@ -810,10 +801,7 @@ fn delegation_chain_does_not_execute() {
 		AccountInfo::<Test>::set_delegation(&BOB_ADDR, ALICE_ADDR);
 
 		let result = builder::bare_call(BOB_ADDR)
-			.data(
-				Counter::setNumberCall { newNumber: 99u64 }
-					.abi_encode(),
-			)
+			.data(Counter::setNumberCall { newNumber: 99u64 }.abi_encode())
 			.build_and_unwrap_result();
 		// Bob is treated as an EOA (no code), so the call succeeds but does nothing
 		assert!(!result.did_revert(), "call to Bob should not revert (treated as EOA transfer)");

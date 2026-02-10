@@ -136,7 +136,9 @@ mod benchmarks {
 		use sp_core::keccak_256;
 
 		let chain_id = U256::from(T::ChainId::get());
-		let target = H160::from_low_u64_be(100);
+		// Delegate to a deployed contract so ContractInfo is created (worst case)
+		let target_contract = Contract::<T>::with_index(0, VmBinaryModule::dummy(), vec![])?;
+		let target = target_contract.address;
 		let caller: T::AccountId = whitelisted_caller();
 		T::Currency::set_balance(&caller, caller_funding::<T>());
 		<T as Config>::FeeInfo::deposit_txfee(
@@ -147,8 +149,7 @@ mod benchmarks {
 		let mut authorization_list = vec![];
 		for i in 0..n {
 			let key_material = keccak_256(&(i as u32).to_le_bytes());
-			let pair =
-				EcdsaPair::from_seed_slice(&key_material).expect("valid key; qed");
+			let pair = EcdsaPair::from_seed_slice(&key_material).expect("valid key; qed");
 			let signed_auth = eip7702::sign_authorization(&pair, chain_id, target, U256::zero());
 			authorization_list.push(signed_auth);
 		}
@@ -174,7 +175,9 @@ mod benchmarks {
 		use sp_core::keccak_256;
 
 		let chain_id = U256::from(T::ChainId::get());
-		let target = H160::from_low_u64_be(100);
+		// Delegate to a deployed contract so ContractInfo is created (worst case)
+		let target_contract = Contract::<T>::with_index(0, VmBinaryModule::dummy(), vec![])?;
+		let target = target_contract.address;
 		let caller: T::AccountId = whitelisted_caller();
 		T::Currency::set_balance(&caller, caller_funding::<T>());
 		let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
@@ -182,8 +185,7 @@ mod benchmarks {
 		let mut authorization_list = vec![];
 		for i in 0..n {
 			let key_material = keccak_256(&(i as u32).to_le_bytes());
-			let pair =
-				EcdsaPair::from_seed_slice(&key_material).expect("valid key; qed");
+			let pair = EcdsaPair::from_seed_slice(&key_material).expect("valid key; qed");
 
 			let eth_address = eip7702::eth_address(&pair);
 			let account_id = T::AddressMapper::to_account_id(&eth_address);
@@ -2745,6 +2747,30 @@ mod benchmarks {
 
 		// uses twice the weight once for migration and then for checking if there is another key.
 		assert_eq!(meter.consumed(), <T as Config>::WeightInfo::v2_migration_step() * 2);
+	}
+
+	#[benchmark]
+	fn v3_migration_step() {
+		use crate::migrations::v3;
+		let addr = H160::from([1u8; 20]);
+
+		v3::old::AccountInfoOf::<T>::insert(
+			addr,
+			v3::old::AccountInfo { account_type: v3::old::AccountType::EOA, dust: 0 },
+		);
+		let mut meter = WeightMeter::new();
+
+		#[block]
+		{
+			v3::Migration::<T>::step(None, &mut meter).unwrap();
+		}
+
+		let migrated = AccountInfoOf::<T>::get(addr).unwrap();
+		assert!(migrated.account_type.contract_info().is_none());
+		assert!(!AccountInfo::<T>::is_delegated(&addr));
+
+		// uses twice the weight once for migration and then for checking if there is another key.
+		assert_eq!(meter.consumed(), <T as Config>::WeightInfo::v3_migration_step() * 2);
 	}
 
 	/// Helper function to create a test signer for finalize_block benchmark

@@ -78,19 +78,12 @@ pub enum AccountType<T: Config> {
 	/// An account that is a contract.
 	Contract(ContractInfo<T>),
 
-	/// An account that is an externally owned account (EOA).
+	/// An externally owned account, optionally delegated via EIP-7702.
 	#[default]
-	EOA,
-
-	/// An account that has delegated its code execution to another address (EIP-7702).
-	///
-	/// Per EIP-7702, delegation chains are not followed - if target is itself delegated,
-	/// `contract_info` is `None` and no code will be executed.
-	Delegated {
-		/// The address this account delegates code execution to.
-		target: H160,
-		/// Contract info copied from the target at delegation time.
-		/// `None` if target is not a contract or is itself delegated.
+	EOA {
+		/// When `Some`, the account delegates code execution to that address.
+		delegate_target: Option<H160>,
+		/// Storage accounting for this EOA's child trie, when the account is delegated.
 		contract_info: Option<ContractInfo<T>>,
 	},
 }
@@ -155,8 +148,7 @@ impl<T: Config> AccountType<T> {
 	pub fn contract_info(self) -> Option<ContractInfo<T>> {
 		match self {
 			AccountType::Contract(info) => Some(info),
-			AccountType::Delegated { contract_info, .. } => contract_info,
-			AccountType::EOA => None,
+			AccountType::EOA { contract_info, .. } => contract_info,
 		}
 	}
 }
@@ -200,12 +192,9 @@ impl<T: Config> AccountInfo<T> {
 	pub fn insert_contract(address: &H160, contract: ContractInfo<T>) {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {
-				match &account.account_type {
-					AccountType::Delegated { target, .. } => {
-						account.account_type = AccountType::Delegated {
-							target: *target,
-							contract_info: Some(contract.clone()),
-						};
+				match &mut account.account_type {
+					AccountType::EOA { delegate_target: Some(_), ref mut contract_info } => {
+						*contract_info = Some(contract.clone());
 					},
 					_ => account.account_type = contract.clone().into(),
 				}
@@ -221,11 +210,8 @@ impl<T: Config> AccountInfo<T> {
 			if let Some(account) = account {
 				match &mut account.account_type {
 					AccountType::Contract(ref mut info) => *info = contract_info,
-					AccountType::Delegated { contract_info: ref mut info, .. } =>
+					AccountType::EOA { contract_info: ref mut info, .. } =>
 						*info = Some(contract_info),
-					AccountType::EOA => {
-						log::error!(target: crate::LOG_TARGET, "update_contract_info called on EOA {address:?}");
-					},
 				}
 			}
 		});
@@ -234,14 +220,14 @@ impl<T: Config> AccountInfo<T> {
 	/// EIP-7702: Check if an account has a delegation indicator set
 	pub fn is_delegated(address: &H160) -> bool {
 		let Some(info) = <AccountInfoOf<T>>::get(address) else { return false };
-		matches!(info.account_type, AccountType::Delegated { .. })
+		matches!(info.account_type, AccountType::EOA { delegate_target: Some(_), .. })
 	}
 
 	/// EIP-7702: Get the delegation target for an address
 	pub fn get_delegation_target(address: &H160) -> Option<H160> {
 		let info = <AccountInfoOf<T>>::get(address)?;
 		match info.account_type {
-			AccountType::Delegated { target, .. } => Some(target),
+			AccountType::EOA { delegate_target: Some(target), .. } => Some(target),
 			_ => None,
 		}
 	}
@@ -251,6 +237,7 @@ impl<T: Config> AccountInfo<T> {
 	/// Marks the account as delegated to the target address.
 	/// Per EIP-7702, only creates ContractInfo if target is a Contract.
 	/// If target is delegated or EOA, contract_info is None (no chain following).
+	/// Existing contract_info (deposit accounting) is preserved across re-delegations.
 	pub fn set_delegation(address: &H160, target: H160) {
 		let target_code_hash =
 			<AccountInfoOf<T>>::get(&target).and_then(|info| match info.account_type {
@@ -259,31 +246,32 @@ impl<T: Config> AccountInfo<T> {
 			});
 
 		AccountInfoOf::<T>::mutate(address, |account| {
-			let contract_info = match target_code_hash {
-				Some(code_hash) => {
-					// Preserve existing ContractInfo if re-delegating
-					let existing =
-						account.as_ref().and_then(|a| match &a.account_type {
-							AccountType::Delegated { contract_info: Some(c), .. } =>
-								Some(c.clone()),
-							_ => None,
-						});
-					Some(match existing {
-						Some(mut info) => {
-							info.code_hash = code_hash;
-							info
-						},
-						None => ContractInfo::<T>::new_for_delegation(address, code_hash),
-					})
-				},
-				None => None,
-			};
-
 			if let Some(account) = account {
-				account.account_type = AccountType::Delegated { target, contract_info };
+				match &mut account.account_type {
+					AccountType::EOA { ref mut delegate_target, ref mut contract_info } => {
+						*delegate_target = Some(target);
+						if let Some(code_hash) = target_code_hash {
+							match contract_info {
+								Some(info) => info.code_hash = code_hash,
+								ci @ None =>
+									*ci = Some(ContractInfo::<T>::new_for_delegation(
+										address, code_hash,
+									)),
+							}
+						}
+					},
+					_ => {
+						let ci = target_code_hash
+							.map(|ch| ContractInfo::<T>::new_for_delegation(address, ch));
+						account.account_type =
+							AccountType::EOA { delegate_target: Some(target), contract_info: ci };
+					},
+				}
 			} else {
+				let contract_info =
+					target_code_hash.map(|ch| ContractInfo::<T>::new_for_delegation(address, ch));
 				*account = Some(AccountInfo {
-					account_type: AccountType::Delegated { target, contract_info },
+					account_type: AccountType::EOA { delegate_target: Some(target), contract_info },
 					dust: 0,
 				});
 			}
@@ -295,11 +283,14 @@ impl<T: Config> AccountInfo<T> {
 	/// Per EIP-7702, storage is **not** cleaned up here. The child trie persists so
 	/// that a future re-delegation can access the same storage. Callers that want a
 	/// clean slate should clear storage via a delegate contract before revoking.
+	///
+	/// Contract info (deposit accounting, trie_id) is preserved so that a subsequent
+	/// re-delegation does not lose track of held deposits.
 	pub fn clear_delegation(address: &H160) {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {
-				if let AccountType::Delegated { .. } = &account.account_type {
-					account.account_type = AccountType::EOA;
+				if let AccountType::EOA { ref mut delegate_target, .. } = account.account_type {
+					*delegate_target = None;
 				}
 			}
 		});

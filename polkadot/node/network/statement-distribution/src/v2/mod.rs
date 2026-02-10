@@ -385,7 +385,7 @@ impl PeerState {
 	// under an active leaf.
 	fn reconcile_active_leaf(&mut self, leaf_hash: Hash, implicit: &[Hash]) -> Vec<Hash> {
 		if !self.view.contains(&leaf_hash) {
-			return Vec::new()
+			return Vec::new();
 		}
 
 		let mut v = Vec::with_capacity(implicit.len());
@@ -428,7 +428,7 @@ pub(crate) async fn handle_network_update<Context>(
 			gum::trace!(target: LOG_TARGET, ?peer_id, ?role, ?protocol_version, "Peer connected");
 
 			let versioned_protocol = if protocol_version != ValidationVersion::V3.into() {
-				return
+				return;
 			} else {
 				protocol_version.try_into().expect("Qed, we checked above")
 			};
@@ -492,7 +492,7 @@ pub(crate) async fn handle_network_update<Context>(
 		NetworkBridgeEvent::PeerMessage(peer_id, message) => match message {
 			net_protocol::StatementDistributionMessage::V3(
 				protocol_v3::StatementDistributionMessage::Statement(relay_parent, statement),
-			) =>
+			) => {
 				handle_incoming_statement(
 					ctx,
 					state,
@@ -502,18 +502,21 @@ pub(crate) async fn handle_network_update<Context>(
 					reputation,
 					metrics,
 				)
-				.await,
+				.await
+			},
 			net_protocol::StatementDistributionMessage::V3(
 				protocol_v3::StatementDistributionMessage::BackedCandidateManifest(inner),
 			) => handle_incoming_manifest(ctx, state, peer_id, inner, reputation, metrics).await,
 			net_protocol::StatementDistributionMessage::V3(
 				protocol_v3::StatementDistributionMessage::BackedCandidateKnown(inner),
-			) =>
+			) => {
 				handle_incoming_acknowledgement(ctx, state, peer_id, inner, reputation, metrics)
-					.await,
+					.await
+			},
 		},
-		NetworkBridgeEvent::PeerViewChange(peer_id, view) =>
-			handle_peer_view_update(ctx, state, peer_id, view, metrics).await,
+		NetworkBridgeEvent::PeerViewChange(peer_id, view) => {
+			handle_peer_view_update(ctx, state, peer_id, view, metrics).await
+		},
 		NetworkBridgeEvent::OurViewChange(_view) => {
 			// handled by `handle_activated_leaf`
 		},
@@ -588,7 +591,7 @@ async fn handle_active_leaf_update<Context>(
 					"No session info available for current session"
 				);
 
-				return Ok(())
+				return Ok(());
 			},
 			Some(s) => s,
 		};
@@ -698,7 +701,7 @@ pub(crate) async fn handle_active_leaves_update<Context>(
 
 	for new_relay_parent in new_relay_parents.iter().cloned() {
 		if state.per_scheduling_parent.contains_key(&new_relay_parent) {
-			continue
+			continue;
 		}
 
 		if let Err(err) = handle_active_leaf_update(ctx, state, new_relay_parent).await {
@@ -708,7 +711,7 @@ pub(crate) async fn handle_active_leaves_update<Context>(
 				error = ?err,
 				"Failed to handle active leaf update"
 			);
-			continue
+			continue;
 		}
 	}
 
@@ -751,7 +754,7 @@ fn find_active_validator_state(
 	assignments_per_group: &HashMap<GroupIndex, Vec<ParaId>>,
 ) -> Option<LocalValidatorState> {
 	if groups.all().is_empty() {
-		return None
+		return None;
 	}
 
 	let our_group = groups.by_validator_index(validator_index)?;
@@ -947,7 +950,7 @@ async fn send_pending_cluster_statements<Context>(
 		.into_iter()
 		.filter_map(|(originator, compact)| {
 			if !candidates.is_confirmed(compact.candidate_hash()) {
-				return None
+				return None;
 			}
 
 			let res = pending_statement_network_message(
@@ -1157,10 +1160,12 @@ pub(crate) async fn share_local_statement<Context>(
 	// Two possibilities: either the statement is `Seconded` or we already
 	// have the candidate. Sanity: check the para-id is valid.
 	let expected = match statement.payload() {
-		FullStatementWithPVD::Seconded(ref c, _) =>
-			Some((c.descriptor.para_id(), c.descriptor.relay_parent())),
-		FullStatementWithPVD::Valid(hash) =>
-			state.candidates.get_confirmed(&hash).map(|c| (c.para_id(), c.relay_parent())),
+		FullStatementWithPVD::Seconded(ref c, _) => {
+			Some((c.descriptor.para_id(), c.descriptor.relay_parent()))
+		},
+		FullStatementWithPVD::Valid(hash) => {
+			state.candidates.get_confirmed(&hash).map(|c| (c.para_id(), c.relay_parent()))
+		},
 	};
 
 	let is_seconded = match statement.payload() {
@@ -1174,7 +1179,7 @@ pub(crate) async fn share_local_statement<Context>(
 	};
 
 	if local_index != statement.validator_index() {
-		return Err(JfyiError::InvalidShare)
+		return Err(JfyiError::InvalidShare);
 	}
 
 	let seconding_limit = local_assignments.len();
@@ -1187,11 +1192,11 @@ pub(crate) async fn share_local_statement<Context>(
 			limit = ?seconding_limit,
 			"Local node has issued too many `Seconded` statements",
 		);
-		return Err(JfyiError::InvalidShare)
+		return Err(JfyiError::InvalidShare);
 	}
 
 	if !local_assignments.contains(&expected_para) || relay_parent != expected_relay_parent {
-		return Err(JfyiError::InvalidShare)
+		return Err(JfyiError::InvalidShare);
 	}
 
 	let mut post_confirmation = None;
@@ -1221,7 +1226,7 @@ pub(crate) async fn share_local_statement<Context>(
 					statement = ?compact_statement.payload(),
 					"Candidate backing issued redundant statement?",
 				);
-				return Err(JfyiError::InvalidShare)
+				return Err(JfyiError::InvalidShare);
 			},
 			Ok(true) => {},
 		}
@@ -1482,7 +1487,7 @@ async fn handle_incoming_statement<Context>(
 	let peer_state = match state.peers.get(&peer) {
 		None => {
 			// sanity: should be impossible.
-			return
+			return;
 		},
 		Some(p) => p,
 	};
@@ -1497,7 +1502,7 @@ async fn handle_incoming_statement<Context>(
 				COST_UNEXPECTED_STATEMENT_MISSING_KNOWLEDGE,
 			)
 			.await;
-			return
+			return;
 		},
 		Some(p) => p,
 	};
@@ -1510,7 +1515,7 @@ async fn handle_incoming_statement<Context>(
 				"Missing expected session info.",
 			);
 
-			return
+			return;
 		},
 		Some(s) => s,
 	};
@@ -1524,7 +1529,7 @@ async fn handle_incoming_statement<Context>(
 			"Ignoring a statement from disabled validator."
 		);
 		modify_reputation(reputation, ctx.sender(), peer, COST_DISABLED_VALIDATOR).await;
-		return
+		return;
 	}
 
 	let local_validator = match per_scheduling_parent.local_validator.as_mut() {
@@ -1540,7 +1545,7 @@ async fn handle_incoming_statement<Context>(
 				)
 				.await;
 			}
-			return
+			return;
 		},
 		Some(l) => l,
 	};
@@ -1556,7 +1561,7 @@ async fn handle_incoming_statement<Context>(
 					COST_UNEXPECTED_STATEMENT_VALIDATOR_NOT_FOUND,
 				)
 				.await;
-				return
+				return;
 			},
 		};
 
@@ -1598,7 +1603,7 @@ async fn handle_incoming_statement<Context>(
 			Ok(None) => return,
 			Err(rep) => {
 				modify_reputation(reputation, ctx.sender(), peer, rep).await;
-				return
+				return;
 			},
 		}
 	} else {
@@ -1633,7 +1638,7 @@ async fn handle_incoming_statement<Context>(
 					Ok(s) => s,
 					Err(rep) => {
 						modify_reputation(reputation, ctx.sender(), peer, rep).await;
-						return
+						return;
 					},
 				}
 			} else {
@@ -1650,7 +1655,7 @@ async fn handle_incoming_statement<Context>(
 				COST_UNEXPECTED_STATEMENT_INVALID_SENDER,
 			)
 			.await;
-			return
+			return;
 		}
 	};
 
@@ -1678,7 +1683,7 @@ async fn handle_incoming_statement<Context>(
 				COST_UNEXPECTED_STATEMENT_BAD_ADVERTISE,
 			)
 			.await;
-			return
+			return;
 		}
 	}
 
@@ -1713,7 +1718,7 @@ async fn handle_incoming_statement<Context>(
 				"Error - accepted message from unknown validator."
 			);
 
-			return
+			return;
 		},
 		Ok(known) => known,
 	};
@@ -1785,12 +1790,13 @@ fn handle_cluster_statement(
 			Ok(ClusterAccept::Ok) => true,
 			Ok(ClusterAccept::WithPrejudice) => false,
 			Err(ClusterRejectIncoming::ExcessiveSeconded) => return Err(COST_EXCESSIVE_SECONDED),
-			Err(ClusterRejectIncoming::CandidateUnknown | ClusterRejectIncoming::Duplicate) =>
-				return Err(COST_UNEXPECTED_STATEMENT_CLUSTER_REJECTED),
+			Err(ClusterRejectIncoming::CandidateUnknown | ClusterRejectIncoming::Duplicate) => {
+				return Err(COST_UNEXPECTED_STATEMENT_CLUSTER_REJECTED)
+			},
 			Err(ClusterRejectIncoming::NotInGroup) => {
 				// sanity: shouldn't be possible; we already filtered this
 				// out above.
-				return Err(COST_UNEXPECTED_STATEMENT_NOT_IN_GROUP)
+				return Err(COST_UNEXPECTED_STATEMENT_NOT_IN_GROUP);
 			},
 		}
 	};
@@ -1934,7 +1940,7 @@ async fn provide_candidate_to_grid<Context>(
 				"Cannot handle backable candidate due to lack of topology",
 			);
 
-			return
+			return;
 		},
 	};
 
@@ -1949,7 +1955,7 @@ async fn provide_candidate_to_grid<Context>(
 				"Handled backed candidate with unknown group?",
 			);
 
-			return
+			return;
 		},
 		Some(g) => g.len(),
 	};
@@ -1988,12 +1994,13 @@ async fn provide_candidate_to_grid<Context>(
 	for (v, action) in actions {
 		let p = match connected_validator_peer(authorities, per_session, v) {
 			None => continue,
-			Some(p) =>
+			Some(p) => {
 				if peers.get(&p).map_or(false, |d| d.knows_relay_parent(&relay_parent)) {
 					(p, peers.get(&p).expect("Qed, was checked above").protocol_version.into())
 				} else {
-					continue
-				},
+					continue;
+				}
+			},
 		};
 
 		match action {
@@ -2142,7 +2149,7 @@ async fn fragment_chain_update_inner<Context>(
 	for (hypo, membership) in candidate_memberships {
 		// skip parablocks which aren't potential candidates
 		if membership.is_empty() {
-			continue
+			continue;
 		}
 
 		for leaf_hash in membership {
@@ -2179,10 +2186,10 @@ async fn fragment_chain_update_inner<Context>(
 				// Sanity check if group_index is valid for this para at scheduling parent.
 				let Some(expected_groups) = prs.groups_per_para.get(&receipt.descriptor.para_id())
 				else {
-					continue
+					continue;
 				};
 				if !expected_groups.iter().any(|g| *g == group_index) {
-					continue
+					continue;
 				}
 
 				send_backing_fresh_statements(
@@ -2266,7 +2273,7 @@ async fn handle_incoming_manifest_common<'a, Context>(
 				COST_UNEXPECTED_MANIFEST_MISSING_KNOWLEDGE,
 			)
 			.await;
-			return None
+			return None;
 		},
 		Some(s) => s,
 	};
@@ -2283,17 +2290,17 @@ async fn handle_incoming_manifest_common<'a, Context>(
 			)
 			.await;
 		}
-		return None
+		return None;
 	}
 
 	let Some(expected_groups) = scheduling_parent_state.groups_per_para.get(&para_id) else {
 		modify_reputation(reputation, ctx.sender(), peer, COST_MALFORMED_MANIFEST).await;
-		return None
+		return None;
 	};
 
 	if !expected_groups.iter().any(|g| g == &manifest_summary.claimed_group_index) {
 		modify_reputation(reputation, ctx.sender(), peer, COST_MALFORMED_MANIFEST).await;
-		return None
+		return None;
 	}
 
 	let grid_topology = per_session.grid_view.as_ref()?;
@@ -2314,7 +2321,7 @@ async fn handle_incoming_manifest_common<'a, Context>(
 				COST_UNEXPECTED_MANIFEST_PEER_UNKNOWN,
 			)
 			.await;
-			return None
+			return None;
 		},
 		Some(s) => s,
 	};
@@ -2351,24 +2358,24 @@ async fn handle_incoming_manifest_common<'a, Context>(
 		Ok(x) => x,
 		Err(grid::ManifestImportError::Conflicting) => {
 			modify_reputation(reputation, ctx.sender(), peer, COST_CONFLICTING_MANIFEST).await;
-			return None
+			return None;
 		},
 		Err(grid::ManifestImportError::Overflow) => {
 			modify_reputation(reputation, ctx.sender(), peer, COST_EXCESSIVE_SECONDED).await;
-			return None
+			return None;
 		},
 		Err(grid::ManifestImportError::Insufficient) => {
 			modify_reputation(reputation, ctx.sender(), peer, COST_INSUFFICIENT_MANIFEST).await;
-			return None
+			return None;
 		},
 		Err(grid::ManifestImportError::Malformed) => {
 			modify_reputation(reputation, ctx.sender(), peer, COST_MALFORMED_MANIFEST).await;
-			return None
+			return None;
 		},
 		Err(grid::ManifestImportError::Disallowed) => {
 			modify_reputation(reputation, ctx.sender(), peer, COST_UNEXPECTED_MANIFEST_DISALLOWED)
 				.await;
-			return None
+			return None;
 		},
 	};
 
@@ -2381,7 +2388,7 @@ async fn handle_incoming_manifest_common<'a, Context>(
 		Some((claimed_parent_hash, para_id)),
 	) {
 		modify_reputation(reputation, ctx.sender(), peer, COST_INACCURATE_ADVERTISEMENT).await;
-		return None
+		return None;
 	}
 
 	if acknowledge {
@@ -2631,7 +2638,7 @@ async fn handle_incoming_acknowledgement<Context>(
 					COST_UNEXPECTED_ACKNOWLEDGEMENT_UNKNOWN_CANDIDATE,
 				)
 				.await;
-				return
+				return;
 			},
 		}
 	};
@@ -2714,7 +2721,7 @@ pub(crate) async fn handle_backed_candidate_message<Context>(
 				"Received backed candidate notification for unknown or unconfirmed",
 			);
 
-			return
+			return;
 		},
 		Some(c) => c,
 	};
@@ -2853,7 +2860,7 @@ async fn apply_post_confirmation<Context>(
 #[overseer::contextbounds(StatementDistribution, prefix=self::overseer)]
 pub(crate) async fn dispatch_requests<Context>(ctx: &mut Context, state: &mut State) {
 	if !state.request_manager.has_pending_requests() {
-		return
+		return;
 	}
 
 	let peers = &state.peers;
@@ -2872,7 +2879,7 @@ pub(crate) async fn dispatch_requests<Context>(ctx: &mut Context, state: &mut St
 			// but have surely sent us some.
 			if let Some(active) = local_validator.active.as_ref() {
 				if active.cluster_tracker.knows_candidate(validator_id, identifier.candidate_hash) {
-					return Some(StatementFilter::blank(active.cluster_tracker.targets().len()))
+					return Some(StatementFilter::blank(active.cluster_tracker.targets().len()));
 				}
 			}
 
@@ -2881,7 +2888,7 @@ pub(crate) async fn dispatch_requests<Context>(ctx: &mut Context, state: &mut St
 				.advertised_statements(validator_id, &identifier.candidate_hash);
 
 			if let Some(f) = filter {
-				return Some(f)
+				return Some(f);
 			}
 		}
 
@@ -2955,8 +2962,9 @@ pub(crate) async fn receive_response(response_manager: &mut ResponseManager) -> 
 /// this API must call `dispatch_requests`.
 pub(crate) async fn next_retry(request_manager: &mut RequestManager) {
 	match request_manager.next_retry_time() {
-		Some(instant) =>
-			futures_timer::Delay::new(instant.saturating_duration_since(Instant::now())).await,
+		Some(instant) => {
+			futures_timer::Delay::new(instant.saturating_duration_since(Instant::now())).await
+		},
 		None => futures::future::pending().await,
 	}
 }
@@ -3008,7 +3016,7 @@ pub(crate) async fn handle_response<Context>(
 			|para, g_index| {
 				let Some(expected_groups) = scheduling_parent_state.groups_per_para.get(&para)
 				else {
-					return false
+					return false;
 				};
 
 				expected_groups.iter().any(|g| g == &g_index)
@@ -3031,7 +3039,7 @@ pub(crate) async fn handle_response<Context>(
 					"Response incomplete. Retrying"
 				);
 
-				return
+				return;
 			},
 			requests::CandidateRequestStatus::Complete {
 				candidate,
@@ -3068,7 +3076,7 @@ pub(crate) async fn handle_response<Context>(
 				"Candidate re-confirmed by request/response: logic error",
 			);
 
-			return
+			return;
 		}
 	};
 
@@ -3081,7 +3089,7 @@ pub(crate) async fn handle_response<Context>(
 	// hypothetical member of the fragment chain. Later, when it is,
 	// we will import statements.
 	if !confirmed.is_importable(None) {
-		return
+		return;
 	}
 
 	let scheduling_parent_state = match state.per_scheduling_parent.get_mut(&relay_parent) {
@@ -3178,7 +3186,7 @@ pub(crate) fn answer_request(state: &mut State, message: ResponderMessage) {
 			sent_feedback: None,
 		});
 
-		return
+		return;
 	}
 
 	// check peer is allowed to request the candidate (i.e. they're in the cluster or we've sent
@@ -3196,12 +3204,12 @@ pub(crate) fn answer_request(state: &mut State, message: ResponderMessage) {
 			{
 				validator_id = Some(v);
 				is_cluster = true;
-				break
+				break;
 			}
 
 			if local_validator.grid_tracker.can_request(v, *candidate_hash) {
 				validator_id = Some(v);
-				break
+				break;
 			}
 		}
 
@@ -3214,7 +3222,7 @@ pub(crate) fn answer_request(state: &mut State, message: ResponderMessage) {
 					sent_feedback: None,
 				});
 
-				return
+				return;
 			},
 		}
 	};
@@ -3269,7 +3277,7 @@ pub(crate) fn answer_request(state: &mut State, message: ResponderMessage) {
 				?group_index,
 				"Dropping a request from a grid peer because the backing threshold is no longer met."
 			);
-			return
+			return;
 		}
 	}
 

@@ -525,10 +525,12 @@ async fn handle_to_host(
 			handle_execute_pvf(artifacts, prepare_queue, execute_queue, awaiting_prepare, inputs)
 				.await?;
 		},
-		ToHost::HeadsUp { active_pvfs } =>
-			handle_heads_up(artifacts, prepare_queue, active_pvfs).await?,
-		ToHost::UpdateActiveLeaves { update, ancestors } =>
-			handle_update_active_leaves(execute_queue, update, ancestors).await?,
+		ToHost::HeadsUp { active_pvfs } => {
+			handle_heads_up(artifacts, prepare_queue, active_pvfs).await?
+		},
+		ToHost::UpdateActiveLeaves { update, ancestors } => {
+			handle_update_active_leaves(execute_queue, update, ancestors).await?
+		},
 		#[cfg(feature = "test-utils")]
 		ToHost::ReplaceArtifactChecksum { checksum, new_checksum } => {
 			artifacts.replace_artifact_checksum(checksum, new_checksum);
@@ -559,8 +561,9 @@ async fn handle_precheck_pvf(
 				*last_time_needed = SystemTime::now();
 				let _ = result_sender.send(Ok(()));
 			},
-			ArtifactState::Preparing { waiting_for_response, num_failures: _ } =>
-				waiting_for_response.push(result_sender),
+			ArtifactState::Preparing { waiting_for_response, num_failures: _ } => {
+				waiting_for_response.push(result_sender)
+			},
 			ArtifactState::FailedToProcess { error, .. } => {
 				// Do not retry an artifact that previously failed preparation.
 				let _ = result_sender.send(PrecheckResult::Err(error.clone()));
@@ -793,7 +796,7 @@ async fn handle_prepare_done(
 			// thus the artifact cannot be unknown, only preparing;
 			// qed.
 			never!("an unknown artifact was prepared: {:?}", artifact_id);
-			return Ok(())
+			return Ok(());
 		},
 		Some(ArtifactState::Prepared { .. }) => {
 			// before sending request to prepare, the artifact is inserted with `preparing` state;
@@ -802,13 +805,13 @@ async fn handle_prepare_done(
 			// thus the artifact cannot be prepared, only preparing;
 			// qed.
 			never!("the artifact is already prepared: {:?}", artifact_id);
-			return Ok(())
+			return Ok(());
 		},
 		Some(ArtifactState::FailedToProcess { .. }) => {
 			// The reasoning is similar to the above, the artifact cannot be
 			// processed at this point.
 			never!("the artifact is already processed unsuccessfully: {:?}", artifact_id);
-			return Ok(())
+			return Ok(());
 		},
 		Some(state @ ArtifactState::Preparing { .. }) => state,
 	};
@@ -823,7 +826,7 @@ async fn handle_prepare_done(
 		num_failures
 	} else {
 		never!("The reasoning is similar to the above, the artifact can only be preparing at this point; qed");
-		return Ok(())
+		return Ok(());
 	};
 
 	// It's finally time to dispatch all the execution requests that were waiting for this artifact
@@ -835,14 +838,14 @@ async fn handle_prepare_done(
 		if result_tx.is_canceled() {
 			// Preparation could've taken quite a bit of time and the requester may be not
 			// interested in execution anymore, in which case we just skip the request.
-			continue
+			continue;
 		}
 
 		let (path, checksum) = match &result {
 			Ok(success) => (success.path.clone(), success.checksum),
 			Err(error) => {
 				let _ = result_tx.send(Err(ValidationError::from(error.clone())));
-				continue
+				continue;
 			},
 		};
 
@@ -862,8 +865,9 @@ async fn handle_prepare_done(
 	}
 
 	*state = match result {
-		Ok(PrepareSuccess { checksum, path, size, .. }) =>
-			ArtifactState::Prepared { checksum, path, last_time_needed: SystemTime::now(), size },
+		Ok(PrepareSuccess { checksum, path, size, .. }) => {
+			ArtifactState::Prepared { checksum, path, last_time_needed: SystemTime::now(), size }
+		},
 		Err(error) => {
 			let last_time_failed = SystemTime::now();
 			let num_failures = *num_failures + 1;
@@ -1003,7 +1007,7 @@ fn can_retry_prepare_after_failure(
 ) -> bool {
 	if error.is_deterministic() {
 		// This error is considered deterministic, so it will probably be reproducible. Don't retry.
-		return false
+		return false;
 	}
 
 	// Retry if the retry cooldown has elapsed and if we have already retried less than
@@ -1216,7 +1220,7 @@ pub(crate) mod tests {
 			}
 
 			if let Poll::Ready(r) = futures::poll!(&mut *fut) {
-				break r
+				break r;
 			}
 
 			if futures::poll!(&mut *task).is_ready() {

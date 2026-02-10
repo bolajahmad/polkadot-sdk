@@ -637,7 +637,7 @@ fn table_attested_to_backed(
 				"Logic error: Validity vote from table does not correspond to group",
 			);
 
-			return None
+			return None;
 		}
 	}
 	vote_positions.sort_by_key(|(_orig, pos_in_group)| *pos_in_group);
@@ -833,7 +833,7 @@ async fn validate_and_make_available(
 
 	let pov = match pov {
 		PoVData::Ready(pov) => pov,
-		PoVData::FetchFromValidator { from_validator, candidate_hash, pov_hash } =>
+		PoVData::FetchFromValidator { from_validator, candidate_hash, pov_hash } => {
 			match request_pov(
 				&mut sender,
 				relay_parent,
@@ -852,11 +852,12 @@ async fn validate_and_make_available(
 						))
 						.await
 						.map_err(Error::BackgroundValidationMpsc)?;
-					return Ok(())
+					return Ok(());
 				},
 				Err(err) => return Err(err),
 				Ok(pov) => pov,
-			},
+			}
+		},
 	};
 
 	let v = {
@@ -947,10 +948,12 @@ async fn handle_communication<Context>(
 		CandidateBackingMessage::Statement { scheduling_parent, statement } => {
 			handle_statement_message(ctx, state, scheduling_parent, statement, metrics).await?;
 		},
-		CandidateBackingMessage::GetBackableCandidates { candidates, sender } =>
-			handle_get_backable_candidates_message(state, candidates, sender, metrics)?,
-		CandidateBackingMessage::CanSecond(request, tx) =>
-			handle_can_second_request(ctx, state, request, tx).await,
+		CandidateBackingMessage::GetBackableCandidates { candidates, sender } => {
+			handle_get_backable_candidates_message(state, candidates, sender, metrics)?
+		},
+		CandidateBackingMessage::CanSecond(request, tx) => {
+			handle_can_second_request(ctx, state, request, tx).await
+		},
 	}
 
 	Ok(())
@@ -1020,14 +1023,14 @@ async fn handle_active_leaves_update<Context>(
 				"Failed to load implicit view for leaf."
 			);
 
-			return Ok(())
+			return Ok(());
 		},
 	};
 
 	// add entries in `per_scheduling_parent`. for all new relay-parents.
 	for maybe_new in fresh_relay_parents {
 		if state.per_scheduling_parent.contains_key(&maybe_new) {
-			continue
+			continue;
 		}
 
 		// construct a `PerSchedulingParent` from the runtime API
@@ -1059,7 +1062,7 @@ macro_rules! try_runtime_api {
 				// We can't do candidate validation work if we don't have the
 				// requisite runtime API data. But these errors should not take
 				// down the node.
-				return Ok(None)
+				return Ok(None);
 			},
 		}
 	};
@@ -1094,7 +1097,7 @@ fn core_index_from_statement(
 			"Invalid validator index: {:?}",
 			statement_validator_index
 		);
-		return None
+		return None;
 	};
 
 	// First check if the statement para id matches the core assignment.
@@ -1103,7 +1106,7 @@ fn core_index_from_statement(
 
 	if core_index.0 > sp_state.n_cores {
 		gum::warn!(target: LOG_TARGET, ?candidate_hash, ?core_index, n_cores = sp_state.n_cores, "Invalid CoreIndex");
-		return None
+		return None;
 	}
 
 	if let StatementWithPVD::Seconded(candidate, _pvd) = statement.payload() {
@@ -1119,7 +1122,7 @@ fn core_index_from_statement(
 				?candidate_para_id,
 				"Invalid CoreIndex, core is not assigned to this para_id"
 			);
-			return None
+			return None;
 		}
 		Some(core_index)
 	} else {
@@ -1180,7 +1183,7 @@ async fn construct_per_scheduling_parent_state<Context>(
 				"Cannot participate in candidate backing",
 			);
 
-			return Ok(None)
+			return Ok(None);
 		},
 	};
 
@@ -1193,7 +1196,7 @@ async fn construct_per_scheduling_parent_state<Context>(
 		let core_index = CoreIndex(idx as _);
 
 		if !claim_queue.contains_key(&core_index) {
-			continue
+			continue;
 		}
 
 		let group_index = group_rotation_info.group_for_core(core_index, n_cores);
@@ -1256,7 +1259,7 @@ async fn seconding_sanity_check<Context>(
 		// leaf otherwise.
 		let allowed_parents_for_para = implicit_view.known_allowed_relay_parents_under(head);
 		if !allowed_parents_for_para.unwrap_or_default().contains(&candidate_relay_parent) {
-			continue
+			continue;
 		}
 
 		let (tx, rx) = oneshot::channel();
@@ -1283,7 +1286,7 @@ async fn seconding_sanity_check<Context>(
 	}
 
 	if responses.is_empty() {
-		return SecondingAllowed::No
+		return SecondingAllowed::No;
 	}
 
 	while let Some(response) = responses.next().await {
@@ -1294,7 +1297,7 @@ async fn seconding_sanity_check<Context>(
 					"Failed to reach prospective parachains subsystem for hypothetical membership",
 				);
 
-				return SecondingAllowed::No
+				return SecondingAllowed::No;
 			},
 			Ok((is_member_or_potential, head)) => match is_member_or_potential {
 				false => {
@@ -1374,7 +1377,7 @@ async fn handle_validated_candidate_command<Context>(
 						} = outputs;
 
 						if sp_state.issued_statements.contains(&candidate_hash) {
-							return Ok(())
+							return Ok(());
 						}
 
 						let receipt = CommittedCandidateReceipt {
@@ -1397,7 +1400,7 @@ async fn handle_validated_candidate_command<Context>(
 						)
 						.await
 						{
-							return Ok(())
+							return Ok(());
 						};
 
 						let statement =
@@ -1432,7 +1435,7 @@ async fn handle_validated_candidate_command<Context>(
 							))
 							.await;
 
-							return Ok(())
+							return Ok(());
 						}
 
 						if let Some(stmt) = res? {
@@ -1626,7 +1629,7 @@ async fn import_statement<Context>(
 						"Could not reach the Prospective Parachains subsystem."
 					);
 
-					return Err(Error::RejectedByProspectiveParachains)
+					return Err(Error::RejectedByProspectiveParachains);
 				},
 				Ok(false) => return Err(Error::RejectedByProspectiveParachains),
 				Ok(true) => {},
@@ -1805,18 +1808,18 @@ async fn kick_off_validation_work<Context>(
 	match sp_state.table_context.local_validator_is_disabled() {
 		Some(true) => {
 			gum::info!(target: LOG_TARGET, "We are disabled - don't kick off validation");
-			return Ok(())
+			return Ok(());
 		},
 		Some(false) => {}, // we are not disabled - move on
 		None => {
 			gum::debug!(target: LOG_TARGET, "We are not a validator - don't kick off validation");
-			return Ok(())
+			return Ok(());
 		},
 	}
 
 	let candidate_hash = attesting.candidate.hash();
 	if sp_state.issued_statements.contains(&candidate_hash) {
-		return Ok(())
+		return Ok(());
 	}
 
 	gum::debug!(
@@ -1870,7 +1873,7 @@ async fn maybe_validate_and_import<Context>(
 				"Received statement for unknown relay-parent"
 			);
 
-			return Ok(())
+			return Ok(());
 		},
 	};
 
@@ -1881,7 +1884,7 @@ async fn maybe_validate_and_import<Context>(
 			sender_validator_idx = ?statement.validator_index(),
 			"Not importing statement because the sender is disabled"
 		);
-		return Ok(())
+		return Ok(());
 	}
 
 	let res = import_statement(ctx, sp_state, &mut state.per_candidate, &statement).await;
@@ -1895,7 +1898,7 @@ async fn maybe_validate_and_import<Context>(
 			"Statement rejected by prospective parachains."
 		);
 
-		return Ok(())
+		return Ok(());
 	}
 
 	let summary = res?;
@@ -1909,7 +1912,7 @@ async fn maybe_validate_and_import<Context>(
 		let candidate_hash = summary.candidate;
 
 		if Some(summary.group_id) != sp_state.assigned_core {
-			return Ok(())
+			return Ok(());
 		}
 
 		let attesting = match statement.payload() {
@@ -1931,20 +1934,20 @@ async fn maybe_validate_and_import<Context>(
 				if let Some(attesting) = sp_state.fallbacks.get_mut(candidate_hash) {
 					let our_index = sp_state.table_context.validator.as_ref().map(|v| v.index());
 					if our_index == Some(statement.validator_index()) {
-						return Ok(())
+						return Ok(());
 					}
 
 					if sp_state.awaiting_validation.contains(candidate_hash) {
 						// Job already running:
 						attesting.backing.push(statement.validator_index());
-						return Ok(())
+						return Ok(());
 					} else {
 						// No job, so start another with current validator:
 						attesting.from_validator = statement.validator_index();
 						attesting.clone()
 					}
 				} else {
-					return Ok(())
+					return Ok(());
 				}
 			},
 		};
@@ -2061,7 +2064,7 @@ async fn handle_second_message<Context>(
 			"Candidate backing was asked to second candidate with wrong PVD",
 		);
 
-		return Ok(())
+		return Ok(());
 	}
 
 	// First, determine v3_enabled by checking any available relay parent state
@@ -2093,7 +2096,8 @@ async fn handle_second_message<Context>(
 				?candidate_hash,
 				"Candidate has scheduling_parent outside of our view."
 			);
-			return Ok(())
+
+			return Ok(());
 		},
 		Some(r) => r,
 	};
@@ -2106,7 +2110,7 @@ async fn handle_second_message<Context>(
 	// validator but defensively use `unwrap_or(false)` to continue processing in this case.
 	if sp_state.table_context.local_validator_is_disabled().unwrap_or(false) {
 		gum::warn!(target: LOG_TARGET, "Local validator is disabled. Don't validate and second");
-		return Ok(())
+		return Ok(());
 	}
 
 	// For V3, use scheduling info from scheduling_parent (claim queue determines assignments)
@@ -2214,7 +2218,7 @@ fn handle_get_backable_candidates_message(
 						?candidate_hash,
 						"Requested candidate's scheduling parent is out of view",
 					);
-					break
+					break;
 				},
 			};
 			let maybe_backed_candidate = sp_state
@@ -2232,7 +2236,7 @@ fn handle_get_backable_candidates_message(
 					.or_insert_with(|| Vec::with_capacity(para_candidates.len()))
 					.push(backed_candidate);
 			} else {
-				break
+				break;
 			}
 		}
 	}

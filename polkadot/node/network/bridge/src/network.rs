@@ -131,7 +131,7 @@ fn send_message<M>(
 	M: Encode + Clone,
 {
 	if peers.is_empty() {
-		return
+		return;
 	}
 
 	let message = {
@@ -301,7 +301,7 @@ impl Network for Arc<dyn NetworkService> {
 					},
 					Ok(_) => {},
 				}
-				return
+				return;
 			},
 			Some(peer_id) => peer_id,
 		};

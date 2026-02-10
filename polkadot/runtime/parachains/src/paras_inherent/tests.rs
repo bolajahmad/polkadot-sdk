@@ -1294,10 +1294,14 @@ mod enter {
 
 	#[test]
 	fn disputes_are_size_limited() {
-		BlockLength::set(limits::BlockLength::max_with_normal_ratio(
-			600,
-			Perbill::from_percent(75),
-		));
+		BlockLength::set(
+			limits::BlockLength::builder()
+				.max_length(600)
+				.modify_max_length_for_class(frame_support::dispatch::DispatchClass::Normal, |m| {
+					*m = Perbill::from_percent(75) * 600
+				})
+				.build(),
+		);
 		// Virtually no time based limit:
 		BlockWeights::set(frame_system::limits::BlockWeights::simple_max(Weight::from_parts(
 			u64::MAX,
@@ -1364,10 +1368,14 @@ mod enter {
 
 	#[test]
 	fn bitfields_are_size_limited() {
-		BlockLength::set(limits::BlockLength::max_with_normal_ratio(
-			600,
-			Perbill::from_percent(75),
-		));
+		BlockLength::set(
+			limits::BlockLength::builder()
+				.max_length(600)
+				.modify_max_length_for_class(frame_support::dispatch::DispatchClass::Normal, |m| {
+					*m = Perbill::from_percent(75) * 600
+				})
+				.build(),
+		);
 		// Virtually no time based limit:
 		BlockWeights::set(frame_system::limits::BlockWeights::simple_max(Weight::from_parts(
 			u64::MAX,
@@ -1435,10 +1443,14 @@ mod enter {
 
 	#[test]
 	fn candidates_are_size_limited() {
-		BlockLength::set(limits::BlockLength::max_with_normal_ratio(
-			1_300,
-			Perbill::from_percent(75),
-		));
+		BlockLength::set(
+			limits::BlockLength::builder()
+				.max_length(1_300)
+				.modify_max_length_for_class(frame_support::dispatch::DispatchClass::Normal, |m| {
+					*m = Perbill::from_percent(75) * 1_300
+				})
+				.build(),
+		);
 		// Virtually no time based limit:
 		BlockWeights::set(frame_system::limits::BlockWeights::simple_max(Weight::from_parts(
 			u64::MAX,

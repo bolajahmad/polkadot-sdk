@@ -102,13 +102,13 @@ pub struct RequestedCandidate {
 impl RequestedCandidate {
 	fn is_pending(&self) -> bool {
 		if self.in_flight {
-			return false
+			return false;
 		}
 
 		if let Some(next_retry_time) = self.next_retry_time {
 			let can_retry = Instant::now() >= next_retry_time;
 			if !can_retry {
-				return false
+				return false;
 			}
 		}
 
@@ -279,7 +279,7 @@ impl RequestManager {
 	pub fn has_pending_requests(&self) -> bool {
 		for (_id, entry) in &self.requests {
 			if entry.is_pending() {
-				return true
+				return true;
 			}
 		}
 
@@ -326,7 +326,7 @@ impl RequestManager {
 		// we would need to request it for each candidate, around 25 right now
 		// on kusama.
 		if response_manager.len() >= 2 * MAX_PARALLEL_ATTESTED_CANDIDATE_REQUESTS as usize {
-			return None
+			return None;
 		}
 
 		let mut res = None;
@@ -345,19 +345,19 @@ impl RequestManager {
 						"Missing entry for priority queue member",
 					);
 
-					continue
+					continue;
 				},
 				Some(e) => e,
 			};
 
 			if !entry.is_pending() {
-				continue
+				continue;
 			}
 
 			let props = match request_props(&id) {
 				None => {
 					cleanup_outdated.push((i, id.clone()));
-					continue
+					continue;
 				},
 				Some(s) => s,
 			};
@@ -404,7 +404,7 @@ impl RequestManager {
 			entry.in_flight = true;
 
 			res = Some(request);
-			break
+			break;
 		}
 
 		for (priority_index, identifier) in cleanup_outdated.into_iter().rev() {
@@ -490,13 +490,13 @@ fn find_request_target_with_update(
 	for (i, p) in known_by.iter().enumerate() {
 		// If we are already sending to that peer, skip for now
 		if response_manager.is_sending_to(p) {
-			continue
+			continue;
 		}
 
 		let mut filter = match peer_advertised(candidate_identifier, p) {
 			None => {
 				prune.push(i);
-				continue
+				continue;
 			},
 			Some(f) => f,
 		};
@@ -505,7 +505,7 @@ fn find_request_target_with_update(
 		filter.mask_valid(&props.unwanted_mask.validated_in_group);
 		if seconded_and_sufficient(&filter, props.backing_threshold) {
 			target = Some((i, *p));
-			break
+			break;
 		}
 	}
 
@@ -582,12 +582,13 @@ impl UnhandledResponse {
 		// it could also happen in the case that we had a request in-flight
 		// and the request entry was garbage-collected on outdated relay parent.
 		let entry = match manager.requests.get_mut(&identifier) {
-			None =>
+			None => {
 				return ResponseValidationOutput {
 					requested_peer,
 					reputation_changes: Vec::new(),
 					request_status: CandidateRequestStatus::Outdated,
-				},
+				}
+			},
 			Some(e) => e,
 		};
 
@@ -625,7 +626,7 @@ impl UnhandledResponse {
 					requested_peer,
 					reputation_changes: vec![(requested_peer, COST_IMPROPERLY_DECODED_RESPONSE)],
 					request_status: CandidateRequestStatus::Incomplete,
-				}
+				};
 			},
 			Err(e @ RequestError::NetworkError(_) | e @ RequestError::Canceled(_)) => {
 				gum::trace!(
@@ -638,7 +639,7 @@ impl UnhandledResponse {
 					requested_peer,
 					reputation_changes: vec![],
 					request_status: CandidateRequestStatus::Incomplete,
-				}
+				};
 			},
 			Ok(response) => response,
 		};
@@ -706,24 +707,24 @@ fn validate_complete_response(
 	// note: roughly ascending cost of operations
 	{
 		if response.candidate_receipt.descriptor.relay_parent() != identifier.relay_parent {
-			return invalid_candidate_output(COST_INVALID_RESPONSE)
+			return invalid_candidate_output(COST_INVALID_RESPONSE);
 		}
 
 		if response.candidate_receipt.descriptor.persisted_validation_data_hash() !=
 			response.persisted_validation_data.hash()
 		{
-			return invalid_candidate_output(COST_INVALID_RESPONSE)
+			return invalid_candidate_output(COST_INVALID_RESPONSE);
 		}
 
 		if !allowed_para_lookup(
 			response.candidate_receipt.descriptor.para_id(),
 			identifier.group_index,
 		) {
-			return invalid_candidate_output(COST_INVALID_RESPONSE)
+			return invalid_candidate_output(COST_INVALID_RESPONSE);
 		}
 
 		if response.candidate_receipt.hash() != identifier.candidate_hash {
-			return invalid_candidate_output(COST_INVALID_RESPONSE)
+			return invalid_candidate_output(COST_INVALID_RESPONSE);
 		}
 
 		let candidate_hash = response.candidate_receipt.hash();
@@ -737,7 +738,7 @@ fn validate_complete_response(
 				peer = ?requested_peer,
 				"Received candidate has invalid UMP signals"
 			);
-			return invalid_candidate_output(COST_INVALID_UMP_SIGNALS)
+			return invalid_candidate_output(COST_INVALID_UMP_SIGNALS);
 		}
 
 		// Check if `session_index` of relay parent matches candidate descriptor
@@ -754,7 +755,7 @@ fn validate_complete_response(
 					candidate_session_index,
 					"Received candidate has invalid session index"
 				);
-				return invalid_candidate_output(COST_INVALID_SESSION_INDEX)
+				return invalid_candidate_output(COST_INVALID_SESSION_INDEX);
 			}
 		}
 	}
@@ -777,7 +778,7 @@ fn validate_complete_response(
 				Some(i) => i,
 				None => {
 					rep_changes.push((requested_peer, COST_UNREQUESTED_RESPONSE_STATEMENT));
-					continue
+					continue;
 				},
 			};
 
@@ -786,7 +787,7 @@ fn validate_complete_response(
 				&identifier.candidate_hash
 			{
 				rep_changes.push((requested_peer, COST_UNREQUESTED_RESPONSE_STATEMENT));
-				continue
+				continue;
 			}
 
 			// filter out duplicates or statements outside the mask.
@@ -796,36 +797,36 @@ fn validate_complete_response(
 				CompactStatement::Seconded(_) => {
 					if unwanted_mask.seconded_in_group[i] {
 						rep_changes.push((requested_peer, COST_UNREQUESTED_RESPONSE_STATEMENT));
-						continue
+						continue;
 					}
 
 					if received_filter.seconded_in_group[i] {
 						rep_changes.push((requested_peer, COST_UNREQUESTED_RESPONSE_STATEMENT));
-						continue
+						continue;
 					}
 				},
 				CompactStatement::Valid(_) => {
 					if unwanted_mask.validated_in_group[i] {
 						rep_changes.push((requested_peer, COST_UNREQUESTED_RESPONSE_STATEMENT));
-						continue
+						continue;
 					}
 
 					if received_filter.validated_in_group[i] {
 						rep_changes.push((requested_peer, COST_UNREQUESTED_RESPONSE_STATEMENT));
-						continue
+						continue;
 					}
 				},
 			}
 
 			if disabled_mask.get(i).map_or(false, |x| *x) {
-				continue
+				continue;
 			}
 
 			let validator_public =
 				match validator_key_lookup(unchecked_statement.unchecked_validator_index()) {
 					None => {
 						rep_changes.push((requested_peer, COST_INVALID_SIGNATURE));
-						continue
+						continue;
 					},
 					Some(p) => p,
 				};
@@ -834,7 +835,7 @@ fn validate_complete_response(
 				match unchecked_statement.try_into_checked(&signing_context, &validator_public) {
 					Err(_) => {
 						rep_changes.push((requested_peer, COST_INVALID_SIGNATURE));
-						continue
+						continue;
 					},
 					Ok(checked) => checked,
 				};
@@ -855,7 +856,7 @@ fn validate_complete_response(
 		// Only accept responses which are sufficient, according to our
 		// required backing threshold.
 		if !seconded_and_sufficient(&received_filter, backing_threshold) {
-			return invalid_candidate_output(COST_INVALID_RESPONSE)
+			return invalid_candidate_output(COST_INVALID_RESPONSE);
 		}
 
 		statements
@@ -912,7 +913,7 @@ fn insert_or_update_priority(
 		// expected identifier.
 		if priority_sorted[prev_index].0 == new_priority {
 			// unchanged.
-			return prev_index
+			return prev_index;
 		} else {
 			priority_sorted.remove(prev_index);
 		}

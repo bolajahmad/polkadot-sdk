@@ -185,22 +185,22 @@ pub fn fetched_collation_sanity_check(
 	v3_enabled: bool,
 ) -> Result<(), SecondingError> {
 	if persisted_validation_data.hash() != fetched.descriptor().persisted_validation_data_hash() {
-		return Err(SecondingError::PersistedValidationDataMismatch)
+		return Err(SecondingError::PersistedValidationDataMismatch);
 	}
 
 	if advertised
 		.prospective_candidate
 		.map_or(false, |pc| pc.candidate_hash() != fetched.hash())
 	{
-		return Err(SecondingError::CandidateHashMismatch)
+		return Err(SecondingError::CandidateHashMismatch);
 	}
 
 	if advertised.scheduling_parent != fetched.descriptor.scheduling_parent(v3_enabled) {
-		return Err(SecondingError::SchedulingParentMismatch)
+		return Err(SecondingError::SchedulingParentMismatch);
 	}
 
 	if maybe_parent_head_and_hash.map_or(false, |(head, hash)| head.hash() != hash) {
-		return Err(SecondingError::ParentHeadDataMismatch)
+		return Err(SecondingError::ParentHeadDataMismatch);
 	}
 
 	// For V3 protocol advertisements, verify the fetched descriptor version matches the advertised
@@ -211,7 +211,7 @@ pub fn fetched_collation_sanity_check(
 			return Err(SecondingError::DescriptorVersionMismatch(
 				*advertised_version,
 				fetched_version,
-			))
+			));
 		}
 	}
 
@@ -293,9 +293,8 @@ pub struct Collations {
 }
 
 impl Collations {
-	pub(super) fn new(group_assignments: &Vec<ParaId>) -> Self {
+	pub(super) fn new<'a>(group_assignments: impl Iterator<Item = &'a ParaId>) -> Self {
 		let mut candidates_state = BTreeMap::<ParaId, CandidatesStatePerPara>::new();
-
 		for para_id in group_assignments {
 			candidates_state.entry(*para_id).or_default().claims_per_para += 1;
 		}
@@ -340,7 +339,7 @@ impl Collations {
 	/// fulfilled.
 	pub(super) fn pick_a_collation_to_fetch(
 		&mut self,
-		unfulfilled_claim_queue_entries: Vec<ParaId>,
+		unfulfilled_claim_queue_entries: VecDeque<ParaId>,
 	) -> Option<(PendingCollation, CollatorId)> {
 		gum::trace!(
 			target: LOG_TARGET,
@@ -357,7 +356,7 @@ impl Collations {
 				.get_mut(&assignment)
 				.and_then(|collations| collations.pop_front())
 			{
-				return Some(collation)
+				return Some(collation);
 			}
 		}
 
@@ -373,6 +372,13 @@ impl Collations {
 
 	pub(super) fn queued_for_para(&self, para_id: &ParaId) -> usize {
 		self.waiting_queue.get(para_id).map(|queue| queue.len()).unwrap_or_default()
+	}
+
+	/// Remove all pending collations for a specific peer from the waiting queue.
+	pub(super) fn remove_pending_for_peer(&mut self, peer_id: &PeerId) {
+		for queue in self.waiting_queue.values_mut() {
+			queue.retain(|(pending, _)| &pending.peer_id != peer_id);
+		}
 	}
 }
 
@@ -423,7 +429,7 @@ impl Future for CollationFetchRequest {
 					pending_collation: self.pending_collation.clone(),
 				},
 				Err(CollationFetchError::Cancelled),
-			))
+			));
 		}
 
 		let res = self.from_collator.poll_unpin(cx).map(|res| {

@@ -68,7 +68,7 @@ struct AllowedRelayParents {
 }
 
 impl AllowedRelayParents {
-	fn allowed_relay_parents_for(&self) -> &[Hash] {
+	fn allowed_relay_parents(&self) -> &[Hash] {
 		&self.allowed_relay_parents_contiguous
 	}
 }
@@ -155,7 +155,7 @@ impl View {
 			+ SubsystemSender<RuntimeApiMessage>,
 	{
 		if self.leaves.contains_key(&leaf_hash) {
-			return Err(FetchError::AlreadyKnown)
+			return Err(FetchError::AlreadyKnown);
 		}
 
 		let res = self.fetch_fresh_leaf_and_insert_ancestry(leaf_hash, &mut *sender).await;
@@ -185,7 +185,7 @@ impl View {
 		let mut removed = Vec::new();
 
 		if self.leaves.remove(&leaf_hash).is_none() {
-			return removed
+			return removed;
 		}
 
 		// Prune everything before the minimum out of all leaves,
@@ -238,7 +238,7 @@ impl View {
 		block_info
 			.maybe_allowed_relay_parents
 			.as_ref()
-			.map(|mins| mins.allowed_relay_parents_for())
+			.map(|mins| mins.allowed_relay_parents())
 	}
 
 	/// Returns all paths from the oldest block in storage to each leaf that passes through
@@ -257,12 +257,12 @@ impl View {
 
 		if self.leaves.is_empty() {
 			// No leaves so the view should be empty. Don't return any paths.
-			return vec![]
+			return vec![];
 		};
 
 		if !self.block_info_storage.contains_key(relay_parent) {
 			// `relay_parent` is not in the view - don't return any paths
-			return vec![]
+			return vec![];
 		}
 
 		// Find all paths from each leaf to `relay_parent`.
@@ -277,7 +277,7 @@ impl View {
 			loop {
 				if visited.contains(&current_leaf) {
 					// There is a cycle - abandon this path
-					break
+					break;
 				}
 
 				current_leaf = match self.block_info_storage.get(&current_leaf) {
@@ -302,7 +302,7 @@ impl View {
 							// we want the path ordered from oldest to newest so reverse it
 							paths.push(path.into_iter().rev().collect());
 						}
-						break
+						break;
 					},
 				};
 			}
@@ -342,21 +342,24 @@ impl View {
 			sender.send_message(ChainApiMessage::BlockHeader(block_hash, tx)).await;
 			let header = match rx.await {
 				Ok(Ok(Some(header))) => header,
-				Ok(Ok(None)) =>
+				Ok(Ok(None)) => {
 					return Err(FetchError::BlockHeaderUnavailable(
 						block_hash,
 						BlockHeaderUnavailableReason::Unknown,
-					)),
-				Ok(Err(e)) =>
+					));
+				},
+				Ok(Err(e)) => {
 					return Err(FetchError::BlockHeaderUnavailable(
 						block_hash,
 						BlockHeaderUnavailableReason::Internal(e),
-					)),
-				Err(_) =>
+					));
+				},
+				Err(_) => {
 					return Err(FetchError::BlockHeaderUnavailable(
 						block_hash,
 						BlockHeaderUnavailableReason::SubsystemUnavailable,
-					)),
+					));
+				},
 			};
 			block_info_entry.insert(BlockInfo {
 				block_number: header.number,

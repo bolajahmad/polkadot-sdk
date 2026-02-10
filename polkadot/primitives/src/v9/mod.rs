@@ -623,7 +623,7 @@ pub fn check_candidate_backing<H: AsRef<[u8]> + Clone + Encode + core::fmt::Debu
 			group_len,
 			validator_indices.len(),
 		);
-		return Err(())
+		return Err(());
 	}
 
 	if validity_votes.len() > group_len {
@@ -633,7 +633,7 @@ pub fn check_candidate_backing<H: AsRef<[u8]> + Clone + Encode + core::fmt::Debu
 			group_len,
 			validity_votes.len(),
 		);
-		return Err(())
+		return Err(());
 	}
 
 	let mut signed = 0;
@@ -656,7 +656,7 @@ pub fn check_candidate_backing<H: AsRef<[u8]> + Clone + Encode + core::fmt::Debu
 				validator_id,
 				val_in_group_idx,
 			);
-			return Err(())
+			return Err(());
 		}
 	}
 
@@ -667,7 +667,7 @@ pub fn check_candidate_backing<H: AsRef<[u8]> + Clone + Encode + core::fmt::Debu
 			validity_votes.len(),
 			signed,
 		);
-		return Err(())
+		return Err(());
 	}
 
 	Ok(signed)
@@ -765,10 +765,10 @@ impl GroupRotationInfo {
 	/// `core_index` should be less than `cores`, which is capped at `u32::max()`.
 	pub fn group_for_core(&self, core_index: CoreIndex, cores: usize) -> GroupIndex {
 		if self.group_rotation_frequency == 0 {
-			return GroupIndex(core_index.0)
+			return GroupIndex(core_index.0);
 		}
 		if cores == 0 {
-			return GroupIndex(0)
+			return GroupIndex(0);
 		}
 
 		let cores = core::cmp::min(cores, u32::MAX as usize);
@@ -787,10 +787,10 @@ impl GroupRotationInfo {
 	/// `core_index` should be less than `cores`, which is capped at `u32::max()`.
 	pub fn core_for_group(&self, group_index: GroupIndex, cores: usize) -> CoreIndex {
 		if self.group_rotation_frequency == 0 {
-			return CoreIndex(group_index.0)
+			return CoreIndex(group_index.0);
 		}
 		if cores == 0 {
-			return CoreIndex(0)
+			return CoreIndex(0);
 		}
 
 		let cores = core::cmp::min(cores, u32::MAX as usize);
@@ -1069,8 +1069,9 @@ impl ConsensusLog {
 		digest_item: &sp_runtime::DigestItem,
 	) -> Result<Option<Self>, codec::Error> {
 		match digest_item {
-			sp_runtime::DigestItem::Consensus(id, encoded) if id == &POLKADOT_ENGINE_ID =>
-				Ok(Some(Self::decode(&mut &encoded[..])?)),
+			sp_runtime::DigestItem::Consensus(id, encoded) if id == &POLKADOT_ENGINE_ID => {
+				Ok(Some(Self::decode(&mut &encoded[..])?))
+			},
 			_ => Ok(None),
 		}
 	}
@@ -1106,33 +1107,38 @@ impl DisputeStatement {
 		session: SessionIndex,
 	) -> Result<Vec<u8>, ()> {
 		match self {
-			DisputeStatement::Valid(ValidDisputeStatementKind::Explicit) =>
+			DisputeStatement::Valid(ValidDisputeStatementKind::Explicit) => {
 				Ok(ExplicitDisputeStatement { valid: true, candidate_hash, session }
-					.signing_payload()),
+					.signing_payload())
+			},
 			DisputeStatement::Valid(ValidDisputeStatementKind::BackingSeconded(
 				inclusion_parent,
 			)) => Ok(CompactStatement::Seconded(candidate_hash).signing_payload(&SigningContext {
 				session_index: session,
 				parent_hash: *inclusion_parent,
 			})),
-			DisputeStatement::Valid(ValidDisputeStatementKind::BackingValid(inclusion_parent)) =>
+			DisputeStatement::Valid(ValidDisputeStatementKind::BackingValid(inclusion_parent)) => {
 				Ok(CompactStatement::Valid(candidate_hash).signing_payload(&SigningContext {
 					session_index: session,
 					parent_hash: *inclusion_parent,
-				})),
-			DisputeStatement::Valid(ValidDisputeStatementKind::ApprovalChecking) =>
-				Ok(ApprovalVote(candidate_hash).signing_payload(session)),
+				}))
+			},
+			DisputeStatement::Valid(ValidDisputeStatementKind::ApprovalChecking) => {
+				Ok(ApprovalVote(candidate_hash).signing_payload(session))
+			},
 			DisputeStatement::Valid(
 				ValidDisputeStatementKind::ApprovalCheckingMultipleCandidates(candidate_hashes),
-			) =>
+			) => {
 				if candidate_hashes.contains(&candidate_hash) {
 					Ok(ApprovalVoteMultipleCandidates(candidate_hashes).signing_payload(session))
 				} else {
 					Err(())
-				},
-			DisputeStatement::Invalid(InvalidDisputeStatementKind::Explicit) =>
+				}
+			},
+			DisputeStatement::Invalid(InvalidDisputeStatementKind::Explicit) => {
 				Ok(ExplicitDisputeStatement { valid: false, candidate_hash, session }
-					.signing_payload()),
+					.signing_payload())
+			},
 		}
 	}
 
@@ -1351,10 +1357,12 @@ impl ValidityAttestation {
 		signing_context: &SigningContext<H>,
 	) -> Vec<u8> {
 		match *self {
-			ValidityAttestation::Implicit(_) =>
-				(CompactStatement::Seconded(candidate_hash), signing_context).encode(),
-			ValidityAttestation::Explicit(_) =>
-				(CompactStatement::Valid(candidate_hash), signing_context).encode(),
+			ValidityAttestation::Implicit(_) => {
+				(CompactStatement::Seconded(candidate_hash), signing_context).encode()
+			},
+			ValidityAttestation::Explicit(_) => {
+				(CompactStatement::Valid(candidate_hash), signing_context).encode()
+			},
 		}
 	}
 }
@@ -1430,7 +1438,7 @@ impl codec::Decode for CompactStatement {
 	fn decode<I: codec::Input>(input: &mut I) -> Result<Self, codec::Error> {
 		let maybe_magic = <[u8; 4]>::decode(input)?;
 		if maybe_magic != BACKING_STATEMENT_MAGIC {
-			return Err(codec::Error::from("invalid magic string"))
+			return Err(codec::Error::from("invalid magic string"));
 		}
 
 		Ok(match CompactStatementInner::decode(input)? {
@@ -1542,7 +1550,7 @@ pub fn effective_minimum_backing_votes(
 #[derive(Clone, Encode, Decode, Debug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(PartialEq))]
 pub struct SessionInfo {
-	/****** New in v2 ****** */
+	/// **** New in v2 ******
 	/// All the validators actively participating in parachain consensus.
 	/// Indices are into the broader validator set.
 	pub active_validator_indices: Vec<ValidatorIndex>,
@@ -1551,7 +1559,7 @@ pub struct SessionInfo {
 	/// The amount of sessions to keep for disputes.
 	pub dispute_period: SessionIndex,
 
-	/****** Old fields ***** */
+	/// **** Old fields *****
 	/// Validators in canonical ordering.
 	///
 	/// NOTE: There might be more authorities in the current session, than `validators`
@@ -1831,7 +1839,6 @@ pub struct InternalVersion(pub u8);
 /// A type representing the version of the candidate descriptor.
 #[derive(PartialEq, Eq, Copy, Clone, Encode, Decode, TypeInfo, Debug)]
 pub enum CandidateDescriptorVersion {
-	///
 	/// with deprecated collator id and collator signature.
 	V1,
 	/// First properly versioned candidate.
@@ -1965,7 +1972,7 @@ impl<H: AsRef<[u8]>> CandidateDescriptorV2<H> {
 			self.scheduling_parent.as_ref() != &[0u8; 32];
 
 		if old_v1_detected {
-			return CandidateDescriptorVersion::V1
+			return CandidateDescriptorVersion::V1;
 		}
 
 		match self.version {
@@ -2072,7 +2079,7 @@ impl<H: Copy + AsRef<[u8]>> CandidateDescriptorV2<H> {
 	#[cfg(feature = "test")]
 	pub fn signature(&self) -> Option<CollatorSignature> {
 		if self.version(false) == CandidateDescriptorVersion::V1 {
-			return Some(self.rebuild_signature_field())
+			return Some(self.rebuild_signature_field());
 		}
 
 		None
@@ -2081,7 +2088,7 @@ impl<H: Copy + AsRef<[u8]>> CandidateDescriptorV2<H> {
 	/// Returns the `core_index` of `V2` and `V3` candidate descriptors, `None` for `V1`.
 	pub fn core_index(&self, v3_enabled: bool) -> Option<CoreIndex> {
 		if self.version(v3_enabled) == CandidateDescriptorVersion::V1 {
-			return None
+			return None;
 		}
 
 		Some(CoreIndex(self.core_index as u32))
@@ -2090,7 +2097,7 @@ impl<H: Copy + AsRef<[u8]>> CandidateDescriptorV2<H> {
 	/// Returns the `session_index` of `V2` and `V3` candidate descriptors, `None` for `V1`.
 	pub fn session_index(&self, v3_enabled: bool) -> Option<SessionIndex> {
 		if self.version(v3_enabled) == CandidateDescriptorVersion::V1 {
-			return None
+			return None;
 		}
 
 		Some(self.session_index)
@@ -2120,8 +2127,9 @@ impl<H: Copy + AsRef<[u8]>> CandidateDescriptorV2<H> {
 		match self.version(v3_enabled) {
 			CandidateDescriptorVersion::V1 => None,
 			CandidateDescriptorVersion::V2 => Some(self.session_index),
-			CandidateDescriptorVersion::V3 =>
-				Some(self.session_index.saturating_add(self.scheduling_session_offset as _)),
+			CandidateDescriptorVersion::V3 => {
+				Some(self.session_index.saturating_add(self.scheduling_session_offset as _))
+			},
 			CandidateDescriptorVersion::Unknown => None,
 		}
 	}
@@ -2527,7 +2535,7 @@ impl CandidateUMPSignals {
 			},
 			_ => {
 				// This means that we got duplicate UMP signals.
-				return Err(CommittedCandidateReceiptError::DuplicateUMPSignal)
+				return Err(CommittedCandidateReceiptError::DuplicateUMPSignal);
 			},
 		};
 
@@ -2565,7 +2573,7 @@ impl CandidateCommitments {
 
 		if signals_iter.next().is_none() {
 			// No UMP separator
-			return Ok(res)
+			return Ok(res);
 		}
 
 		// Process first signal
@@ -2578,7 +2586,7 @@ impl CandidateCommitments {
 
 		// At most two signals are allowed
 		if signals_iter.next().is_some() {
-			return Err(CommittedCandidateReceiptError::TooManyUMPSignals)
+			return Err(CommittedCandidateReceiptError::TooManyUMPSignals);
 		}
 
 		Ok(res)
@@ -2665,19 +2673,20 @@ impl<H: Copy + AsRef<[u8]>> CommittedCandidateReceiptV2<H> {
 				// If the parachain runtime started sending ump signals, v1 descriptors are no
 				// longer allowed.
 				if !signals.is_empty() {
-					return Err(CommittedCandidateReceiptError::UMPSignalWithV1Descriptor)
+					return Err(CommittedCandidateReceiptError::UMPSignalWithV1Descriptor);
 				} else {
 					// Nothing else to check for v1 descriptors.
-					return Ok(CandidateUMPSignals::default())
+					return Ok(CandidateUMPSignals::default());
 				}
 			},
 			CandidateDescriptorVersion::V2 => {},
-			CandidateDescriptorVersion::Unknown =>
-				return Err(CommittedCandidateReceiptError::UnknownVersion(self.descriptor.version)),
+			CandidateDescriptorVersion::Unknown => {
+				return Err(CommittedCandidateReceiptError::UnknownVersion(self.descriptor.version))
+			},
 			_ if signals.is_empty() => {
 				// V3 and above require UMP signals.
 				// This is technically changed behavior, but can't be triggered without v3 enabled.
-				return Err(CommittedCandidateReceiptError::NoUMPSignalWithV3Descriptor)
+				return Err(CommittedCandidateReceiptError::NoUMPSignalWithV3Descriptor);
 			},
 			_ => {},
 		}
@@ -2711,7 +2720,7 @@ impl<H: Copy + AsRef<[u8]>> CommittedCandidateReceiptV2<H> {
 			.ok_or(CommittedCandidateReceiptError::NoAssignment)?;
 
 		if assigned_cores.is_empty() {
-			return Err(CommittedCandidateReceiptError::NoAssignment)
+			return Err(CommittedCandidateReceiptError::NoAssignment);
 		}
 
 		let descriptor_core_index = CoreIndex(self.descriptor.core_index as u32);
@@ -2723,11 +2732,11 @@ impl<H: Copy + AsRef<[u8]>> CommittedCandidateReceiptV2<H> {
 			// We got more than one assigned core and no core selector. Special care is needed.
 			if !assigned_cores.contains(&descriptor_core_index) {
 				// core index in the descriptor is not assigned to the para. Error.
-				return Err(CommittedCandidateReceiptError::InvalidCoreIndex)
+				return Err(CommittedCandidateReceiptError::InvalidCoreIndex);
 			} else {
 				// the descriptor core index is indeed assigned to the para. This is the most we can
 				// check for now
-				return Ok(())
+				return Ok(());
 			}
 		} else {
 			// No core selector but there's only one assigned core, use it.
@@ -2744,7 +2753,7 @@ impl<H: Copy + AsRef<[u8]>> CommittedCandidateReceiptV2<H> {
 			return Err(CommittedCandidateReceiptError::CoreIndexMismatch {
 				descriptor: descriptor_core_index,
 				commitments: core_index,
-			})
+			});
 		}
 
 		Ok(())

@@ -156,10 +156,12 @@ async fn run_iteration<Context>(
 			},
 			FromOrchestra::Signal(OverseerSignal::BlockFinalized(..)) => {},
 			FromOrchestra::Communication { msg } => match msg {
-				ProspectiveParachainsMessage::IntroduceSecondedCandidate(request, tx) =>
-					handle_introduce_seconded_candidate(view, request, tx, metrics).await,
-				ProspectiveParachainsMessage::CandidateBacked(para, candidate_hash) =>
-					handle_candidate_backed(view, para, candidate_hash, metrics).await,
+				ProspectiveParachainsMessage::IntroduceSecondedCandidate(request, tx) => {
+					handle_introduce_seconded_candidate(view, request, tx, metrics).await
+				},
+				ProspectiveParachainsMessage::CandidateBacked(para, candidate_hash) => {
+					handle_candidate_backed(view, para, candidate_hash, metrics).await
+				},
 				ProspectiveParachainsMessage::GetBackableCandidates {
 					leaf,
 					para_id,
@@ -167,10 +169,12 @@ async fn run_iteration<Context>(
 					ancestors,
 					sender,
 				} => answer_get_backable_candidates(&view, leaf, para_id, count, ancestors, sender),
-				ProspectiveParachainsMessage::GetHypotheticalMembership(request, tx) =>
-					answer_hypothetical_membership_request(&view, request, tx, metrics),
-				ProspectiveParachainsMessage::GetProspectiveValidationData(request, tx) =>
-					answer_prospective_validation_data_request(&view, request, tx),
+				ProspectiveParachainsMessage::GetHypotheticalMembership(request, tx) => {
+					answer_hypothetical_membership_request(&view, request, tx, metrics)
+				},
+				ProspectiveParachainsMessage::GetProspectiveValidationData(request, tx) => {
+					answer_prospective_validation_data_request(&view, request, tx)
+				},
 			},
 		}
 	}
@@ -206,7 +210,7 @@ async fn handle_active_leaves_update<Context>(
 	// There can only be one newly activated leaf, `update.activated` is an `Option`.
 	for activated in update.activated.into_iter() {
 		if update.deactivated.contains(&activated.hash) {
-			continue
+			continue;
 		}
 
 		let hash = activated.hash;
@@ -225,7 +229,7 @@ async fn handle_active_leaves_update<Context>(
 				// `update.activated` is an option, but we can use this
 				// to exit the 'loop' and skip this block without skipping
 				// pruning logic.
-				continue
+				continue;
 			},
 			Some(info) => info,
 		};
@@ -275,7 +279,7 @@ async fn handle_active_leaves_update<Context>(
 					"Relay chain ancestors have wrong order: {:?}",
 					unexpected_ancestors
 				);
-				continue
+				continue;
 			},
 		};
 
@@ -295,7 +299,7 @@ async fn handle_active_leaves_update<Context>(
 					"Failed to get inclusion backing state."
 				);
 
-				continue
+				continue;
 			};
 
 			let pending_availability = preprocess_candidates_pending_availability(
@@ -329,7 +333,7 @@ async fn handle_active_leaves_update<Context>(
 							"Scraped invalid candidate pending availability",
 						);
 
-						break
+						break;
 					},
 				}
 
@@ -517,7 +521,7 @@ async fn preprocess_candidates_pending_availability<Context>(
 				"Had to stop processing pending candidates early due to missing info.",
 			);
 
-			break
+			break;
 		};
 
 		let next_required_parent = pending.commitments.head_data.clone();
@@ -580,7 +584,7 @@ async fn handle_introduce_seconded_candidate(
 				);
 
 				let _ = tx.send(false);
-				return
+				return;
 			},
 		};
 
@@ -689,6 +693,7 @@ async fn handle_candidate_backed(
 				?relay_parent,
 				?para,
 				?is_active_leaf,
+				?candidate_hash,
 				"Candidate backed. Candidate chain for para: {:?}",
 				chain.best_chain_vec()
 			);
@@ -712,7 +717,7 @@ async fn handle_candidate_backed(
 			"Received instruction to back a candidate for unscheduled para",
 		);
 
-		return
+		return;
 	}
 
 	if !found_candidate {
@@ -744,7 +749,7 @@ fn answer_get_backable_candidates(
 		);
 
 		let _ = tx.send(vec![]);
-		return
+		return;
 	}
 	let Some(data) = view.per_relay_parent.get(&leaf) else {
 		gum::debug!(
@@ -755,7 +760,7 @@ fn answer_get_backable_candidates(
 		);
 
 		let _ = tx.send(vec![]);
-		return
+		return;
 	};
 
 	let Some(chain) = data.fragment_chains.get(&para) else {
@@ -767,7 +772,7 @@ fn answer_get_backable_candidates(
 		);
 
 		let _ = tx.send(vec![]);
-		return
+		return;
 	};
 
 	gum::trace!(
@@ -893,7 +898,7 @@ fn answer_prospective_validation_data_request(
 		})
 	}) {
 		if head_data.is_some() && relay_parent_info.is_some() && max_pov_size.is_some() {
-			break
+			break;
 		}
 		if relay_parent_info.is_none() {
 			relay_parent_info = relay_chain_scope.ancestor(&request.candidate_relay_parent);
@@ -1016,7 +1021,7 @@ async fn fetch_ancestors<Context>(
 	required_session: u32,
 ) -> JfyiErrorResult<Vec<BlockInfo>> {
 	if ancestors == 0 {
-		return Ok(Vec::new())
+		return Ok(Vec::new());
 	}
 
 	let (tx, rx) = oneshot::channel();
@@ -1040,7 +1045,7 @@ async fn fetch_ancestors<Context>(
 				);
 
 				// Return, however far we got.
-				break
+				break;
 			},
 			Some(info) => info,
 		};
@@ -1057,7 +1062,7 @@ async fn fetch_ancestors<Context>(
 		if session == required_session {
 			block_info.push(info);
 		} else {
-			break
+			break;
 		}
 	}
 
@@ -1071,7 +1076,7 @@ async fn fetch_block_header_with_cache<Context>(
 	relay_hash: Hash,
 ) -> JfyiErrorResult<Option<Header>> {
 	if let Some(h) = cache.get(&relay_hash) {
-		return Ok(Some(h.clone()))
+		return Ok(Some(h.clone()));
 	}
 
 	let (tx, rx) = oneshot::channel();

@@ -24,9 +24,9 @@ use crate::{
 	session_rotation::{self, Eras, Rotator},
 	slashing::OffenceRecord,
 	weights::WeightInfo,
-	ActiveEraInfo, BalanceOf, Exposure, Forcing, LedgerIntegrityState, MaxNominationsOf,
-	Nominations, NominationsQuota, PositiveImbalanceOf, RewardDestination, SnapshotStatus,
-	StakingLedger, ValidatorPrefs, STAKING_ID,
+	BalanceOf, Exposure, Forcing, LedgerIntegrityState, MaxNominationsOf, Nominations,
+	NominationsQuota, PositiveImbalanceOf, RewardDestination, SnapshotStatus, StakingLedger,
+	ValidatorPrefs, STAKING_ID,
 };
 use alloc::{boxed::Box, vec, vec::Vec};
 use frame_election_provider_support::{
@@ -1749,7 +1749,7 @@ impl<T: Config> StakingInterface for Pallet<T> {
 
 	sp_staking::std_or_benchmarks_enabled! {
 		fn set_era(era: EraIndex) {
-			ActiveEra::<T>::put(ActiveEraInfo { index: era, start: None });
+			ActiveEra::<T>::put(crate::ActiveEraInfo { index: era, start: None });
 			// Simulate prod behaviour where current era is always ahead of active era by 1.
 			CurrentEra::<T>::put(era.saturating_add(1));
 		}

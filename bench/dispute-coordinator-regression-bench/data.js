@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770733817041,
+  "lastUpdate": 1770752980666,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -24107,6 +24107,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "dispute-distribution",
             "value": 0.009455372159999972,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "94772640+snowmead@users.noreply.github.com",
+            "name": "Michael Assaf",
+            "username": "snowmead"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "fbddee8faabeadef47a375c71c1a8a11274e4e0d",
+          "message": "Add `DecodeWithMemTracking` derive to `CompactProof` (#11028)\n\n# Description\n\nAdd `DecodeWithMemTracking` derive to `CompactProof` in\n`substrate/primitives/trie/src/storage_proof.rs`.\n\n`StorageProof` already derived `DecodeWithMemTracking` but\n`CompactProof` in the same file was missed.\n\n## Integration\n\nNo integration changes required for downstream projects. `CompactProof`\nnow implements `DecodeWithMemTracking`, which is a strictly additive\ntrait implementation. Existing code using `CompactProof` will continue\nto work as before.\n\n## Review Notes\n\nSingle-line change adding `DecodeWithMemTracking` to the derive macro\nlist on `CompactProof`:\n\n```diff\n-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, TypeInfo)]\n+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]\n pub struct CompactProof {\n     pub encoded_nodes: Vec<Vec<u8>>,\n }\n```\n\n`CompactProof` only contains `Vec<Vec<u8>>`, which already implements\n`DecodeWithMemTracking`, so the derive works without any manual\nimplementation.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-10T18:41:06Z",
+          "tree_id": "8454baf6ec660756950140fb84b8400668568743",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/fbddee8faabeadef47a375c71c1a8a11274e4e0d"
+        },
+        "date": 1770752955804,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006568397689999993,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.00270463459,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009177024279999984,
             "unit": "seconds"
           }
         ]

@@ -3,9 +3,6 @@
 pragma solidity >=0.4.21;
 
 contract ContractWithConsumeAllGas {
-	/**
-	 * Calls the `main` function with the max offset and length and returns the success code.
-	 */
 	function test() external {
 		assembly {
 			mstore(0, 0xcc572cf9) // main selector
@@ -19,9 +16,6 @@ contract ContractWithConsumeAllGas {
 		}
 	}
 
-	/**
-	 * A function that takes in the offset and length and reverts with the given offset and length.
-	 */
 	function main(uint256 offset, uint256 len) external pure {
 		assembly {
 			// nullify memory ptr slot

@@ -137,7 +137,6 @@ pub fn friends(friends: impl IntoIterator<Item = u64>) -> FriendsOf<Test> {
 
 pub fn fg(fs: impl IntoIterator<Item = u64>) -> FriendGroupOf<Test> {
 	FriendGroupOf::<Test> {
-		deposit: 10,
 		friends: friends(fs),
 		friends_needed: 2,
 		inheritor: FERDIE,

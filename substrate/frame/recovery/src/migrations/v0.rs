@@ -86,9 +86,8 @@ impl<BlockNumber: Clone, Balance, Friends> RecoveryConfig<BlockNumber, Balance, 
 	pub fn into_v1_friend_group<AccountId>(
 		self,
 		inheritor: AccountId,
-	) -> crate::FriendGroup<BlockNumber, AccountId, Balance, Friends> {
+	) -> crate::FriendGroup<BlockNumber, AccountId, Friends> {
 		crate::FriendGroup {
-			deposit: self.deposit,
 			friends: self.friends,
 			friends_needed: self.threshold as u32,
 			inheritor,

@@ -149,10 +149,7 @@ pub type HashOf<T> = <T as frame_system::Config>::Hash;
 	MaxEncodedLen,
 	DecodeWithMemTracking,
 )]
-pub struct FriendGroup<ProvidedBlockNumber, AccountId, Balance, Friends> {
-	/// Slashable deposit that the rescuer needs to reserve.
-	pub deposit: Balance,
-
+pub struct FriendGroup<ProvidedBlockNumber, AccountId, Friends> {
 	/// List of friends that can initiate the recovery process. Always sorted.
 	pub friends: Friends,
 
@@ -194,7 +191,7 @@ pub type InheritanceOrder = u32;
 
 /// A `FriendGroup` for a specific `Config`.
 pub type FriendGroupOf<T> =
-	FriendGroup<ProvidedBlockNumberOf<T>, AccountIdFor<T>, BalanceOf<T>, FriendsOf<T>>;
+	FriendGroup<ProvidedBlockNumberOf<T>, AccountIdFor<T>, FriendsOf<T>>;
 
 /// Collection of friend groups of a lost account.
 pub type FriendGroupsOf<T> = BoundedVec<FriendGroupOf<T>, ConstU32<MAX_GROUPS_PER_ACCOUNT>>;
@@ -244,7 +241,7 @@ where
 	/// overflow occurs.
 	pub fn cancelable_at<Balance, Friends>(
 		&self,
-		friend_groups: &[FriendGroup<ProvidedBlockNumber, AccountId, Balance, Friends>],
+		friend_groups: &[FriendGroup<ProvidedBlockNumber, AccountId, Friends>],
 	) -> Option<ProvidedBlockNumber> {
 		let fg = friend_groups.get(self.friend_group_index as usize)?;
 		self.last_approval_block.checked_add(&fg.cancel_delay)
@@ -969,7 +966,7 @@ impl<T: Config> Pallet<T> {
 			// cannot contain the lost account itself
 			ensure!(!friend_group.friends.contains(&lost), Error::<T>::LostAccountInFriendGroup);
 			ensure!(friend_group.friends.windows(2).all(|w| w[0] < w[1]), Error::<T>::FriendsNotSortedOrUnique);
-						ensure!(
+			ensure!(
 				friend_group.friends_needed as usize <= friend_group.friends.len(),
 				Error::<T>::TooManyFriendsNeeded
 			);

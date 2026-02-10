@@ -29,7 +29,6 @@ fn basic_flow_works() {
 	new_test_ext().execute_with(|| {
 		// Alice configures one friend group with Bob, Charlie and Dave
 		let fg = FriendGroupOf::<T> {
-			deposit: 10,
 			friends: friends([BOB, CHARLIE, DAVE]),
 			friends_needed: 2,
 			inheritor: FERDIE,
@@ -87,7 +86,6 @@ fn set_friend_groups_multiple_works() {
 	new_test_ext().execute_with(|| {
 		// Alice configures two friend groups with Bob, Charlie and Dave
 		let fg1 = FriendGroupOf::<T> {
-			deposit: 10,
 			friends: friends([BOB, CHARLIE, DAVE]),
 			friends_needed: 2,
 			inheritor: FERDIE,
@@ -96,7 +94,6 @@ fn set_friend_groups_multiple_works() {
 			cancel_delay: 10,
 		};
 		let fg2 = FriendGroupOf::<T> {
-			deposit: 10,
 			friends: friends([CHARLIE, DAVE]),
 			friends_needed: 2,
 			inheritor: FERDIE,
@@ -109,7 +106,7 @@ fn set_friend_groups_multiple_works() {
 		// Alice configures two friend groups
 		assert_ok!(Recovery::set_friend_groups(signed(ALICE), friend_groups));
 		// Deposit taken for both friend groups
-		assert_fg_deposit(ALICE, 144);
+		assert_fg_deposit(ALICE, 112);
 	});
 }
 
@@ -118,7 +115,6 @@ fn set_friend_groups_multiple_works() {
 fn set_friend_groups_too_many_friends_needed_fails() {
 	new_test_ext().execute_with(|| {
 		let fg = FriendGroupOf::<T> {
-			deposit: 10,
 			friends: friends([BOB, CHARLIE, DAVE]),
 			friends_needed: 4,
 			inheritor: FERDIE,
@@ -140,7 +136,6 @@ fn set_friend_groups_too_many_friends_needed_fails() {
 fn set_friend_groups_no_friends_fails() {
 	new_test_ext().execute_with(|| {
 		let fg = FriendGroupOf::<T> {
-			deposit: 10,
 			friends: friends([]),
 			friends_needed: 0,
 			inheritor: FERDIE,
@@ -158,7 +153,6 @@ fn set_friend_groups_no_friends_fails() {
 fn set_friend_groups_remove_works() {
 	new_test_ext().execute_with(|| {
 		let fg = FriendGroupOf::<T> {
-			deposit: 10,
 			friends: friends([BOB, CHARLIE, DAVE]),
 			friends_needed: 2,
 			inheritor: FERDIE,
@@ -169,7 +163,7 @@ fn set_friend_groups_remove_works() {
 
 		assert_ok!(Recovery::set_friend_groups(signed(ALICE), vec![fg.clone()]));
 		assert_eq!(Recovery::friend_groups(ALICE), vec![fg.clone()]);
-		assert_fg_deposit(ALICE, 79);
+		assert_fg_deposit(ALICE, 63);
 
 		assert_ok!(Recovery::set_friend_groups(signed(ALICE), vec![]));
 		assert_eq!(Recovery::friend_groups(ALICE), vec![]);
@@ -178,7 +172,7 @@ fn set_friend_groups_remove_works() {
 		// re-add
 		assert_ok!(Recovery::set_friend_groups(signed(ALICE), vec![fg.clone()]));
 		assert_eq!(Recovery::friend_groups(ALICE), vec![fg.clone()]);
-		assert_fg_deposit(ALICE, 79);
+		assert_fg_deposit(ALICE, 63);
 
 		// re-remove
 		assert_ok!(Recovery::set_friend_groups(signed(ALICE), vec![]));
@@ -192,7 +186,6 @@ fn set_friend_groups_remove_works() {
 fn set_friend_groups_ongoing_attempt_fails() {
 	new_test_ext().execute_with(|| {
 		let fg = FriendGroupOf::<T> {
-			deposit: 10,
 			friends: friends([BOB, CHARLIE, DAVE]),
 			friends_needed: 2,
 			inheritor: FERDIE,
@@ -215,7 +208,6 @@ fn set_friend_groups_ongoing_attempt_fails() {
 fn set_friend_groups_lost_account_in_group_fails() {
 	new_test_ext().execute_with(|| {
 		let fg = FriendGroupOf::<T> {
-			deposit: 10,
 			friends: friends([ALICE, BOB, CHARLIE]),
 			friends_needed: 2,
 			inheritor: FERDIE,
@@ -237,7 +229,6 @@ fn set_friend_groups_max_groups_works() {
 	new_test_ext().execute_with(|| {
 		let friend_groups: Vec<_> = (0..10u8)
 			.map(|i| FriendGroupOf::<T> {
-				deposit: 10,
 				friends: friends([BOB, CHARLIE]),
 				friends_needed: 1,
 				inheritor: FERDIE,
@@ -257,7 +248,6 @@ fn set_friend_groups_max_groups_works() {
 fn initiate_attempt_multiple_fails() {
 	new_test_ext().execute_with(|| {
 		let fg = FriendGroupOf::<T> {
-			deposit: 10,
 			friends: friends([BOB, CHARLIE, DAVE]),
 			friends_needed: 2,
 			inheritor: FERDIE,

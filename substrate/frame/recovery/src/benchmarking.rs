@@ -64,7 +64,6 @@ fn create_friend_group<T: Config>(
 	fund_account::<T>(&inheritor);
 
 	FriendGroupOf::<T> {
-		deposit: T::SecurityDeposit::get(),
 		friends: friends.try_into().unwrap(),
 		friends_needed: threshold,
 		inheritor,

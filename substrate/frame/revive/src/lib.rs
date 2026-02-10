@@ -1980,8 +1980,13 @@ impl<T: Config> Pallet<T> {
 
 		// emulate transaction behavior
 		let fees = call_info.tx_fee.saturating_add(call_info.storage_deposit);
-		if let (Some(from), Some(true)) = (&from, dry_run_config.perform_balance_checks) {
-			let fees = if gas.is_some() { fees } else { Zero::zero() };
+		if let Some(from) = &from {
+			let fees =
+				if gas.is_some() && matches!(dry_run_config.perform_balance_checks, Some(true)) {
+					fees
+				} else {
+					Zero::zero()
+				};
 			let balance = Self::evm_balance(from);
 			if balance < Pallet::<T>::convert_native_to_evm(fees).saturating_add(value) {
 				return Err(EthTransactError::Message(format!(

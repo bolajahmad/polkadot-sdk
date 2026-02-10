@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770652010168,
+  "lastUpdate": 1770723744418,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "5588131+kianenigma@users.noreply.github.com",
-            "name": "Kian Paimani",
-            "username": "kianenigma"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "1bb16561d96991808cfe56b783af3cb6ea958a82",
-          "message": "add try-state check for staking roles -- staker cannot be nominator a… (#9034)\n\nTiny follow-up to\nhttps://github.com/paritytech/polkadot-sdk/pull/8701/files\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-02T14:56:51Z",
-          "tree_id": "5fcce81c444c7aaf9c89e16a555d94498ab08b86",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/1bb16561d96991808cfe56b783af3cb6ea958a82"
-        },
-        "date": 1751472346157,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.238944714033336,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19776596873333335,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12628222823333335,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robertvaneerdewijk@gmail.com",
+            "name": "0xRVE",
+            "username": "0xRVE"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "1b9ea1c3656e816dfcaa2624ffb9c8c45ce917d7",
+          "message": "[pallet-revive] Fix storage deposit refunds in nested contract calls (#10920)\n\nfixes https://github.com/paritytech/contract-issues/issues/213 where\nstorage deposit refunds failed in nested/reentrant calls.\n\nProblem\nStorage refunds were calculated incorrectly when a contract allocated\nstorage, then performed a nested call that cleared it. Pending storage\nchanges lived only in the parent FrameMeter, so child frames could not\nsee them and refunds were skipped.\n\nSolution\nApply pending storage deposit changes to a cloned ContractInfo before\ncreating nested frames. This makes the parent’s storage state visible to\nchild frames during refund calculation.\n\nImplementation\n- Added apply_pending_changes_to_contract() to apply pending diffs to\nContractInfo\n- Added apply_pending_storage_changes() wrapper on FrameMeter\n- Applied pending storage changes before nested frame creation in\nexec.rs (3 locations)\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: pgherveou <pgherveou@gmail.com>",
+          "timestamp": "2026-02-10T10:26:06Z",
+          "tree_id": "2d78374f47b6b14cca7239e15b9a37c67f730690",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/1b9ea1c3656e816dfcaa2624ffb9c8c45ce917d7"
+        },
+        "date": 1770723719621,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.127873206366669,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12544267923333335,
             "unit": "seconds"
           }
         ]

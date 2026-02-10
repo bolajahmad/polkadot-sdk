@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770733747387,
+  "lastUpdate": 1770752911772,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "Sajjon@users.noreply.github.com",
-            "name": "Alexander Cyon",
-            "username": "Sajjon"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "ee6d22b94d9a93ac5989d4cce2f20a604b86214b",
-          "message": "net/discovery: File persistence for `AddrCache` (#8839)\n\nImplementation of https://github.com/paritytech/polkadot-sdk/issues/8758\n\n# Description\nAuthority Discovery crate has been changed so that the `AddrCache` is\npersisted to `persisted_cache_file_path` a `json` file in\n`net_config_path` folder controlled by `NetworkConfiguration`.\n\n`AddrCache` is JSON serialized (`serde_json::to_pretty_string`) and\npersisted to file:\n- periodically (every 10 minutes)\n- on shutdown\n\nFurthermore, this persisted `AddrCache` on file will be read from upon\nstart of the worker - if it does not exist, or we failed to deserialize\nit a new empty cache is used.\n\n`AddrCache` is made Serialize/Deserialize thanks to `PeerId` and\n`Multiaddr` being made Serialize/Deserialize.\n\n# Implementation\nThe worker use a spawner which is used in the [run loop of the worker,\nwhere at an interval we try to persist the\n[AddrCache](https://github.com/paritytech/polkadot-sdk/blob/cyon/persist_peers_cache/substrate/client/authority-discovery/src/worker.rs#L361-L372).\nWe won't persist the `AddrCache` if `persisted_cache_file_path:\nOption<PathBuf>` is `None` - which it would be if\n[`NetworkConfiguration`\n`net_config_path`](https://github.com/paritytech/polkadot-sdk/blob/master/substrate/client/network/src/config.rs#L591)\nis `None`. We spawn a new task each time the `interval` \"ticks\" - once\nevery 10 minutes - and it uses `fs::write` (there is also a\n`tokio::fs::write` which requires the `fs` feature flag of `tokio` which\nis not activated and I chose to not use it). If the worker shutsdown we\nwill try to persist without using the `spawner`.\n\n# Changes\n- New crate dependency: `serde_with` for `SerializeDisplay` and\n`DeserialzeFromStr` macros\n- `WorkerConfig` in authority-discovery crate has a new field\n`persisted_cache_directory : Option<PathBuf>`\n- `Worker` in authority-discovery crate constructor now takes a new\nparameter, `spawner: Arc<dyn SpawnNamed>`\n\n## Tests\n- [authority-discovery\ntests](substrate/client/authority-discovery/src/tests.rs) tests are\nchanged to use tokio runtime, `#[tokio::test]` and we pass a test worker\nconfig with a `tempdir` for `persisted_cache_directory `\n\n# `net_config_path`\nHere are the `net_config_path` (from `NetworkConfiguration`) which is\nthe folder used by this PR to save a serialized `AddrCache` in:\n\n## `dev`\n```sh\ncargo build --release && ./target/release/polkadot --dev\n```\n\nshows =>\n\n`/var/folders/63/fs7x_3h16svftdz4g9bjk13h0000gn/T/substratey5QShJ/chains/rococo_dev/network/authority_discovery_addr_cache.json'`\n\n## `kusama`\n```sh\ncargo build --release && ./target/release/polkadot --chain kusama --validator\n```\n\nshows => `~/Library/Application\nSupport/polkadot/chains/ksmcc3/network/authority_discovery_addr_cache.json`\n\n> [!CAUTION]\n> The node shutdown automatically with scary error. \n> ```\n> Essential task `overseer` failed. Shutting down service.\n> TCP listener terminated with error error=Custom { kind: Other, error:\n\"A Tokio 1.x context was found, but it is being shutdown.\" }\n> Installed transports terminated, ignore if the node is stopping\n> Litep2p backend terminated`\n>Error:\n>   0: Other: Essential task failed.\n> ```\n> This is maybe expected/correct, but just wanted to flag it, expand\n`output` below to see log\n> \n> Or did I break anything?\n\n<details><summary>Full Log with scary error (expand me 👈)</summary>\nThe log\n\n```sh\n$ ./target/release/polkadot --chain kusama --validator\n2025-06-19 14:34:35 ----------------------------\n2025-06-19 14:34:35 This chain is not in any way\n2025-06-19 14:34:35       endorsed by the\n2025-06-19 14:34:35      KUSAMA FOUNDATION\n2025-06-19 14:34:35 ----------------------------\n2025-06-19 14:34:35 Parity Polkadot\n2025-06-19 14:34:35 ✌️  version 1.18.5-e6b86b54d31\n2025-06-19 14:34:35 ❤️  by Parity Technologies <admin@parity.io>, 2017-2025\n2025-06-19 14:34:35 📋 Chain specification: Kusama\n2025-06-19 14:34:35 🏷  Node name: glamorous-game-6626\n2025-06-19 14:34:35 👤 Role: AUTHORITY\n2025-06-19 14:34:35 💾 Database: RocksDb at /Users/alexandercyon/Library/Application Support/polkadot/chains/ksmcc3/db/full\n2025-06-19 14:34:39 Creating transaction pool txpool_type=SingleState ready=Limit { count: 8192, total_bytes: 20971520 } future=Limit { count: 819, total_bytes: 2097152 }\n2025-06-19 14:34:39 🚀 Using prepare-worker binary at: \"/Users/alexandercyon/Developer/Rust/polkadot-sdk/target/release/polkadot-prepare-worker\"\n2025-06-19 14:34:39 🚀 Using execute-worker binary at: \"/Users/alexandercyon/Developer/Rust/polkadot-sdk/target/release/polkadot-execute-worker\"\n2025-06-19 14:34:39 Local node identity is: 12D3KooWPVh77R44wZwySBys262Jh4BSbpMFxtvQNmi1EpdcwDDW\n2025-06-19 14:34:39 Running litep2p network backend\n2025-06-19 14:34:40 💻 Operating system: macos\n2025-06-19 14:34:40 💻 CPU architecture: aarch64\n2025-06-19 14:34:40 📦 Highest known block at #1294645\n2025-06-19 14:34:40 〽️ Prometheus exporter started at 127.0.0.1:9615\n2025-06-19 14:34:40 Running JSON-RPC server: addr=127.0.0.1:9944,[::1]:9944\n2025-06-19 14:34:40 🏁 CPU single core score: 1.35 GiBs, parallelism score: 1.44 GiBs with expected cores: 8\n2025-06-19 14:34:40 🏁 Memory score: 63.75 GiBs\n2025-06-19 14:34:40 🏁 Disk score (seq. writes): 2.92 GiBs\n2025-06-19 14:34:40 🏁 Disk score (rand. writes): 727.56 MiBs\n2025-06-19 14:34:40 CYON: 🔮 Good, path set to: /Users/alexandercyon/Library/Application Support/polkadot/chains/ksmcc3/network/authority_discovery_addr_cache.json\n2025-06-19 14:34:40 🚨 Your system cannot securely run a validator.\nRunning validation of malicious PVF code has a higher risk of compromising this machine.\nSecure mode is enabled only for Linux\nand a full secure mode is enabled only for Linux x86-64.\nYou can ignore this error with the `--insecure-validator-i-know-what-i-do` command line argument if you understand and accept the risks of running insecurely. With this flag, security features are enabled on a best-effort basis, but not mandatory.\nMore information: https://docs.polkadot.com/infrastructure/running-a-validator/operational-tasks/general-management/#secure-your-validator\n2025-06-19 14:34:40 Successfully persisted AddrCache on disk\n2025-06-19 14:34:40 subsystem exited with error subsystem=\"candidate-validation\" err=FromOrigin { origin: \"candidate-validation\", source: Context(\"could not enable Secure Validator Mode for non-Linux; check logs\") }\n2025-06-19 14:34:40 Starting workers\n2025-06-19 14:34:40 Starting approval distribution workers\n2025-06-19 14:34:40 👶 Starting BABE Authorship worker\n2025-06-19 14:34:40 Starting approval voting workers\n2025-06-19 14:34:40 Starting main subsystem loop\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"candidate-validation\"\n2025-06-19 14:34:40 Starting with an empty approval vote DB.\n2025-06-19 14:34:40 subsystem finished unexpectedly subsystem=Ok(())\n2025-06-19 14:34:40 🥩 BEEFY gadget waiting for BEEFY pallet to become available...\n2025-06-19 14:34:40 Received `Conclude` signal, exiting\n2025-06-19 14:34:40 Conclude\n2025-06-19 14:34:40 received `Conclude` signal, exiting\n2025-06-19 14:34:40 received `Conclude` signal, exiting\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"availability-recovery\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"bitfield-distribution\"\n2025-06-19 14:34:40 Approval distribution worker 3, exiting because of shutdown\n2025-06-19 14:34:40 Approval distribution worker 2, exiting because of shutdown\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"dispute-distribution\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"chain-selection\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"pvf-checker\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"availability-store\"\n2025-06-19 14:34:40 Approval distribution worker 1, exiting because of shutdown\n2025-06-19 14:34:40 Approval distribution worker 0, exiting because of shutdown\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"approval-voting\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"approval-distribution\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"chain-api\"\n2025-06-19 14:34:40 Approval distribution stream finished, most likely shutting down\n2025-06-19 14:34:40 Approval distribution stream finished, most likely shutting down\n2025-06-19 14:34:40 Approval distribution stream finished, most likely shutting down\n2025-06-19 14:34:40 Approval distribution stream finished, most likely shutting down\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"provisioner\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"availability-distribution\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"runtime-api\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"candidate-backing\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"collation-generation\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"gossip-support\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"approval-voting-parallel\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"bitfield-signing\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"collator-protocol\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"statement-distribution\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"network-bridge-tx\"\n2025-06-19 14:34:40 Terminating due to subsystem exit subsystem=\"network-bridge-rx\"\n2025-06-19 14:34:41 subsystem exited with error subsystem=\"prospective-parachains\" err=FromOrigin { origin: \"prospective-parachains\", source: SubsystemReceive(Generated(Context(\"Signal channel is terminated and empty.\"))) }\n2025-06-19 14:34:41 subsystem exited with error subsystem=\"dispute-coordinator\" err=FromOrigin { origin: \"dispute-coordinator\", source: SubsystemReceive(Generated(Context(\"Signal channel is terminated and empty.\"))) }\n2025-06-19 14:34:41 Essential task `overseer` failed. Shutting down service.\n2025-06-19 14:34:41 TCP listener terminated with error error=Custom { kind: Other, error: \"A Tokio 1.x context was found, but it is being shutdown.\" }\n2025-06-19 14:34:41 Installed transports terminated, ignore if the node is stopping\n2025-06-19 14:34:41 Litep2p backend terminated\nError:\n   0: Other: Essential task failed.\n\nBacktrace omitted. Run with RUST_BACKTRACE=1 environment variable to display it.\nRun with RUST_BACKTRACE=full to include source snippets.\n```\n\n🤔\n\n</details>\n\n## `kusama -d /my/custom/path`\n```sh\ncargo build --release && ./target/release/polkadot --chain kusama --validator --unsafe-force-node-key-generation -d /my/custom/path\n```\nshows => `./my/custom/path/chains/ksmcc3/network/` for `net_config_path`\n\n## `test`\n\nI've configured a `WorkerConfig` with a `tempfile` for all tests. To my\nsurprise I had to call `fs::create_dir_all` in order for the tempdir to\nactually be created.\n\n---------\n\nCo-authored-by: Alexandru Vasile <60601340+lexnv@users.noreply.github.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: alvicsam <alvicsam@gmail.com>",
-          "timestamp": "2025-07-02T12:37:19Z",
-          "tree_id": "41d919f06cd54e8f7f16d84be0ad77d08f3b8ea3",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/ee6d22b94d9a93ac5989d4cce2f20a604b86214b"
-        },
-        "date": 1751463604174,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 63640.009999999995,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 52941.8,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.0000180016,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005633373270000004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.8792864764900004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.3807037511900004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.00001816416,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.0000180016,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.373576919580001,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.3467311513799993,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.40336833514,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.4600884128200047,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.00001816416,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 11.849388419870005,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.2538419268124263,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting-parallel/approval-voting-gather-signatures",
             "value": 0.00585204213,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "94772640+snowmead@users.noreply.github.com",
+            "name": "Michael Assaf",
+            "username": "snowmead"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "fbddee8faabeadef47a375c71c1a8a11274e4e0d",
+          "message": "Add `DecodeWithMemTracking` derive to `CompactProof` (#11028)\n\n# Description\n\nAdd `DecodeWithMemTracking` derive to `CompactProof` in\n`substrate/primitives/trie/src/storage_proof.rs`.\n\n`StorageProof` already derived `DecodeWithMemTracking` but\n`CompactProof` in the same file was missed.\n\n## Integration\n\nNo integration changes required for downstream projects. `CompactProof`\nnow implements `DecodeWithMemTracking`, which is a strictly additive\ntrait implementation. Existing code using `CompactProof` will continue\nto work as before.\n\n## Review Notes\n\nSingle-line change adding `DecodeWithMemTracking` to the derive macro\nlist on `CompactProof`:\n\n```diff\n-#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, TypeInfo)]\n+#[derive(Debug, PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking, TypeInfo)]\n pub struct CompactProof {\n     pub encoded_nodes: Vec<Vec<u8>>,\n }\n```\n\n`CompactProof` only contains `Vec<Vec<u8>>`, which already implements\n`DecodeWithMemTracking`, so the derive works without any manual\nimplementation.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-10T18:41:06Z",
+          "tree_id": "8454baf6ec660756950140fb84b8400668568743",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/fbddee8faabeadef47a375c71c1a8a11274e4e0d"
+        },
+        "date": 1770752886804,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 52942.09999999999,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 63632.98,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.570149557422937,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3649243682999903,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.00002115819,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.953347443980007,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8549897900200149,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.0054725537199999995,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.000021430680000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.659307352400001,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.00002115819,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.7164434118700003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.6565418213499994,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.000021430680000000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.6956681463200014,
             "unit": "seconds"
           }
         ]

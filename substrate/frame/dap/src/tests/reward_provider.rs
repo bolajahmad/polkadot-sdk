@@ -26,7 +26,7 @@ use sp_staking::StakingRewardProvider;
 
 #[test]
 fn allocate_era_rewards_funds_pot_account() {
-	new_test_ext().execute_with(|| {
+	new_test_ext(true).execute_with(|| {
 		// GIVEN: An era and pot accounts provided by staking
 		System::set_block_number(1);
 		let era = 1;
@@ -76,7 +76,7 @@ fn allocate_era_rewards_funds_pot_account() {
 
 #[test]
 fn treasury_rewards_go_to_buffer() {
-	new_test_ext().execute_with(|| {
+	new_test_ext(true).execute_with(|| {
 		// GIVEN: A buffer account with initial balance
 		System::set_block_number(1);
 		let era = 3;

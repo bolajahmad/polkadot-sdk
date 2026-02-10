@@ -90,7 +90,7 @@ fn budget_config_validation_rejects_invalid_configs() {
 
 #[test]
 fn set_budget_allocation_works_with_root() {
-	new_test_ext().execute_with(|| {
+	new_test_ext(true).execute_with(|| {
 		System::set_block_number(1);
 
 		let new_config = BudgetConfig {
@@ -112,7 +112,7 @@ fn set_budget_allocation_works_with_root() {
 
 #[test]
 fn set_budget_allocation_rejects_invalid_config() {
-	new_test_ext().execute_with(|| {
+	new_test_ext(true).execute_with(|| {
 		let invalid_config = BudgetConfig {
 			staker_rewards: Perbill::from_percent(70),
 			validator_self_stake_incentive: Perbill::from_percent(40),
@@ -129,7 +129,7 @@ fn set_budget_allocation_rejects_invalid_config() {
 
 #[test]
 fn set_budget_allocation_requires_budget_origin() {
-	new_test_ext().execute_with(|| {
+	new_test_ext(true).execute_with(|| {
 		let new_config = BudgetConfig {
 			staker_rewards: Perbill::from_percent(80),
 			validator_self_stake_incentive: Perbill::from_percent(5),
@@ -146,7 +146,7 @@ fn set_budget_allocation_requires_budget_origin() {
 
 #[test]
 fn budget_allocation_affects_era_rewards() {
-	new_test_ext().execute_with(|| {
+	new_test_ext(true).execute_with(|| {
 		System::set_block_number(1);
 
 		// Set a custom budget allocation: 60% stakers, 20% validator incentive, 20% buffer
@@ -206,7 +206,7 @@ fn budget_allocation_affects_era_rewards() {
 
 #[test]
 fn budget_allocation_with_zero_treasury() {
-	new_test_ext().execute_with(|| {
+	new_test_ext(true).execute_with(|| {
 		System::set_block_number(1);
 
 		// Set budget with zero buffer: 90% stakers, 10% validator incentive, 0% buffer

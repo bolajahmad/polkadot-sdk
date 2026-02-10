@@ -75,7 +75,7 @@ pub fn new_test_ext(fund_buffer: bool) -> sp_io::TestExternalities {
 	let mut balances = vec![(1, 100), (2, 200), (3, 300)];
 
 	if fund_buffer {
-		let buffer: u64 = DapPalletId::get().into_account_truncating();
+		let buffer: AccountId = DapPalletId::get().into_account_truncating();
 		balances.push((buffer, ExistentialDeposit::get()));
 	}
 

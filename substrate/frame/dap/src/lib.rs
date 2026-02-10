@@ -22,13 +22,14 @@
 //! ## Key Responsibilities:
 //!
 //! - **Slash Collection**: Implements `OnUnbalanced` to collect slashed funds into a buffer account
-//!   instead of burning them. Incoming funds are deactivated to exclude them from governance voting.
+//!   instead of burning them. Incoming funds are deactivated to exclude them from governance
+//!   voting.
 //! - **Era Reward Management**: Implements `StakingRewardProvider` to mint and manage era reward
 //!   pot accounts that the staking implementation can pull for staker payouts.
 //!
-//! The buffer account is created with a provider at genesis or via runtime upgrade, ensuring it meets
-//! the existential deposit requirement. When DAP distributes funds, they must be reactivated before
-//! transfer to restore their participation in governance voting.
+//! The buffer account is created with a provider at genesis or via runtime upgrade, ensuring it
+//! meets the existential deposit requirement. When DAP distributes funds, they must be reactivated
+//! before transfer to restore their participation in governance voting.
 //!
 //! For existing chains adding DAP, include `dap::migrations::v1::InitBufferAccount` in your
 //! migrations tuple.

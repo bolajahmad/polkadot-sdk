@@ -18,10 +18,10 @@
 //! Test mock for the DAP pallet.
 
 use crate::{self as pallet_dap, Config};
-use sp_runtime::{traits::IdentityLookup, BuildStorage};
 use frame_support::{
 	derive_impl, parameter_types, sp_runtime::traits::AccountIdConversion, PalletId,
 };
+use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 type AccountId = u128;

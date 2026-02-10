@@ -592,7 +592,7 @@ impl<T: Config> Pallet<T> {
 	) -> Option<(BalanceOf<T>, RewardDestination<T::AccountId>)> {
 		// noop if amount is zero
 		if amount.is_zero() {
-			return None
+			return None;
 		}
 		let dest = Self::payee(Stash(stash.clone()))?;
 

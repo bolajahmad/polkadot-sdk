@@ -101,7 +101,7 @@ impl<MaxEntries: Get<u32>> Bitfield<MaxEntries> {
 /// A `Consideration`-like type that tracks who paid for it.
 ///
 /// This is useful in situations where the consideration may be moved around between accounts.
-/// Normally, a consideration is just enacted and then later dropped. But if it must be be moved
+/// Normally, a consideration is just enacted and then later dropped. But if it must be moved
 /// between accounts, then tracking this manually is necessary. Hence this type to not blow up the
 /// storage type definitions.
 #[derive(
@@ -117,7 +117,7 @@ impl<MaxEntries: Get<u32>> Bitfield<MaxEntries> {
 	DecodeWithMemTracking,
 )]
 pub struct IdentifiedConsideration<AccountId, Footprint, C> {
-	/// Account that placed paid the storage deposit.
+	/// Account that paid the storage deposit.
 	///
 	/// This is also the account that will receive the refund.
 	pub depositor: AccountId,

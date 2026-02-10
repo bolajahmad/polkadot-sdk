@@ -28,7 +28,7 @@
 //! - `recovered`: An account that has been successfully recovered.
 //! - `inheritor`: An account that is inheriting access to a lost account after recovery.
 //! - `attempt`: An attempt to recover a lost account by an initiator.
-//! - `order`: The level of trust that an account has in a friend group.
+//! - `order`: The priority of a friend group. Lower values have higher priority in conflicts.
 //! - `deposit`: An amount of currency that needs to be held for allocating on-chain storage.
 //! - `friends_needed`: The number of friends that need to approve an attempt.
 //! - `inheritance delay`: How long an attempt will be delayed before it can succeed.
@@ -156,7 +156,7 @@ pub struct FriendGroup<ProvidedBlockNumber, AccountId, Friends> {
 	/// The number of approving friends needed to recover an account.
 	pub friends_needed: u32,
 
-	/// The account that inherited full access to a lost account after successful recovery.
+	/// The account that will inherit full access to the lost account upon successful recovery.
 	pub inheritor: AccountId,
 
 	/// Minimum time that a recovery attempt must stay active before it can be finished.
@@ -529,7 +529,6 @@ pub mod pallet {
 		}
 
 		/// All the recovered accounts that `heir` inherited access to.
-		// TODO: This could be a bit heavy on the node.
 		pub fn inheritance(heir: T::AccountId) -> Vec<T::AccountId> {
 			let mut inheritance = Vec::new();
 
@@ -587,7 +586,7 @@ pub mod pallet {
 		/// MUST be sorted and unique. Trying to insert two friend groups with the same set of
 		/// friends will result in an error.
 		///
-		/// An `FriendGroupsChanged` event is emitted only when the new friends groups differed from
+		/// A `FriendGroupsChanged` event is emitted only when the new friends groups differed from
 		/// the old ones.
 		#[pallet::call_index(2)]
 		#[pallet::weight(T::WeightInfo::set_friend_groups())]
@@ -614,7 +613,12 @@ pub mod pallet {
 					old_ticket.drop(&lost)?;
 				}
 				FriendGroups::<T>::remove(&lost);
-				Self::deposit_event(Event::<T>::FriendGroupsChanged { lost, old_friend_groups });
+				if !old_friend_groups.is_empty() {
+					Self::deposit_event(Event::<T>::FriendGroupsChanged {
+						lost,
+						old_friend_groups,
+					});
+				}
 				return Ok(());
 			}
 
@@ -810,7 +814,7 @@ pub mod pallet {
 		///
 		/// This will release the security deposit back to the initiator. The cancel delay must be
 		/// respected if the initiator calls it to prevent it from front-running the lost account
-		/// from finishing the attempt.
+		/// from slashing the attempt.
 		#[pallet::call_index(6)]
 		#[pallet::weight(T::WeightInfo::cancel_attempt())]
 		pub fn cancel_attempt(
@@ -907,8 +911,8 @@ impl<T: Config> Pallet<T> {
 		Footprint::from_encodable(friend_groups)
 	}
 
-	pub fn attempt_footprint() -> Option<Footprint> {
-		Some(Footprint::from_mel::<AttemptOf<T>>())
+	pub fn attempt_footprint() -> Footprint {
+		Footprint::from_mel::<AttemptOf<T>>()
 	}
 
 	pub fn inheritor_footprint() -> Footprint {
@@ -938,17 +942,6 @@ impl<T: Config> Pallet<T> {
 		friend_group_index: u32,
 	) -> Result<(AttemptOf<T>, AttemptTicketOf<T>, SecurityDepositOf<T>), Error<T>> {
 		pallet::Attempt::<T>::get(lost, friend_group_index).ok_or(Error::<T>::NotAttempt)
-	}
-
-	pub fn update_ticket<C: Consideration<T::AccountId, Footprint>>(
-		who: &T::AccountId,
-		old_ticket: Option<C>,
-		new_footprint: Footprint,
-	) -> Result<C, DispatchError> {
-		match old_ticket {
-			Some(old_ticket) => old_ticket.update(who, new_footprint),
-			None => C::new(who, new_footprint),
-		}
 	}
 
 	/// Sanity check the friend groups and bound them into a bounded vector.

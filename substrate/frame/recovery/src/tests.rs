@@ -1133,3 +1133,76 @@ fn slash_handles_different_receivers() {
 		});
 	});
 }
+
+/// Setting more than MAX_GROUPS_PER_ACCOUNT friend groups fails.
+#[test]
+fn set_friend_groups_too_many_groups_fails() {
+	new_test_ext().execute_with(|| {
+		let friend_groups: Vec<_> = (0..=MAX_GROUPS_PER_ACCOUNT as u8)
+			.map(|i| FriendGroupOf::<T> {
+				friends: friends([BOB, 10 + i as u64]),
+				friends_needed: 1,
+				inheritor: FERDIE,
+				inheritance_delay: 10,
+				inheritance_order: i as u32,
+				cancel_delay: 10,
+			})
+			.collect();
+
+		assert_noop!(
+			Recovery::set_friend_groups(signed(ALICE), friend_groups),
+			Error::<T>::TooManyFriendGroups
+		);
+	});
+}
+
+/// Finishing an attempt when an equal-or-higher order inheritor already exists does not replace it.
+///
+/// Both groups initiate before any inheritor exists. The lower-order group finishes first,
+/// then the higher-order group finishes but does not replace the inheritor.
+#[test]
+fn finish_attempt_higher_order_does_not_replace() {
+	new_test_ext().execute_with(|| {
+		// Two friend groups: group 0 (order 0) and group 1 (order 1)
+		let fg0 = FriendGroupOf::<T> {
+			friends: friends([BOB, CHARLIE, DAVE]),
+			friends_needed: 2,
+			inheritor: FERDIE,
+			inheritance_delay: 10,
+			inheritance_order: 0,
+			cancel_delay: 10,
+		};
+		let fg1 = FriendGroupOf::<T> {
+			friends: friends([BOB, EVE]),
+			friends_needed: 1,
+			inheritor: DAVE,
+			inheritance_delay: 10,
+			inheritance_order: 1,
+			cancel_delay: 10,
+		};
+		assert_ok!(Recovery::set_friend_groups(signed(ALICE), vec![fg0, fg1]));
+
+		// Both groups initiate while no inheritor exists
+		assert_ok!(Recovery::initiate_attempt(signed(BOB), ALICE, 0));
+		assert_ok!(Recovery::initiate_attempt(signed(BOB), ALICE, 1));
+
+		// Group 1 (order 1) gets fully approved
+		assert_ok!(Recovery::approve_attempt(signed(EVE), ALICE, 1));
+
+		// Group 0 (order 0) gets fully approved
+		assert_ok!(Recovery::approve_attempt(signed(BOB), ALICE, 0));
+		assert_ok!(Recovery::approve_attempt(signed(CHARLIE), ALICE, 0));
+
+		frame_system::Pallet::<T>::set_block_number(11);
+
+		// Group 0 finishes first — FERDIE becomes inheritor
+		assert_ok!(Recovery::finish_attempt(signed(BOB), ALICE, 0));
+		assert_eq!(Recovery::inheritor(ALICE), Some(FERDIE));
+
+		// Group 1 finishes — DAVE does NOT replace FERDIE since order 1 >= order 0
+		assert_ok!(Recovery::finish_attempt(signed(BOB), ALICE, 1));
+		assert_eq!(Recovery::inheritor(ALICE), Some(FERDIE));
+		assert!(can_control_account(FERDIE, ALICE));
+		assert!(!can_control_account(DAVE, ALICE));
+	});
+}

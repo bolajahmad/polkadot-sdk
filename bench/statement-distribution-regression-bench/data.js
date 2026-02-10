@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770723846834,
+  "lastUpdate": 1770733782219,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "tsvetomir@parity.io",
-            "name": "Tsvetomir Dimitrov",
-            "username": "tdimitrov"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "6e3f91210275d8dc1ef98e1911cda870573d31f4",
-          "message": "Cleanup and improvements for `ControlledValidatorIndices` (#8896)\n\nImprovements for `ControlledValidatorIndices` from\nhttps://github.com/paritytech/polkadot-sdk/pull/8837:\n      - remove unneeded dependency\n- more readable implementations for `get` and\n`find_controlled_validator_indices`",
-          "timestamp": "2025-07-02T09:01:41Z",
-          "tree_id": "2e2ecc850e21e724983c6838b3f6ea2ca55be082",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/6e3f91210275d8dc1ef98e1911cda870573d31f4"
-        },
-        "date": 1751450847288,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 127.94399999999995,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.033984454858,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04512539091199997,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.06495127138999993,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a20ac9bd4fedd78da159fa4bbd8452dc8c17ec4b",
+          "message": "xcm-emulator: advance relay block number by relay_blocks_per_para_block (#11031)\n\nAfter `AuraDigestProvider` was introduced, emulated integration tests\nfor parachains with `slot_duration != relay_slot_duration` (e.g. 12s\nPolkadot/Kusama chains) panic because `FixedVelocityConsensusHook`\nderives a parachain slot that doesn't match `CurrentSlot`.\nFix by advancing the relay block number by `slot_duration /\nRELAY_CHAIN_SLOT_DURATION_MILLIS` per parachain block (instead of always\n+1), and computing the aura digest slot inline using both durations.\nThis removes the `DigestProvider` associated type from the `Parachain`\ntrait and the `AuraDigestProvider` struct — the emulator now handles the\ndigest automatically.\nDownstream users must remove `DigestProvider: AuraDigestProvider,` from\ntheir `decl_test_parachains!` invocations.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-10T13:18:35Z",
+          "tree_id": "e5cf27b46ffd198010768292a5ca63d9fbc31f35",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a20ac9bd4fedd78da159fa4bbd8452dc8c17ec4b"
+        },
+        "date": 1770733756877,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.08599999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03833551304399999,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06474695777399991,
             "unit": "seconds"
           }
         ]

@@ -708,7 +708,7 @@ async fn test_block_hash_for_tag_with_block_tags_works() -> anyhow::Result<()> {
 	];
 
 	for tag in tags {
-		let balance = client.get_balance(account.address(), tag.clone().into()).await?;
+		let balance = client.get_balance(account.address(), tag.into()).await?;
 
 		assert!(balance >= U256::zero(), "Balance should be retrievable with tag {tag:?}");
 	}

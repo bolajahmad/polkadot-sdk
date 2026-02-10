@@ -180,6 +180,9 @@ mod benchmarks {
 		let target = target_contract.address;
 		let caller: T::AccountId = whitelisted_caller();
 		T::Currency::set_balance(&caller, caller_funding::<T>());
+		<T as Config>::FeeInfo::deposit_txfee(
+			<T as Config>::Currency::issue(caller_funding::<T>()),
+		);
 		let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
 
 		let mut authorization_list = vec![];

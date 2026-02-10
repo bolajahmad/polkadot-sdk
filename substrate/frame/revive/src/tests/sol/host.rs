@@ -18,6 +18,7 @@
 //! The pallet-revive shared VM integration test suite.
 use crate::{
 	address::AddressMapper,
+	evm::fees::InfoT,
 	exec::EMPTY_CODE_HASH,
 	metering::TransactionLimits,
 	storage::AccountInfo,
@@ -33,7 +34,7 @@ use crate::{
 use frame_support::{assert_err_ignore_postinfo, assert_ok};
 
 use alloy_core::sol_types::{SolCall, SolInterface};
-use frame_support::traits::{fungible::Mutate, Get};
+use frame_support::traits::{fungible::{Balanced, Mutate}, Get};
 use pallet_revive_fixtures::{compile_module_with_type, Caller, FixtureType, Host};
 use pretty_assertions::assert_eq;
 use sp_core::H160;
@@ -55,6 +56,11 @@ fn create_delegated_eoa(target: &H160) -> H160 {
 
 	let authority_id = <Test as Config>::AddressMapper::to_account_id(&authority);
 	let _ = <Test as Config>::Currency::set_balance(&authority_id, 100_000_000);
+
+	// Pre-fund the tx fee pool so charge_deposit can withdraw from it
+	<Test as Config>::FeeInfo::deposit_txfee(
+		<Test as Config>::Currency::issue(10_000_000_000),
+	);
 
 	let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
 	let auth = signer.sign_authorization(chain_id, *target, nonce);

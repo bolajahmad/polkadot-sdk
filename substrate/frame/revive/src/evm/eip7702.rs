@@ -24,13 +24,14 @@
 use crate::{
 	address::AddressMapper,
 	evm::api::{recover_eth_address_from_message, AuthorizationListEntry},
+	primitives::StorageDeposit,
 	storage::AccountInfo,
-	Config, ExecConfig, Pallet, LOG_TARGET,
+	Config, ExecConfig, HoldReason, Pallet, LOG_TARGET,
 };
 use alloc::vec::Vec;
 use frame_support::traits::fungible::Inspect;
 use sp_core::{Get, H160, U256};
-use sp_runtime::SaturatedConversion;
+use sp_runtime::{traits::Zero, SaturatedConversion};
 
 /// EIP-7702: Magic value for authorization signature message
 const EIP7702_MAGIC: u8 = 0x05;
@@ -95,10 +96,30 @@ pub fn process_authorizations<T: Config>(
 		}
 
 		// Apply delegation
-		if auth.address.is_zero() {
-			AccountInfo::<T>::clear_delegation(&authority);
+		let deposit = if auth.address.is_zero() {
+			AccountInfo::<T>::clear_delegation(&authority)
 		} else {
-			AccountInfo::<T>::set_delegation(&authority, auth.address);
+			AccountInfo::<T>::set_delegation(&authority, auth.address)
+		};
+
+		match deposit {
+			StorageDeposit::Charge(amount) if !amount.is_zero() =>
+				Pallet::<T>::charge_deposit(
+					Some(HoldReason::StorageDepositReserve),
+					origin,
+					&account_id,
+					amount,
+					exec_config,
+				)?,
+			StorageDeposit::Refund(amount) if !amount.is_zero() =>
+				Pallet::<T>::refund_deposit(
+					HoldReason::StorageDepositReserve,
+					&account_id,
+					origin,
+					amount,
+					Some(exec_config),
+				)?,
+			_ => {},
 		}
 
 		frame_system::Pallet::<T>::inc_account_nonce(&account_id);

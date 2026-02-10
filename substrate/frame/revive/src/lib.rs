@@ -2532,7 +2532,7 @@ impl<T: Config> Pallet<T> {
 	///
 	/// `to` is usually the transaction origin and `from` a contract or
 	/// the pallets own account.
-	fn refund_deposit(
+	pub(crate) fn refund_deposit(
 		hold_reason: HoldReason,
 		from: &T::AccountId,
 		to: &T::AccountId,

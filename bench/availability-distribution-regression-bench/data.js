@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770752877678,
+  "lastUpdate": 1770758294257,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "eresav@me.com",
-            "name": "Andrei Eres",
-            "username": "AndreiEres"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "180fcce69fbddfa1bde9830362d8026340b4b750",
-          "message": "Add extra information to the harmless error logs during validate_transaction (#9047)\n\n# Description\n\nFixes https://github.com/paritytech/polkadot-sdk/issues/5936\n\nSince we are still receiving reports about this error, I suggest adding\nan extra line to prevent further questions.\n\n---------\n\nCo-authored-by: Alexander Samusev <41779041+alvicsam@users.noreply.github.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
-          "timestamp": "2025-07-03T08:04:56Z",
-          "tree_id": "96761998cffcd729b6d55e08006d78737aab6742",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/180fcce69fbddfa1bde9830362d8026340b4b750"
-        },
-        "date": 1751534830832,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022554517359999998,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.009022524840000082,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012873082906666661,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1588428403533334,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-store",
             "value": 0.14566085278666663,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "skunert49@gmail.com",
+            "name": "Sebastian Kunert",
+            "username": "skunert"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b5de070244e81a3524a78366f3a21d2b20f2adb0",
+          "message": "Fix link-checker CI job (#11038)\n\nLets give the link-checker job some new life.\n\nSadly our blog posts are not available anymore (or at least I could not\nfind them), so I removed all references to them. Was thinking about\nlinking web archive, but its silly to first remove our blog and then\nlink to an archive.",
+          "timestamp": "2026-02-10T20:04:57Z",
+          "tree_id": "cc40a52e95a27e8fe53cb2541bae42169fd19dd2",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b5de070244e81a3524a78366f3a21d2b20f2adb0"
+        },
+        "date": 1770758270123,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14484811268,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.006848243480000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.022982166093333332,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.00973237859999999,
             "unit": "seconds"
           }
         ]

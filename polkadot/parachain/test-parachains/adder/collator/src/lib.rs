@@ -207,7 +207,7 @@ impl Collator {
 
 			let Ok((block_data, head_data)) = state.lock().unwrap().advance(parent) else {
 				if tolerate_state_mismatch {
-					return async { None }.boxed()
+					return async { None }.boxed();
 				}
 				panic!("State mismatch")
 			};

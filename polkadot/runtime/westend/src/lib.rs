@@ -523,14 +523,7 @@ impl_opaque_keys! {
 }
 
 /// AuthorityDiscovery must be before Initializer because Initializer reads its storage.
-pub type SessionHandlers = (
-	Grandpa,
-	Babe,
-	AuthorityDiscovery,
-	ParaSessionInfo,
-	Initializer,
-	Beefy,
-);
+pub type SessionHandlers = (Grandpa, Babe, AuthorityDiscovery, ParaSessionInfo, Initializer, Beefy);
 
 impl pallet_session::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;

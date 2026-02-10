@@ -847,8 +847,6 @@ impl HypotheticalOrConcreteCandidate for HypotheticalCandidate {
 	fn candidate_hash(&self) -> CandidateHash {
 		self.candidate_hash()
 	}
-
-	// Uses default implementation: returns relay_parent()
 }
 
 #[cfg(test)]

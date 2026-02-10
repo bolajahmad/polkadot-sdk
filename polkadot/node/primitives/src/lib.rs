@@ -541,6 +541,8 @@ pub struct SubmitCollationParams {
 	/// The scheduling parent for V3 candidate descriptors.
 	/// If set, the candidate descriptor will use this as the scheduling parent
 	/// (creating a V3 descriptor). If None, relay_parent is used (V2 descriptor).
+	///
+	/// WARNING: Should only be set if the `CandidateReceiptV3` node feature is set.
 	pub scheduling_parent: Option<Hash>,
 }
 

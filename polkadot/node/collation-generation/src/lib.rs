@@ -98,15 +98,13 @@ use polkadot_node_subsystem::{
 	SubsystemContext, SubsystemError, SubsystemResult, SubsystemSender,
 };
 use polkadot_node_subsystem_util::{
-	request_claim_queue, request_node_features, request_persisted_validation_data,
-	request_session_index_for_child, request_validation_code_hash, request_validators,
-	runtime::ClaimQueueSnapshot,
+	request_claim_queue, request_persisted_validation_data, request_session_index_for_child,
+	request_validation_code_hash, request_validators, runtime::ClaimQueueSnapshot,
 };
 use polkadot_primitives::{
-	node_features::FeatureIndex, transpose_claim_queue, CandidateCommitments,
-	CandidateDescriptorV2, CommittedCandidateReceiptV2, CoreIndex, Hash, Id as ParaId,
-	OccupiedCoreAssumption, PersistedValidationData, SessionIndex, TransposedClaimQueue,
-	ValidationCodeHash,
+	transpose_claim_queue, CandidateCommitments, CandidateDescriptorV2,
+	CommittedCandidateReceiptV2, CoreIndex, Hash, Id as ParaId, OccupiedCoreAssumption,
+	PersistedValidationData, SessionIndex, TransposedClaimQueue, ValidationCodeHash,
 };
 use schnellru::{ByLength, LruMap};
 use std::{collections::HashSet, sync::Arc};
@@ -267,10 +265,6 @@ impl CollationGenerationSubsystem {
 		let session_index =
 			request_session_index_for_child(relay_parent, ctx.sender()).await.await??;
 
-		let node_features =
-			request_node_features(relay_parent, session_index, ctx.sender()).await.await??;
-		let v3_enabled = FeatureIndex::CandidateReceiptV3.is_set(&node_features);
-
 		let session_info =
 			self.session_info_cache.get(relay_parent, session_index, ctx.sender()).await?;
 		let collation = PreparedCollation {
@@ -290,7 +284,6 @@ impl CollationGenerationSubsystem {
 			result_sender,
 			&mut self.metrics,
 			&transpose_claim_queue(claim_queue),
-			v3_enabled,
 			scheduling_parent,
 		)
 		.await?;
@@ -321,10 +314,6 @@ impl CollationGenerationSubsystem {
 
 		let session_index =
 			request_session_index_for_child(relay_parent, ctx.sender()).await.await??;
-
-		let node_features =
-			request_node_features(relay_parent, session_index, ctx.sender()).await.await??;
-		let v3_enabled = FeatureIndex::CandidateReceiptV3.is_set(&node_features);
 
 		let session_info =
 			self.session_info_cache.get(relay_parent, session_index, ctx.sender()).await?;
@@ -508,7 +497,6 @@ impl CollationGenerationSubsystem {
 						result_sender,
 						&metrics,
 						&transposed_claim_queue,
-						v3_enabled,
 						None, // scheduling_parent - not supported by CollatorFn interface
 					)
 					.await
@@ -595,7 +583,6 @@ async fn construct_and_distribute_receipt(
 	result_sender: Option<oneshot::Sender<CollationSecondedSignal>>,
 	metrics: &Metrics,
 	transposed_claim_queue: &TransposedClaimQueue,
-	v3_enabled: bool,
 	scheduling_parent: Option<Hash>,
 ) -> Result<()> {
 	let PreparedCollation {
@@ -675,7 +662,7 @@ async fn construct_and_distribute_receipt(
 
 		let ccr = CommittedCandidateReceiptV2 { descriptor, commitments: commitments.clone() };
 
-		ccr.parse_ump_signals(&transposed_claim_queue, v3_enabled)
+		ccr.parse_ump_signals(&transposed_claim_queue, scheduling_parent.is_some())
 			.map_err(Error::CandidateReceiptCheck)?;
 
 		ccr.to_plain()

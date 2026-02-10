@@ -27,8 +27,8 @@ use polkadot_node_subsystem::{
 use polkadot_node_subsystem_test_helpers::TestSubsystemContextHandle;
 use polkadot_node_subsystem_util::TimeoutExt;
 use polkadot_primitives::{
-	node_features::FeatureIndex, CandidateDescriptorVersion, CandidateReceiptV2, ClaimQueueOffset,
-	CollatorPair, CoreSelector, NodeFeatures, PersistedValidationData, UMPSignal, UMP_SEPARATOR,
+	CandidateDescriptorVersion, CandidateReceiptV2, ClaimQueueOffset, CollatorPair, CoreSelector,
+	PersistedValidationData, UMPSignal, UMP_SEPARATOR,
 };
 use polkadot_primitives_test_helpers::dummy_head_data;
 use rstest::rstest;
@@ -616,17 +616,6 @@ mod helpers {
 
 		assert_matches!(
 			overseer_recv(virtual_overseer).await,
-			AllMessages::RuntimeApi(RuntimeApiMessage::Request(hash, RuntimeApiRequest::NodeFeatures(_session_index, tx))) => {
-				assert_eq!(hash, activated_hash);
-				let mut node_features = NodeFeatures::new();
-				node_features.resize(FeatureIndex::CandidateReceiptV3 as usize + 1, false);
-				node_features.set(FeatureIndex::CandidateReceiptV3 as usize, true);
-				tx.send(Ok(node_features)).unwrap();
-			}
-		);
-
-		assert_matches!(
-			overseer_recv(virtual_overseer).await,
 			AllMessages::RuntimeApi(RuntimeApiMessage::Request(hash, RuntimeApiRequest::Validators(tx))) => {
 				assert_eq!(hash, activated_hash);
 				tx.send(Ok(vec![
@@ -752,17 +741,6 @@ mod helpers {
 			AllMessages::RuntimeApi(RuntimeApiMessage::Request(rp, RuntimeApiRequest::SessionIndexForChild(tx))) => {
 				assert_eq!(rp, relay_parent);
 				tx.send(Ok(1)).unwrap();
-			}
-		);
-
-		assert_matches!(
-			overseer_recv(virtual_overseer).await,
-			AllMessages::RuntimeApi(RuntimeApiMessage::Request(rp, RuntimeApiRequest::NodeFeatures(_session_index, tx))) => {
-				assert_eq!(rp, relay_parent);
-				let mut node_features = NodeFeatures::new();
-				node_features.resize(FeatureIndex::CandidateReceiptV3 as usize + 1, false);
-				node_features.set(FeatureIndex::CandidateReceiptV3 as usize, true);
-				tx.send(Ok(node_features)).unwrap();
 			}
 		);
 

@@ -537,21 +537,21 @@ where
 	let mut parent_header = pov_parent_header.clone();
 
 	for block_index in 0..blocks_per_core {
-		// TODO: Remove when transaction streaming is implemented
+		// TODO: With transaction streaming we do not need to skip anything any more and can just
+		// set `is_last`.
+
+		// If we have more than 3 blocks in total, aka a block time which is less than 2s, we are
+		// going to skip the last block. Otherwise, when running with 3 blocks, we are just
+		// adjusting the authoring duration below.
+		let skip_last_block_in_slot = total_number_of_blocks > 3 && is_last_block_in_core;
 		// We require that the next node has imported our last block before it can start building
 		// the next block. To ensure that the next node is able to do so, we are skipping the last
 		// block in the parachain slot. In the future this can be removed again.
 		let is_last_block_in_core = block_index + 1 == blocks_per_core ||
 			// This branch here is for the case when we are going to skip the last block.
-			(block_index + 2 == blocks_per_core && blocks_per_core > 1);
+			(block_index + 2 == blocks_per_core && skip_last_block_in_slot);
 
-		// If we have more than 3 blocks in total, aka a block time which is less than 2s, we are
-		// going to skip the last block. Otherwise, when running with 3 blocks, we are just
-		// adjusting the authoring duration below.
-		if block_index + 1 == blocks_per_core &&
-			total_number_of_blocks > 3 &&
-			is_last_core_in_parachain_slot
-		{
+		if block_index + 1 == blocks_per_core && skip_last_block_in_slot {
 			tracing::debug!(
 				target: LOG_TARGET,
 				"Skipping block production so that the next node is able to import all blocks before its slot."

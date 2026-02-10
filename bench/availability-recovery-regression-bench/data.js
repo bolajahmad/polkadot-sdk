@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770723744418,
+  "lastUpdate": 1770733678163,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "13c89a63ced08a8a53248beda238b8ddd02b999d",
-          "message": "`sp-tracing`: Remove `test-utils` feature (#9063)\n\nThe crate is already exposing testing related features by default, so\nthere is no real need to hide the rest behind some feature. Also because\nof feature unification, the feature is enabled always in the workspace.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-02T22:21:51Z",
-          "tree_id": "ee36d6b238db7ed1ae04ae802ce20b18c138375a",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/13c89a63ced08a8a53248beda238b8ddd02b999d"
-        },
-        "date": 1751498762474,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.20008162850000005,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.212048605333333,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12544267923333335,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "paolo@parity.io",
+            "name": "Paolo La Camera",
+            "username": "sigurpol"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a20ac9bd4fedd78da159fa4bbd8452dc8c17ec4b",
+          "message": "xcm-emulator: advance relay block number by relay_blocks_per_para_block (#11031)\n\nAfter `AuraDigestProvider` was introduced, emulated integration tests\nfor parachains with `slot_duration != relay_slot_duration` (e.g. 12s\nPolkadot/Kusama chains) panic because `FixedVelocityConsensusHook`\nderives a parachain slot that doesn't match `CurrentSlot`.\nFix by advancing the relay block number by `slot_duration /\nRELAY_CHAIN_SLOT_DURATION_MILLIS` per parachain block (instead of always\n+1), and computing the aura digest slot inline using both durations.\nThis removes the `DigestProvider` associated type from the `Parachain`\ntrait and the `AuraDigestProvider` struct — the emulator now handles the\ndigest automatically.\nDownstream users must remove `DigestProvider: AuraDigestProvider,` from\ntheir `decl_test_parachains!` invocations.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-10T13:18:35Z",
+          "tree_id": "e5cf27b46ffd198010768292a5ca63d9fbc31f35",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/a20ac9bd4fedd78da159fa4bbd8452dc8c17ec4b"
+        },
+        "date": 1770733652877,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.2757953513,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12201810116666664,
             "unit": "seconds"
           }
         ]

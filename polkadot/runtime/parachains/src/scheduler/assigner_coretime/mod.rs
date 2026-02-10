@@ -286,8 +286,9 @@ impl<'a, T: Config> AccessMode<'a, T> {
 			Self::Peek { on_demand_orders } => on_demand_orders
 				.pop_assignment_for_cores::<T>(now, num_cores)
 				.collect::<Vec<_>>(),
-			Self::Pop =>
-				on_demand::Pallet::<T>::pop_assignment_for_cores(now, num_cores).collect::<Vec<_>>(),
+			Self::Pop => {
+				on_demand::Pallet::<T>::pop_assignment_for_cores(now, num_cores).collect::<Vec<_>>()
+			},
 		}
 		.into_iter()
 	}
@@ -617,14 +618,14 @@ fn ensure_workload<T: Config>(
 
 	let Some(queue) = descriptor.queue else {
 		// No queue.
-		return
+		return;
 	};
 
 	let mut next_scheduled = queue.first;
 
 	if next_scheduled > now {
 		// Not yet ready.
-		return
+		return;
 	}
 
 	// Update is needed:
@@ -633,13 +634,13 @@ fn ensure_workload<T: Config>(
 
 		// Still good?
 		if update.end_hint.map_or(true, |e| e > now) {
-			break Some(update)
+			break Some(update);
 		}
 		// Move on if possible:
 		if let Some(n) = update.next_schedule {
 			next_scheduled = n;
 		} else {
-			break None
+			break None;
 		}
 	};
 

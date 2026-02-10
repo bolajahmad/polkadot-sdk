@@ -207,8 +207,9 @@ impl<T: Config> UncheckedMigrateToV2<T> {
 
 		// Compare traffic values, handling the Option case
 		match expected_traffic {
-			Some(expected) =>
-				ensure!(new_order_status.traffic == expected, "Traffic value should be preserved"),
+			Some(expected) => {
+				ensure!(new_order_status.traffic == expected, "Traffic value should be preserved")
+			},
 			None => {
 				// If there was no old QueueStatus, traffic should be the default
 				let default_traffic = T::TrafficDefaultValue::get();

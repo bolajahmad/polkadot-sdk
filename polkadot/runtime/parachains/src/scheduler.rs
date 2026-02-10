@@ -223,7 +223,7 @@ impl<T: Config> Pallet<T> {
 				.map(|(core_index, paras)| {
 					(core_index, paras.into_iter().map(|e| e.para_id()).collect())
 				})
-				.collect()
+				.collect();
 		}
 
 		let config = configuration::ActiveConfig::<T>::get();
@@ -323,13 +323,13 @@ impl<T: Config> Pallet<T> {
 		let session_start_block = SessionStartBlock::<T>::get();
 
 		if at < session_start_block {
-			return None
+			return None;
 		}
 
 		let validator_groups = ValidatorGroups::<T>::get();
 
 		if core.0 as usize >= validator_groups.len() {
-			return None
+			return None;
 		}
 
 		let rotations_since_session_start: BlockNumberFor<T> =

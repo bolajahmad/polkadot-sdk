@@ -968,7 +968,7 @@ pub(crate) fn sanitize_bitfields<T: crate::inclusion::Config>(
 /// - version 2 descriptors are not allowed
 /// - the core index in descriptor doesn't match the one computed from the commitments
 /// - the `SelectCore` signal does not refer to a core at the top of claim queue
-fn sanitize_backed_candidate_v2<T: crate::inclusion::Config>(
+fn sanitize_backed_candidate_v2_v3<T: crate::inclusion::Config>(
 	candidate: &BackedCandidate<T::Hash>,
 	allowed_relay_parents: &AllowedRelayParentsTracker<T::Hash, BlockNumberFor<T>>,
 	v3_enabled: bool,
@@ -1047,6 +1047,29 @@ fn sanitize_backed_candidate_v2<T: crate::inclusion::Config>(
 		return false
 	};
 
+	let Some(session_index) = candidate.descriptor().session_index(v3_enabled) else {
+		log::debug!(
+			target: LOG_TARGET,
+			"Invalid V2/V3 candidate receipt {:?} for paraid {:?}, missing session index.",
+			candidate.candidate().hash(),
+			candidate.descriptor().para_id(),
+		);
+		return false
+	};
+
+	// TODO: Properly check session index: https://github.com/paritytech/polkadot-sdk/issues/11033
+	if session_index != scheduling_session {
+		log::debug!(
+			target: LOG_TARGET,
+			"Dropping candidate receipt {:?} for paraid {:?}, session index {} and scheduling session {} need to match for now.",
+			candidate.candidate().hash(),
+			candidate.descriptor().para_id(),
+			session_index,
+			scheduling_session,
+		);
+		return false
+	}
+
 	// Check if scheduling session is equal to current session index.
 	if scheduling_session != shared::CurrentSessionIndex::<T>::get() {
 		log::debug!(
@@ -1092,7 +1115,7 @@ fn sanitize_backed_candidates<T: crate::inclusion::Config>(
 	let mut candidates_per_para: BTreeMap<ParaId, Vec<_>> = BTreeMap::new();
 
 	for candidate in backed_candidates {
-		if !sanitize_backed_candidate_v2::<T>(&candidate, allowed_relay_parents, v3_enabled) {
+		if !sanitize_backed_candidate_v2_v3::<T>(&candidate, allowed_relay_parents, v3_enabled) {
 			continue
 		}
 

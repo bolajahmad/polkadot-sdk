@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770752946259,
+  "lastUpdate": 1770758359900,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "4211399+ordian@users.noreply.github.com",
-            "name": "ordian",
-            "username": "ordian"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "87a8fb03886485c6e0f5125ddfc7211ca9947803",
-          "message": "dispute-coordinator: handle race with offchain disabling (#9050)\n\nFixes a potential race with off-chain disabling when we learned about\ndisablement after importing a dispute from that validator.\n\nI think there's no need to handle startup to do deactivation. This will\nbe only relevant for when a node upgrades to the release with a fix and\nwriting a migration for that seems like an overkill since this scenario\nis very low probability.",
-          "timestamp": "2025-07-02T11:38:00Z",
-          "tree_id": "80d69b0fb439b35bd22fb88d94e7e7bfa85f0efa",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/87a8fb03886485c6e0f5125ddfc7211ca9947803"
-        },
-        "date": 1751460132901,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.94999999999993,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.033894240757999995,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04508936317999994,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.06860241233399987,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "skunert49@gmail.com",
+            "name": "Sebastian Kunert",
+            "username": "skunert"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b5de070244e81a3524a78366f3a21d2b20f2adb0",
+          "message": "Fix link-checker CI job (#11038)\n\nLets give the link-checker job some new life.\n\nSadly our blog posts are not available anymore (or at least I could not\nfind them), so I removed all references to them. Was thinking about\nlinking web archive, but its silly to first remove our blog and then\nlink to an archive.",
+          "timestamp": "2026-02-10T20:04:57Z",
+          "tree_id": "cc40a52e95a27e8fe53cb2541bae42169fd19dd2",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b5de070244e81a3524a78366f3a21d2b20f2adb0"
+        },
+        "date": 1770758336025,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.03999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06870568115599993,
+            "unit": "seconds"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.038341100108,
             "unit": "seconds"
           }
         ]

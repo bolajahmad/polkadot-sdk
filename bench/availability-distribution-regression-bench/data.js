@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770827238589,
+  "lastUpdate": 1770835839674,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "10196091+Ank4n@users.noreply.github.com",
-            "name": "Ankan",
-            "username": "Ank4n"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "f1ba2a1c7206c70ad66168859c90ab4e4327aab6",
-          "message": "Optimize buffered offence storage and prevent unbounded growth in staking-async ah-client pallet (#9049)\n\n## 🤔 Why\nThis addresses potential memory issues and improves efficiency of\noffence handling during buffered operating mode (see\nhttps://github.com/paritytech-secops/srlabs_findings/issues/525)\n\n\n## 🔑 Key changes\n\n- Prevents duplicate offences for the same offender in the same session\nby keeping only the highest slash fraction\n- Introduces `BufferedOffence` struct with optional reporter and slash\nfraction fields\n- Restructures buffered offences storage from `Vec<(SessionIndex,\nVec<Offence>)>` to nested `BTreeMap<SessionIndex, BTreeMap<AccountId,\nBufferedOffence>>`\n- Adds `MaxOffenceBatchSize` configuration parameter for batching\ncontrol\n- Processes offences in batches with configurable size limits, sending\nonly first session's offences per block\n- Implements proper benchmarking infrastructure for\n`process_buffered_offences` function\n- Adds WeightInfo trait with benchmarked weights for batch processing in\n`on_initialize` hook\n\n## ✍️ Co-authors\n@Ank4n \n@sigurpol\n\n---------\n\nCo-authored-by: Paolo La Camera <paolo@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-04T09:02:33Z",
-          "tree_id": "410487862394418dd87119db2954a36e4de0c43c",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/f1ba2a1c7206c70ad66168859c90ab4e4327aab6"
-        },
-        "date": 1751623910280,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.009127081746666753,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022431811193333328,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013302316553333336,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15677837248000004,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-distribution",
             "value": 0.006904812859999999,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bruno.devic@parity.io",
+            "name": "BDevParity",
+            "username": "BDevParity"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b44a93e39116ba68656ed1e8b3354efcab54b588",
+          "message": "[Release|CI/CD] Automate publishing crates (#10913)",
+          "timestamp": "2026-02-11T17:43:31Z",
+          "tree_id": "7635021793139894efb864e32465109f0c2d78f0",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b44a93e39116ba68656ed1e8b3354efcab54b588"
+        },
+        "date": 1770835814576,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.023106139713333328,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.006804628059999997,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009929329419999976,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14530333858666672,
             "unit": "seconds"
           }
         ]

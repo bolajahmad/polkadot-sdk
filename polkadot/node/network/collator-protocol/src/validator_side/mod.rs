@@ -427,6 +427,7 @@ struct PerRelayParent {
 	current_core: CoreIndex,
 	session_index: SessionIndex,
 	ah_held_off_advertisements: RelayParentHoldOffState,
+	activated_at: Instant,
 }
 
 /// Information about a held off advertisement
@@ -649,6 +650,7 @@ where
 		session_index,
 		current_core: core_now,
 		ah_held_off_advertisements: RelayParentHoldOffState::NotStarted,
+		activated_at: Instant::now(),
 	}))
 }
 
@@ -1089,6 +1091,23 @@ fn hold_off_asset_hub_collation_if_needed(
 		return false;
 	};
 
+	// Calculate elapsed time since leaf activation
+	let elapsed = rp_state.activated_at.elapsed();
+	let remaining_delay = hold_off_duration.saturating_sub(elapsed);
+
+	// If enough time has passed since leaf activation, process immediately
+	if remaining_delay.is_zero() {
+		gum::debug!(
+			target: LOG_TARGET,
+			?peer_id,
+			?relay_parent,
+			?prospective_candidate,
+			?elapsed,
+			"AssetHub collation arrived late, processing immediately without hold-off",
+		);
+		return false;
+	}
+
 	let hold_off_outcome =
 		rp_state.ah_held_off_advertisements.hold_off_if_necessary(HeldOffAdvertisement {
 			relay_parent,
@@ -1100,7 +1119,7 @@ fn hold_off_asset_hub_collation_if_needed(
 	match hold_off_outcome {
 		HoldOffOperationOutcome::FirstHoldOff => {
 			state.ah_held_off_rp_timers.push(Box::pin(async move {
-				Delay::new(hold_off_duration).await;
+				Delay::new(remaining_delay).await;
 				relay_parent
 			}));
 
@@ -1109,6 +1128,8 @@ fn hold_off_asset_hub_collation_if_needed(
 				?peer_id,
 				?relay_parent,
 				?prospective_candidate,
+				?elapsed,
+				?remaining_delay,
 				"AssetHub collation held off, not from invulnerable collator. First hold off.",
 			);
 

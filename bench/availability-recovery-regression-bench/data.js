@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770806375890,
+  "lastUpdate": 1770827208689,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "10196091+Ank4n@users.noreply.github.com",
-            "name": "Ankan",
-            "username": "Ank4n"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "f1ba2a1c7206c70ad66168859c90ab4e4327aab6",
-          "message": "Optimize buffered offence storage and prevent unbounded growth in staking-async ah-client pallet (#9049)\n\n## 🤔 Why\nThis addresses potential memory issues and improves efficiency of\noffence handling during buffered operating mode (see\nhttps://github.com/paritytech-secops/srlabs_findings/issues/525)\n\n\n## 🔑 Key changes\n\n- Prevents duplicate offences for the same offender in the same session\nby keeping only the highest slash fraction\n- Introduces `BufferedOffence` struct with optional reporter and slash\nfraction fields\n- Restructures buffered offences storage from `Vec<(SessionIndex,\nVec<Offence>)>` to nested `BTreeMap<SessionIndex, BTreeMap<AccountId,\nBufferedOffence>>`\n- Adds `MaxOffenceBatchSize` configuration parameter for batching\ncontrol\n- Processes offences in batches with configurable size limits, sending\nonly first session's offences per block\n- Implements proper benchmarking infrastructure for\n`process_buffered_offences` function\n- Adds WeightInfo trait with benchmarked weights for batch processing in\n`on_initialize` hook\n\n## ✍️ Co-authors\n@Ank4n \n@sigurpol\n\n---------\n\nCo-authored-by: Paolo La Camera <paolo@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-04T09:02:33Z",
-          "tree_id": "410487862394418dd87119db2954a36e4de0c43c",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/f1ba2a1c7206c70ad66168859c90ab4e4327aab6"
-        },
-        "date": 1751623885098,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.144511902033333,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19730591513333334,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12559420213333336,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "oliver.tale-yazdi@parity.io",
+            "name": "Oliver Tale-Yazdi",
+            "username": "ggwpez"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "822c6f6f574e5d35e005d24757241300b458ed81",
+          "message": "[FRAME] Omni bencher run each benchmark at least 10 secs (#10794)\n\nChanges:\n- Ensure all benchmarks run for at least 10 seconds. Configurable with\n`--min-duration <s>`\n- Turn off runtime logging in bench bot to reduce spam log output\n- Reduce DB repetition to 1 since PoV metering must be deterministic\n\nExample of the System benchmark with the `set_heap_pages` benchmark that\ntook less than 10 ms before:\n```pre\n2026-01-13T21:36:10.687286Z [ 22 % ] Starting benchmark: frame_system::set_heap_pages    \n2026-01-13T21:36:10.688437Z [ 33 % ] Starting benchmark: frame_system::set_code    \n```\n\nNow takes 10 seconds:\n```pre\n2026-01-13T21:37:31.392981Z [ 22 % ] Starting benchmark: frame_system::set_heap_pages    \n2026-01-13T21:37:32.271275Z [ 22 % ] Running  benchmark: frame_system::set_heap_pages (overtime)    \n2026-01-13T21:37:37.272099Z [ 22 % ] Running  benchmark: frame_system::set_heap_pages (overtime)    \n2026-01-13T21:37:41.393107Z [ 33 % ] Starting benchmark: frame_system::set_code    \n```\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-11T14:57:49Z",
+          "tree_id": "2dfc4e77e49963eaffc94612715df4068330e2b9",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/822c6f6f574e5d35e005d24757241300b458ed81"
+        },
+        "date": 1770827185804,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.068838199333335,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.11738192933333333,
             "unit": "seconds"
           }
         ]

@@ -264,6 +264,7 @@ impl ExtBuilder {
 		ext.execute_with(|| {
 			<pallet_session::Pallet<Test> as OnGenesis>::on_genesis();
 		});
+		ext.commit_all().expect("Failed to commit on_genesis changes");
 
 		ext
 	}

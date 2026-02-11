@@ -361,6 +361,7 @@ pub fn new_test_ext_raw_authorities(authorities: Vec<AuthorityId>) -> sp_io::Tes
 	ext.execute_with(|| {
 		<pallet_session::Pallet<Test> as OnGenesis>::on_genesis();
 	});
+	ext.commit_all().expect("Failed to commit on_genesis changes");
 	ext
 }
 

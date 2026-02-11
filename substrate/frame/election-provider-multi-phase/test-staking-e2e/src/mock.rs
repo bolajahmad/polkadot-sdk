@@ -631,10 +631,14 @@ impl ExtBuilder {
 
 		let mut ext = sp_io::TestExternalities::from(storage);
 
+		ext.execute_with(|| {
+			<pallet_session::Pallet<Runtime> as OnGenesis>::on_genesis();
+		});
+		ext.commit_all().expect("Failed to commit on_genesis changes");
+
 		// We consider all test to start after timestamp is initialized This must be ensured by
 		// having `timestamp::on_initialize` called before `staking::on_initialize`.
 		ext.execute_with(|| {
-			<pallet_session::Pallet<Runtime> as OnGenesis>::on_genesis();
 			System::set_block_number(1);
 			Session::on_initialize(1);
 			<Staking as Hooks<u32>>::on_initialize(1);

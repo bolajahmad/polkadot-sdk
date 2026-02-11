@@ -277,6 +277,7 @@ pub fn new_test_ext_raw_authorities(authorities: AuthorityList) -> sp_io::TestEx
 	ext.execute_with(|| {
 		<pallet_session::Pallet<Test> as OnGenesis>::on_genesis();
 	});
+	ext.commit_all().expect("Failed to commit on_genesis changes");
 
 	ext
 }

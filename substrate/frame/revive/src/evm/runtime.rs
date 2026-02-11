@@ -137,6 +137,11 @@ where
 	fn check(self, lookup: &Lookup) -> Result<Self::Checked, TransactionValidityError> {
 		if !self.0.is_signed() {
 			if let Some(crate::Call::eth_transact { payload }) = self.0.function.is_sub_type() {
+				log::debug!(
+					target: LOG_TARGET,
+					"eth_transact substrate tx hash: 0x{}",
+					sp_core::hexdisplay::HexDisplay::from(&sp_core::hashing::blake2_256(&self.encode())),
+				);
 				let checked = E::try_into_checked_extrinsic(payload, self.encoded_size())?;
 				return Ok(checked);
 			};

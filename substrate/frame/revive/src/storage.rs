@@ -347,14 +347,14 @@ impl<T: Config> AccountInfo<T> {
 				if let AccountType::EOA { ref mut delegate_target, ref mut contract_info } =
 					account.account_type
 				{
-					if delegate_target.is_some() {
-						if let Some(ci) = contract_info.as_mut() {
+					*delegate_target = None;
+					if let Some(ci) = contract_info.as_mut() {
+						if ci.code_hash != Default::default() {
 							let _ = CodeInfo::<T>::decrement_refcount(ci.code_hash);
-							refund = ci.storage_base_deposit;
-							ci.storage_base_deposit = Zero::zero();
+							refund = core::mem::take(&mut ci.storage_base_deposit);
+							ci.code_hash = Default::default();
 						}
 					}
-					*delegate_target = None;
 				}
 			}
 			StorageDeposit::Refund(refund)

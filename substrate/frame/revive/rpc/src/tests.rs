@@ -841,11 +841,8 @@ async fn test_runtime_pallets_address_upload_code() -> anyhow::Result<()> {
 /// 5. Clear delegation (authorization with zero address)
 /// 6. Read from Alice → returns empty (no code)
 async fn test_eip7702_delegation_flow() -> anyhow::Result<()> {
-	use crate::example::SubmittedTransaction;
-	use pallet_revive::{
-		evm::{Account, Transaction7702Unsigned},
-		precompiles::alloy::sol_types::SolCall,
-	};
+	use crate::example::TransactionType;
+	use pallet_revive::{evm::Account, precompiles::alloy::sol_types::SolCall};
 	use pallet_revive_fixtures::Counter;
 
 	let client = Arc::new(SharedResources::client().await);
@@ -869,7 +866,7 @@ async fn test_eip7702_delegation_flow() -> anyhow::Result<()> {
 	let authority = Account::from_secret_key(seed);
 	let authority_pair = <sp_core::ecdsa::Pair as sp_core::Pair>::from_seed_slice(&seed).unwrap();
 
-	// Fund the authority so it can hold deposits
+	// Fund the authority
 	let tx = TransactionBuilder::new(client.clone())
 		.value(U256::from(10_000_000_000_000_000_000u128))
 		.to(authority.address())
@@ -878,7 +875,6 @@ async fn test_eip7702_delegation_flow() -> anyhow::Result<()> {
 	tx.wait_for_receipt().await?;
 
 	let chain_id = client.chain_id().await?;
-	let gas_price = client.gas_price().await?;
 
 	// --- Step 1: Delegate authority → Counter via 7702 tx ---
 	let auth_nonce = client
@@ -890,24 +886,11 @@ async fn test_eip7702_delegation_flow() -> anyhow::Result<()> {
 		counter_addr,
 		auth_nonce,
 	);
-
-	let nonce = client.get_transaction_count(alith.address(), BlockTag::Latest.into()).await?;
-	// Use a generous gas limit since estimate_gas doesn't forward the authorization list.
-	let gas = U256::from(30_000_000u64);
-	let unsigned: TransactionUnsigned = Transaction7702Unsigned {
-		chain_id,
-		nonce,
-		gas,
-		gas_price,
-		max_fee_per_gas: gas_price,
-		to: alith.address(),
-		authorization_list: vec![auth],
-		..Default::default()
-	}
-	.into();
-	let signed = alith.sign_transaction(unsigned);
-	let hash = client.send_raw_transaction(signed.signed_payload().into()).await?;
-	SubmittedTransaction::from_raw(client.clone(), hash, gas)
+	TransactionBuilder::new(client.clone())
+		.to(alith.address())
+		.authorization_list(vec![auth])
+		.send_with_type(TransactionType::Eip7702)
+		.await?
 		.wait_for_receipt()
 		.await?;
 
@@ -944,22 +927,11 @@ async fn test_eip7702_delegation_flow() -> anyhow::Result<()> {
 		pallet_revive::evm::Address::zero(),
 		auth_nonce,
 	);
-
-	let nonce = client.get_transaction_count(alith.address(), BlockTag::Latest.into()).await?;
-	let unsigned: TransactionUnsigned = Transaction7702Unsigned {
-		chain_id,
-		nonce,
-		gas,
-		gas_price,
-		max_fee_per_gas: gas_price,
-		to: alith.address(),
-		authorization_list: vec![clear_auth],
-		..Default::default()
-	}
-	.into();
-	let signed = alith.sign_transaction(unsigned);
-	let hash = client.send_raw_transaction(signed.signed_payload().into()).await?;
-	SubmittedTransaction::from_raw(client.clone(), hash, gas)
+	TransactionBuilder::new(client.clone())
+		.to(alith.address())
+		.authorization_list(vec![clear_auth])
+		.send_with_type(TransactionType::Eip7702)
+		.await?
 		.wait_for_receipt()
 		.await?;
 

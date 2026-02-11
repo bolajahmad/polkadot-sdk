@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770758392804,
+  "lastUpdate": 1770806510167,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
@@ -24205,6 +24205,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "dispute-coordinator",
             "value": 0.00266205088,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "yrong1997@gmail.com",
+            "name": "Ron",
+            "username": "yrong"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9c4478123349fcc1d4e964a6dbb07ef2e66011ea",
+          "message": "Snowbridge: Remove unused proof fields (#10955)\n\n### Context\n\nWhen verifying Ethereum-to-Polkadot transfer messages, the key field in\nreceipt_proof is not used. Remove it as a cleanup and update the tests\naccordingly.\n\n---------\n\nCo-authored-by: Branislav Kontur <bkontur@gmail.com>",
+          "timestamp": "2026-02-11T09:33:12Z",
+          "tree_id": "3682eb5b488471e7399805873e1cc68ef21e73de",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/9c4478123349fcc1d4e964a6dbb07ef2e66011ea"
+        },
+        "date": 1770806486561,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.00652387983,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0026784154800000006,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009145818279999983,
             "unit": "seconds"
           }
         ]

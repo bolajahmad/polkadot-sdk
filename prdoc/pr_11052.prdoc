@@ -1,20 +1,18 @@
 title: 'update multi asset bounties pallet account derivation logic '
 doc:
-- audience: Todo
-  description: "# Description\n\nUpdates bounty and child-bounty account derivation\
-    \ in `pallet-multi-asset-bounties` to use the sub-account prefixes `\"mbt\"` (multi-asset\
-    \ bounty) and `\"mcb\"` (multi-asset child bounty) instead of `\"bt\"` and `\"\
-    cb\"`. To avoid having the same bounty account by both the new multi asset bounties\
-    \ pallet and the old bounties pallet.\n\n## Integration\n\nThe pallet is only\
-    \ deployed on Westend (not Kusama or Polkadot), so no production downstream depends\
-    \ on the old derivation; the change is limited to testnet.\n\n## Review Notes\n\
-    \n- Logic is limited to the two `TryConvert` impls: `BountySourceFromPalletId`\
-    \ and `ChildBountySourceFromPalletId` in `lib.rs`. Only the tuple passed to `into_sub_account_truncating`\
-    \ is updated (`\"bt\"` \u2192 `\"mbt\"`, `\"cb\"` \u2192 `\"mcb\"`).\n- Doc comments\
-    \ were added at module level (account derivation subsection) and on both structs\
-    \ to document the prefixes.\n- **Version bump:** Patch (not major) because the\
-    \ pallet is only live on Westend; no Kusama/Polkadot deployment, so no production\
-    \ dependency on the old derivation."
+- audience: Runtime Dev
+  description: |-
+    Bounty and child-bounty account derivation now use the sub-account prefixes `"mbt"` (multi-asset bounty)
+    and `"mcb"` (multi-asset child bounty) instead of `"bt"` and `"cb"`. This avoids collisions with the old
+    bounties pallet (same account for both pallets).
+
+    `BountySourceFromPalletId` derives with `("mbt", parent_bounty_id)`; `ChildBountySourceFromPalletId`
+    derives with `("mcb", parent_bounty_id, child_bounty_id)`. Module and type docs were updated.
+- audience: Runtime User
+  description: |-
+    The account IDs for bounty and child-bounty funding accounts have changed. Off-chain code that derives
+    or hardcodes these addresses must use the new derivation: prefix `"mbt"` for bounties and `"mcb"` for
+    child bounties (same pallet ID and index encoding as before). Pallet is only on Westend; no production impact.
 crates:
 - name: pallet-multi-asset-bounties
-  bump: major
+  bump: patch

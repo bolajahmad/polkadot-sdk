@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770806444240,
+  "lastUpdate": 1770827266454,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "eresav@me.com",
-            "name": "Andrei Eres",
-            "username": "AndreiEres"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "180fcce69fbddfa1bde9830362d8026340b4b750",
-          "message": "Add extra information to the harmless error logs during validate_transaction (#9047)\n\n# Description\n\nFixes https://github.com/paritytech/polkadot-sdk/issues/5936\n\nSince we are still receiving reports about this error, I suggest adding\nan extra line to prevent further questions.\n\n---------\n\nCo-authored-by: Alexander Samusev <41779041+alvicsam@users.noreply.github.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
-          "timestamp": "2025-07-03T08:04:56Z",
-          "tree_id": "96761998cffcd729b6d55e08006d78737aab6742",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/180fcce69fbddfa1bde9830362d8026340b4b750"
-        },
-        "date": 1751534855858,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 52944.3,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 63631.8,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 3.37327737584231,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.000020030320000000002,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.000020120979999999998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.000020120979999999998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.4282464276000004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.9074199140899992,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.4788472414100108,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.459648775479998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005434994860000005,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.435932584869998,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.434369631820002,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.000020030320000000002,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 12.149899570130007,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 4.534953835453101,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "oliver.tale-yazdi@parity.io",
+            "name": "Oliver Tale-Yazdi",
+            "username": "ggwpez"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "822c6f6f574e5d35e005d24757241300b458ed81",
+          "message": "[FRAME] Omni bencher run each benchmark at least 10 secs (#10794)\n\nChanges:\n- Ensure all benchmarks run for at least 10 seconds. Configurable with\n`--min-duration <s>`\n- Turn off runtime logging in bench bot to reduce spam log output\n- Reduce DB repetition to 1 since PoV metering must be deterministic\n\nExample of the System benchmark with the `set_heap_pages` benchmark that\ntook less than 10 ms before:\n```pre\n2026-01-13T21:36:10.687286Z [ 22 % ] Starting benchmark: frame_system::set_heap_pages    \n2026-01-13T21:36:10.688437Z [ 33 % ] Starting benchmark: frame_system::set_code    \n```\n\nNow takes 10 seconds:\n```pre\n2026-01-13T21:37:31.392981Z [ 22 % ] Starting benchmark: frame_system::set_heap_pages    \n2026-01-13T21:37:32.271275Z [ 22 % ] Running  benchmark: frame_system::set_heap_pages (overtime)    \n2026-01-13T21:37:37.272099Z [ 22 % ] Running  benchmark: frame_system::set_heap_pages (overtime)    \n2026-01-13T21:37:41.393107Z [ 33 % ] Starting benchmark: frame_system::set_code    \n```\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-11T14:57:49Z",
+          "tree_id": "2dfc4e77e49963eaffc94612715df4068330e2b9",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/822c6f6f574e5d35e005d24757241300b458ed81"
+        },
+        "date": 1770827244571,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 52942.59999999999,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 63629.58999999999,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.6898258662000005,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.005214196749999997,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.00002418317,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.7193090400500006,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.00002418317,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.00002195665,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 14.002195753090017,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.68889084056,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.702550108170002,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3560490027300007,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8403566986300147,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.556250174773132,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.00002195665,
             "unit": "seconds"
           }
         ]

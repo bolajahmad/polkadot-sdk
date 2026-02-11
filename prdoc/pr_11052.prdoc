@@ -1,0 +1,20 @@
+title: 'update multi asset bounties pallet account derivation logic '
+doc:
+- audience: Todo
+  description: "# Description\n\nUpdates bounty and child-bounty account derivation\
+    \ in `pallet-multi-asset-bounties` to use the sub-account prefixes `\"mbt\"` (multi-asset\
+    \ bounty) and `\"mcb\"` (multi-asset child bounty) instead of `\"bt\"` and `\"\
+    cb\"`. To avoid having the same bounty account by both the new multi asset bounties\
+    \ pallet and the old bounties pallet.\n\n## Integration\n\nThe pallet is only\
+    \ deployed on Westend (not Kusama or Polkadot), so no production downstream depends\
+    \ on the old derivation; the change is limited to testnet.\n\n## Review Notes\n\
+    \n- Logic is limited to the two `TryConvert` impls: `BountySourceFromPalletId`\
+    \ and `ChildBountySourceFromPalletId` in `lib.rs`. Only the tuple passed to `into_sub_account_truncating`\
+    \ is updated (`\"bt\"` \u2192 `\"mbt\"`, `\"cb\"` \u2192 `\"mcb\"`).\n- Doc comments\
+    \ were added at module level (account derivation subsection) and on both structs\
+    \ to document the prefixes.\n- **Version bump:** Patch (not major) because the\
+    \ pallet is only live on Westend; no Kusama/Polkadot deployment, so no production\
+    \ dependency on the old derivation."
+crates:
+- name: pallet-multi-asset-bounties
+  bump: major

@@ -52,11 +52,11 @@ use polkadot_node_core_pvf_common::{
 		thread::{self, WaitOutcome},
 		PipeFd, WorkerInfo, WorkerKind,
 	},
-	worker_dir, ArtifactChecksum,
+	worker_dir,
 };
-use polkadot_node_primitives::{BlockData, PoV, POV_BOMB_LIMIT};
+use polkadot_node_primitives::{BlockData, POV_BOMB_LIMIT};
 use polkadot_parachain_primitives::primitives::ValidationResult;
-use polkadot_primitives::{ExecutorParams, PersistedValidationData};
+use polkadot_primitives::ExecutorParams;
 use std::{
 	io::{self, Read},
 	os::{

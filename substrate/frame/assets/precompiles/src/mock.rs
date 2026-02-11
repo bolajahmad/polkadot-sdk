@@ -101,8 +101,10 @@ impl pallet_revive::Config for Test {
 	type AddressMapper = pallet_revive::TestAccountMapper<Self>;
 	type Balance = u64;
 	type Currency = Balances;
-	type Precompiles =
-		(ERC20<Self, InlineIdConfig<0x0120>>, ERC20<Self, ForeignIdConfig<0x0220, Self>>);
+	type Precompiles = (
+		ERC20WithPermit<Self, InlineIdConfig<0x0120>>,
+		ERC20WithPermit<Self, ForeignIdConfig<0x0220, Self>>,
+	);
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

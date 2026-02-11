@@ -36,51 +36,6 @@ use pallet_revive::precompiles::{
 	AddressMapper, AddressMatcher, Error, Ext, Precompile, RuntimeCosts, H160, H256,
 };
 
-// ERC20Permit interface extension (EIP-2612)
-//
-// # Usage
-//
-// The permit pallet provides storage (nonces, domain separators) and EIP-712
-// signature verification for gasless approvals. To implement EIP-2612:
-//
-// 1. **Implement a precompile** that handles the following selectors:
-//    - `0xd505accf` - permit(address,address,uint256,uint256,uint8,bytes32,bytes32)
-//    - `0x7ecebe00` - nonces(address)
-//    - `0x3644e515` - DOMAIN_SEPARATOR()
-//
-// 2. **In the permit handler**, call `permit::Pallet::use_permit()` to:
-//    - Validate the deadline against current timestamp
-//    - Verify the ECDSA signature
-//    - Atomically increment the nonce (preventing replay attacks)
-//
-// 3. **After successful verification**, call `pallet_assets::Pallet::do_approve_transfer()`
-//    to set the actual approval.
-//
-// # Security Notes
-//
-// - **Always use `use_permit()`**, not `verify_permit()`, for state-changing operations.
-//   `verify_permit()` does not consume the permit and leaves it replayable.
-// - The `verifying_contract` parameter must be the precompile's address to ensure
-//   proper EIP-712 domain separation between different assets.
-// - Signatures with high `s` values are rejected to prevent malleability attacks.
-alloy::sol! {
-	interface IERC20Permit {
-		function permit(
-			address owner,
-			address spender,
-			uint256 value,
-			uint256 deadline,
-			uint8 v,
-			bytes32 r,
-			bytes32 s
-		) external;
-
-		function nonces(address owner) external view returns (uint256);
-
-		function DOMAIN_SEPARATOR() external view returns (bytes32);
-	}
-}
-
 pub mod foreign_assets;
 pub mod migration;
 #[cfg(feature = "runtime-benchmarks")]
@@ -179,7 +134,7 @@ where
 	type AssetIdExtractor = ForeignAssetIdExtractor<Runtime, Instance>;
 }
 
-/// An ERC20 precompile.
+/// An ERC20 precompile with EIP-2612 permit support.
 pub struct ERC20<Runtime, PrecompileConfig, Instance = ()> {
 	_phantom: PhantomData<(Runtime, PrecompileConfig, Instance)>,
 }
@@ -188,14 +143,13 @@ impl<Runtime, PrecompileConfig, Instance: 'static> Precompile
 	for ERC20<Runtime, PrecompileConfig, Instance>
 where
 	PrecompileConfig: AssetPrecompileConfig,
-	Runtime: crate::Config<Instance> + pallet_revive::Config,
+	Runtime: crate::Config<Instance> + pallet_revive::Config + permit::Config,
 	<<PrecompileConfig as AssetPrecompileConfig>::AssetIdExtractor as AssetIdExtractor>::AssetId:
 		Into<<Runtime as Config<Instance>>::AssetId>,
 	Call<Runtime, Instance>: Into<<Runtime as pallet_revive::Config>::RuntimeCall>,
 	alloy::primitives::U256: TryInto<<Runtime as Config<Instance>>::Balance>,
-
-	// Note can't use From as it's not implemented for alloy::primitives::U256 for unsigned types
 	alloy::primitives::U256: TryFrom<<Runtime as Config<Instance>>::Balance>,
+	<Runtime as pallet_timestamp::Config>::Moment: sp_runtime::traits::UniqueSaturatedInto<u128>,
 {
 	type T = Runtime;
 	type Interface = IERC20::IERC20Calls;
@@ -208,18 +162,29 @@ where
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error> {
 		let asset_id = PrecompileConfig::AssetIdExtractor::asset_id_from_address(address)?.into();
+		let contract_addr = H160::from(*address);
 
 		match input {
-			IERC20Calls::transfer(_) | IERC20Calls::approve(_) | IERC20Calls::transferFrom(_)
+			// State-changing calls - check read-only
+			IERC20Calls::transfer(_)
+			| IERC20Calls::approve(_)
+			| IERC20Calls::transferFrom(_)
+			| IERC20Calls::permit(_)
 				if env.is_read_only() =>
 				Err(Error::Error(pallet_revive::Error::<Self::T>::StateChangeDenied.into())),
 
+			// ERC20 functions
 			IERC20Calls::transfer(call) => Self::transfer(asset_id, call, env),
 			IERC20Calls::totalSupply(_) => Self::total_supply(asset_id, env),
 			IERC20Calls::balanceOf(call) => Self::balance_of(asset_id, call, env),
 			IERC20Calls::allowance(call) => Self::allowance(asset_id, call, env),
 			IERC20Calls::approve(call) => Self::approve(asset_id, call, env),
 			IERC20Calls::transferFrom(call) => Self::transfer_from(asset_id, call, env),
+
+			// ERC20Permit functions (EIP-2612)
+			IERC20Calls::permit(call) => Self::permit(asset_id, contract_addr, call, env),
+			IERC20Calls::nonces(call) => Self::nonces(contract_addr, call, env),
+			IERC20Calls::DOMAIN_SEPARATOR(_) => Self::domain_separator(contract_addr, env),
 		}
 	}
 }
@@ -230,14 +195,13 @@ const ERR_BALANCE_CONVERSION_FAILED: &str = "Balance conversion failed";
 impl<Runtime, PrecompileConfig, Instance: 'static> ERC20<Runtime, PrecompileConfig, Instance>
 where
 	PrecompileConfig: AssetPrecompileConfig,
-	Runtime: crate::Config<Instance> + pallet_revive::Config,
+	Runtime: crate::Config<Instance> + pallet_revive::Config + permit::Config,
 	<<PrecompileConfig as AssetPrecompileConfig>::AssetIdExtractor as AssetIdExtractor>::AssetId:
 		Into<<Runtime as Config<Instance>>::AssetId>,
 	Call<Runtime, Instance>: Into<<Runtime as pallet_revive::Config>::RuntimeCall>,
 	alloy::primitives::U256: TryInto<<Runtime as Config<Instance>>::Balance>,
-
-	// Note can't use From as it's not implemented for alloy::primitives::U256 for unsigned types
 	alloy::primitives::U256: TryFrom<<Runtime as Config<Instance>>::Balance>,
+	<Runtime as pallet_timestamp::Config>::Moment: sp_runtime::traits::UniqueSaturatedInto<u128>,
 {
 	/// Get the caller as an `H160` address.
 	fn caller(env: &mut impl Ext<T = Runtime>) -> Result<H160, Error> {
@@ -424,4 +388,114 @@ where
 
 		return Ok(IERC20::transferFromCall::abi_encode_returns(&true));
 	}
+
+	// ==================== ERC20Permit Functions (EIP-2612) ====================
+
+	/// Execute the permit call (EIP-2612).
+	///
+	/// This verifies the signature, consumes the permit (increments nonce),
+	/// and sets the approval.
+	fn permit(
+		asset_id: <Runtime as Config<Instance>>::AssetId,
+		verifying_contract: H160,
+		call: &IERC20::permitCall,
+		env: &mut impl Ext<T = Runtime>,
+	) -> Result<Vec<u8>, Error> {
+		// TODO: Add proper weight for permit operation
+		env.charge(<Runtime as Config<Instance>>::WeightInfo::approve_transfer())?;
+
+		let owner_h160: H160 = call.owner.into_array().into();
+		let spender_h160: H160 = call.spender.into_array().into();
+
+		// Convert U256 values to byte arrays
+		let value_bytes: [u8; 32] = call.value.to_be_bytes();
+		let deadline_bytes: [u8; 32] = call.deadline.to_be_bytes();
+		let r_bytes: [u8; 32] = call.r.0;
+		let s_bytes: [u8; 32] = call.s.0;
+
+		// Use the permit - this validates deadline, signature, and increments nonce
+		permit::Pallet::<Runtime>::use_permit(
+			&verifying_contract,
+			&owner_h160,
+			&spender_h160,
+			&value_bytes,
+			&deadline_bytes,
+			call.v,
+			&r_bytes,
+			&s_bytes,
+		)
+		.map_err(|e| {
+			let msg = match e {
+				permit::pallet::Error::PermitExpired => "Permit expired",
+				permit::pallet::Error::InvalidSignature => "Invalid signature",
+				permit::pallet::Error::SignatureSValueTooHigh => "Signature malleability",
+				permit::pallet::Error::NonceOverflow => "Nonce overflow",
+				_ => "Permit verification failed",
+			};
+			Error::Revert(Revert { reason: msg.into() })
+		})?;
+
+		// Set the approval
+		let owner_account =
+			<Runtime as pallet_revive::Config>::AddressMapper::to_account_id(&owner_h160);
+		let spender_account =
+			<Runtime as pallet_revive::Config>::AddressMapper::to_account_id(&spender_h160);
+
+		pallet_assets::Pallet::<Runtime, Instance>::do_approve_transfer(
+			asset_id,
+			&owner_account,
+			&spender_account,
+			Self::to_balance(call.value)?,
+		)?;
+
+		// Emit Approval event
+		Self::deposit_event(
+			env,
+			IERC20Events::Approval(IERC20::Approval {
+				owner: call.owner,
+				spender: call.spender,
+				value: call.value,
+			}),
+		)?;
+
+		// permit returns void
+		Ok(Vec::new())
+	}
+
+	/// Get the current nonce for an owner address.
+	fn nonces(
+		verifying_contract: H160,
+		call: &IERC20::noncesCall,
+		env: &mut impl Ext<T = Runtime>,
+	) -> Result<Vec<u8>, Error> {
+		// TODO: Add proper weight for nonces read
+		env.charge(<Runtime as Config<Instance>>::WeightInfo::balance())?;
+
+		let owner_h160: H160 = call.owner.into_array().into();
+		let nonce = permit::Pallet::<Runtime>::nonce(&verifying_contract, &owner_h160);
+
+		// Convert sp_core::U256 to alloy U256
+		let nonce_bytes = nonce.to_big_endian();
+		let nonce_alloy = alloy::primitives::U256::from_be_bytes(nonce_bytes);
+
+		Ok(IERC20::noncesCall::abi_encode_returns(&nonce_alloy))
+	}
+
+	/// Get the EIP-712 domain separator for this contract.
+	fn domain_separator(
+		verifying_contract: H160,
+		env: &mut impl Ext<T = Runtime>,
+	) -> Result<Vec<u8>, Error> {
+		// TODO: Add proper weight for domain separator computation
+		env.charge(<Runtime as Config<Instance>>::WeightInfo::balance())?;
+
+		let separator = permit::Pallet::<Runtime>::domain_separator(&verifying_contract);
+		let separator_alloy: alloy::primitives::FixedBytes<32> = separator.0.into();
+
+		Ok(IERC20::DOMAIN_SEPARATORCall::abi_encode_returns(&separator_alloy))
+	}
 }
+
+// Type alias for backwards compatibility
+pub type ERC20WithPermit<Runtime, PrecompileConfig, Instance = ()> =
+	ERC20<Runtime, PrecompileConfig, Instance>;

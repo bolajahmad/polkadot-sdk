@@ -59,7 +59,7 @@ use crate::{
 	weightinfo_extension::OnFinalizeBlockParts,
 };
 use alloc::{boxed::Box, format, vec};
-use codec::{Codec, Decode, Encode};
+use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use environmental::*;
 use frame_support::{
 	dispatch::{
@@ -1624,21 +1624,13 @@ impl<T: Config> Pallet<T> {
 
 		// Process authorizations OUTSIDE the transaction context
 		// so delegation changes persist even if the call fails.
-		// The pre-dispatch weight assumes all authorizations create new accounts (worst case).
-		// Refund the difference for authorizations that hit existing accounts.
 		let exec_config =
 			ExecConfig::new_eth_tx(effective_gas_price, encoded_len, base_info.total_weight());
-		let auth_result = if !authorization_list.is_empty() {
-			evm::eip7702::process_authorizations::<T>(&authorization_list, &signer, &exec_config)
+		let (_auth_result, refund) =
+			Self::process_authorization_list(&authorization_list, &signer, &exec_config)
 				.inspect_err(|e| {
 					log::error!(target: LOG_TARGET, "process_authorizations failed: {e:?}. This is a bug: the transaction should have failed validation.");
-				})?
-		} else {
-			Default::default()
-		};
-		let refund = <RuntimeCosts as metering::Token<T>>::weight(
-			&RuntimeCosts::DelegationRefunds(auth_result.existing_accounts),
-		);
+				})?;
 		let extra_weight = base_info.total_weight().saturating_sub(refund);
 		let base_call_weight = base_info.call_weight.saturating_sub(refund);
 
@@ -1665,6 +1657,26 @@ impl<T: Config> Pallet<T> {
 				effective_gas_price,
 			)
 		})
+	}
+
+	/// Process EIP-7702 authorization list and compute the weight refund.
+	///
+	/// The pre-dispatch weight assumes all authorizations create new accounts (worst case).
+	/// Returns the result and the refund weight for authorizations that hit existing accounts.
+	fn process_authorization_list(
+		authorization_list: &[evm::AuthorizationListEntry],
+		origin: &T::AccountId,
+		exec_config: &ExecConfig<T>,
+	) -> Result<(evm::eip7702::AuthorizationResult, Weight), sp_runtime::DispatchError> {
+		let auth_result = if !authorization_list.is_empty() {
+			evm::eip7702::process_authorizations::<T>(authorization_list, origin, exec_config)?
+		} else {
+			Default::default()
+		};
+		let refund = <RuntimeCosts as metering::Token<T>>::weight(
+			&RuntimeCosts::DelegationRefunds(auth_result.existing_accounts),
+		);
+		Ok((auth_result, refund))
 	}
 
 	/// A generalized version of [`Self::call`].
@@ -1934,28 +1946,14 @@ impl<T: Config> Pallet<T> {
 		};
 
 		// Process authorizations and adjust base_weight before creating limits.
-		// The pre-dispatch weight assumes all authorizations create new accounts (worst case).
-		// Refund the difference for authorizations that hit existing accounts.
 		let exec_config =
 			ExecConfig::new_eth_tx(effective_gas_price, call_info.encoded_len, base_weight);
-		let mut auth_deposit = BalanceOf::<T>::zero();
-		if !authorization_list.is_empty() {
-			let auth_result = evm::eip7702::process_authorizations::<T>(
-				&authorization_list,
-				&origin,
-				&exec_config,
-			)
-			.map_err(|err| extract_error(err).unwrap_err())?;
-			let refund = <RuntimeCosts as metering::Token<T>>::weight(
-				&RuntimeCosts::DelegationRefunds(auth_result.existing_accounts),
-			);
-			base_weight = base_weight.saturating_sub(refund);
-			// Use worst case (all authorizations create new accounts) to match the
-		// pre-validation ED check in `into_call`, which also uses worst case.
-			let ed = Self::min_balance();
-			auth_deposit =
-				ed.saturating_mul(authorization_list.len().saturated_into());
-		}
+		let (_auth_result, refund) =
+			Self::process_authorization_list(&authorization_list, &origin, &exec_config)
+				.map_err(|err| extract_error(err).unwrap_err())?;
+		base_weight = base_weight.saturating_sub(refund);
+		let auth_deposit = Self::worst_case_delegation_deposit()
+			.saturating_mul(authorization_list.len().saturated_into());
 
 		let exec_config =
 			ExecConfig::new_eth_tx(effective_gas_price, call_info.encoded_len, base_weight)
@@ -2616,6 +2614,19 @@ impl<T: Config> Pallet<T> {
 	/// Return the existential deposit of [`Config::Currency`].
 	fn min_balance() -> BalanceOf<T> {
 		<T::Currency as Inspect<AccountIdOf<T>>>::minimum_balance()
+	}
+
+	/// Worst-case storage deposit for a single EIP-7702 authorization.
+	///
+	/// Assumes a new account delegating to a contract with the maximum code size.
+	pub(crate) fn worst_case_delegation_deposit() -> BalanceOf<T> {
+		let ed = Self::min_balance();
+		let contract_deposit = T::DepositPerByte::get()
+			.saturating_mul((<ContractInfo<T>>::max_encoded_len() as u32).into())
+			.saturating_add(T::DepositPerItem::get());
+		let max_code_deposit = vm::calculate_code_deposit::<T>(limits::code::BLOB_BYTES);
+		let code_lockup = T::CodeHashLockupDepositPercent::get().mul_ceil(max_code_deposit);
+		ed.saturating_add(contract_deposit).saturating_add(code_lockup)
 	}
 
 	/// Deposit a pallet revive event.

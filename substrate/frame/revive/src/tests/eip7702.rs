@@ -31,6 +31,38 @@ use frame_support::{
 };
 use sp_core::{H160, H256, U256};
 
+/// Common setup for delegation tests that call `process_authorizations` directly.
+struct DelegationTestSetup {
+	signer: TestSigner,
+	authority_id: AccountId32,
+	origin: AccountId32,
+	exec_config: ExecConfig<Test>,
+	chain_id: U256,
+}
+
+impl DelegationTestSetup {
+	fn new(seed: [u8; 32]) -> Self {
+		let chain_id = U256::from(<Test as Config>::ChainId::get());
+		let signer = TestSigner::new(&seed);
+		let authority_id = <Test as Config>::AddressMapper::to_account_id(&signer.address);
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 100_000_000);
+		<Test as Config>::FeeInfo::deposit_txfee(<Test as Config>::Currency::issue(10_000_000_000));
+		let origin = <Test as Config>::AddressMapper::to_account_id(&H160::from([0xFF; 20]));
+		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&origin, 10_000_000_000);
+		let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
+		Self { signer, authority_id, origin, exec_config, chain_id }
+	}
+
+	fn process(&self, auths: &[AuthorizationListEntry]) -> AuthorizationResult {
+		crate::evm::eip7702::process_authorizations::<Test>(auths, &self.origin, &self.exec_config)
+			.expect("process_authorizations failed")
+	}
+
+	fn nonce(&self) -> U256 {
+		U256::from(frame_system::Pallet::<Test>::account_nonce(&self.authority_id))
+	}
+}
+
 /// Helper to call process_authorizations with a funded origin and exec_config.
 fn test_process_authorizations(auths: &[AuthorizationListEntry]) -> AuthorizationResult {
 	let origin = <Test as Config>::AddressMapper::to_account_id(&H160::from([0xFF; 20]));
@@ -573,8 +605,8 @@ fn cleared_delegation_does_not_execute_code() {
 	ExtBuilder::default().build().execute_with(|| {
 		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&ALICE, 100_000_000);
 
-		let counter = builder::bare_instantiate(Code::Upload(counter_code))
-			.build_and_unwrap_contract();
+		let counter =
+			builder::bare_instantiate(Code::Upload(counter_code)).build_and_unwrap_contract();
 
 		// Delegate ALICE → Counter and write storage
 		AccountInfo::<Test>::set_delegation(&ALICE_ADDR, counter.addr);
@@ -890,33 +922,19 @@ fn delegation_charges_storage_deposit() {
 		let target = builder::bare_instantiate(Code::Upload(dummy_evm_contract()))
 			.build_and_unwrap_contract();
 
-		let chain_id = U256::from(<Test as Config>::ChainId::get());
-		let seed = H256::from([0xCC; 32]);
-		let signer = TestSigner::new(&seed.0);
-		let authority = signer.address;
-		let authority_id = <Test as Config>::AddressMapper::to_account_id(&authority);
-		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 100_000_000);
-		<Test as Config>::FeeInfo::deposit_txfee(<Test as Config>::Currency::issue(10_000_000_000));
-
+		let setup = DelegationTestSetup::new([0xCC; 32]);
 		let hold_before =
-			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &authority_id);
+			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &setup.authority_id);
 		assert_eq!(hold_before, 0);
 
-		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-		let auth = signer.sign_authorization(chain_id, target.addr, nonce);
-		let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
-		let origin = <Test as Config>::AddressMapper::to_account_id(&H160::from([0xFF; 20]));
-		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&origin, 10_000_000_000);
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], &origin, &exec_config)
-			.expect("process_authorizations failed");
+		let auth = setup.signer.sign_authorization(setup.chain_id, target.addr, setup.nonce());
+		setup.process(&[auth]);
 
-		// Verify a hold was placed on the authority account
 		let hold_after =
-			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &authority_id);
+			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &setup.authority_id);
 		assert!(hold_after > 0, "should have a storage deposit hold after delegation");
 
-		// The hold should match the contract info's storage_base_deposit
-		let contract_info = get_contract(&authority);
+		let contract_info = get_contract(&setup.signer.address);
 		assert_eq!(hold_after, contract_info.storage_base_deposit());
 	});
 }
@@ -930,41 +948,25 @@ fn clear_delegation_refunds_storage_deposit() {
 		let target = builder::bare_instantiate(Code::Upload(dummy_evm_contract()))
 			.build_and_unwrap_contract();
 
-		let chain_id = U256::from(<Test as Config>::ChainId::get());
-		let seed = H256::from([0xDD; 32]);
-		let signer = TestSigner::new(&seed.0);
-		let authority = signer.address;
-		let authority_id = <Test as Config>::AddressMapper::to_account_id(&authority);
-		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 100_000_000);
-		<Test as Config>::FeeInfo::deposit_txfee(<Test as Config>::Currency::issue(10_000_000_000));
-
-		let origin = <Test as Config>::AddressMapper::to_account_id(&H160::from([0xFF; 20]));
-		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&origin, 10_000_000_000);
-		let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
+		let setup = DelegationTestSetup::new([0xDD; 32]);
 
 		// Set delegation
-		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-		let auth = signer.sign_authorization(chain_id, target.addr, nonce);
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], &origin, &exec_config)
-			.expect("set delegation failed");
+		let auth = setup.signer.sign_authorization(setup.chain_id, target.addr, setup.nonce());
+		setup.process(&[auth]);
 
 		let hold_after_set =
-			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &authority_id);
+			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &setup.authority_id);
 		assert!(hold_after_set > 0);
 
 		// Clear delegation (address = zero)
-		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-		let auth = signer.sign_authorization(chain_id, H160::zero(), nonce);
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], &origin, &exec_config)
-			.expect("clear delegation failed");
+		let auth = setup.signer.sign_authorization(setup.chain_id, H160::zero(), setup.nonce());
+		setup.process(&[auth]);
 
-		// Hold should be fully released
 		let hold_after_clear =
-			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &authority_id);
+			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &setup.authority_id);
 		assert_eq!(hold_after_clear, 0, "hold should be fully released after clearing delegation");
 
-		// load_contract should return None for a cleared delegation
-		assert!(get_contract_checked(&authority).is_none());
+		assert!(get_contract_checked(&setup.signer.address).is_none());
 	});
 }
 
@@ -981,36 +983,27 @@ fn redelegation_adjusts_deposit() {
 			.salt(Some([1; 32]))
 			.build_and_unwrap_contract();
 
-		let chain_id = U256::from(<Test as Config>::ChainId::get());
-		let seed = H256::from([0xEE; 32]);
-		let signer = TestSigner::new(&seed.0);
-		let authority = signer.address;
-		let authority_id = <Test as Config>::AddressMapper::to_account_id(&authority);
-		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 100_000_000);
-		<Test as Config>::FeeInfo::deposit_txfee(<Test as Config>::Currency::issue(10_000_000_000));
-
-		let origin = <Test as Config>::AddressMapper::to_account_id(&H160::from([0xFF; 20]));
-		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&origin, 10_000_000_000);
-		let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
+		let setup = DelegationTestSetup::new([0xEE; 32]);
 
 		// Delegate to target A
-		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-		let auth = signer.sign_authorization(chain_id, target_a.addr, nonce);
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], &origin, &exec_config)
-			.expect("delegate to A failed");
+		let auth = setup.signer.sign_authorization(setup.chain_id, target_a.addr, setup.nonce());
+		setup.process(&[auth]);
 
-		let hold_a = get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &authority_id);
+		let hold_a =
+			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &setup.authority_id);
 		assert!(hold_a > 0);
 
 		// Re-delegate to target B (same code size → same deposit)
-		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-		let auth = signer.sign_authorization(chain_id, target_b.addr, nonce);
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], &origin, &exec_config)
-			.expect("delegate to B failed");
+		let auth = setup.signer.sign_authorization(setup.chain_id, target_b.addr, setup.nonce());
+		setup.process(&[auth]);
 
-		let hold_b = get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &authority_id);
+		let hold_b =
+			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &setup.authority_id);
 		assert_eq!(hold_a, hold_b, "same-code re-delegation should keep the same deposit");
-		assert_eq!(AccountInfo::<Test>::get_delegation_target(&authority), Some(target_b.addr));
+		assert_eq!(
+			AccountInfo::<Test>::get_delegation_target(&setup.signer.address),
+			Some(target_b.addr)
+		);
 	});
 }
 
@@ -1118,38 +1111,23 @@ fn redelegation_from_contract_to_eoa_refunds() {
 		let target = builder::bare_instantiate(Code::Upload(dummy_evm_contract()))
 			.build_and_unwrap_contract();
 
-		let chain_id = U256::from(<Test as Config>::ChainId::get());
-		let seed = H256::from([0xAA; 32]);
-		let signer = TestSigner::new(&seed.0);
-		let authority = signer.address;
-		let authority_id = <Test as Config>::AddressMapper::to_account_id(&authority);
-		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&authority_id, 100_000_000);
-		<Test as Config>::FeeInfo::deposit_txfee(<Test as Config>::Currency::issue(10_000_000_000));
-
-		let origin = <Test as Config>::AddressMapper::to_account_id(&H160::from([0xFF; 20]));
-		let _ = <<Test as Config>::Currency as Mutate<_>>::set_balance(&origin, 10_000_000_000);
-		let exec_config = ExecConfig::new_eth_tx(U256::from(1), 0, Weight::MAX);
+		let setup = DelegationTestSetup::new([0xAA; 32]);
 
 		// Delegate to contract
-		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-		let auth = signer.sign_authorization(chain_id, target.addr, nonce);
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], &origin, &exec_config)
-			.expect("delegation failed");
+		let auth = setup.signer.sign_authorization(setup.chain_id, target.addr, setup.nonce());
+		setup.process(&[auth]);
 
 		let hold_after_contract =
-			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &authority_id);
+			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &setup.authority_id);
 		assert!(hold_after_contract > 0);
 
 		// Re-delegate to a plain EOA (no code)
 		let plain_eoa = H160::from([0x77; 20]);
-		let nonce = U256::from(frame_system::Pallet::<Test>::account_nonce(&authority_id));
-		let auth = signer.sign_authorization(chain_id, plain_eoa, nonce);
-		crate::evm::eip7702::process_authorizations::<Test>(&[auth], &origin, &exec_config)
-			.expect("re-delegation failed");
+		let auth = setup.signer.sign_authorization(setup.chain_id, plain_eoa, setup.nonce());
+		setup.process(&[auth]);
 
-		// Deposit should be refunded since new target has no code
 		let hold_after_eoa =
-			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &authority_id);
+			get_balance_on_hold(&HoldReason::StorageDepositReserve.into(), &setup.authority_id);
 		assert_eq!(hold_after_eoa, 0, "deposit should be refunded when re-delegating to EOA");
 	});
 }
@@ -1186,7 +1164,7 @@ fn multiple_delegations_each_have_own_deposit() {
 	});
 }
 
-/// Re-delegation to the same target is a no-op for refcount (no double-increment).
+/// Re-delegation to the same target does not change the refcount.
 #[test]
 fn redelegation_to_same_target_keeps_refcount() {
 	ExtBuilder::default().build().execute_with(|| {
@@ -1205,13 +1183,9 @@ fn redelegation_to_same_target_keeps_refcount() {
 		AccountInfo::<Test>::set_delegation(&authority, target.addr);
 		let refcount_after_second = CodeInfoOf::<Test>::get(code_hash).unwrap().refcount();
 
-		// The old code_hash == new code_hash, so decrement is skipped; but increment still
-		// happens. Net effect: +1 per delegation call.
-		// This is fine because clear_delegation will decrement once.
 		assert_eq!(
-			refcount_after_second,
-			refcount_after_first + 1,
-			"re-delegation to same target increments refcount (old == new so no decrement)"
+			refcount_after_second, refcount_after_first,
+			"re-delegation to same target should not change refcount"
 		);
 	});
 }

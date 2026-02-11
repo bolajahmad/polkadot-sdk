@@ -126,15 +126,17 @@ pub fn process_authorizations<T: Config>(
 	Ok(result)
 }
 
-/// Recover the authority address from an authorization signature
-///
-/// Implements the EIP-7702 signature recovery:
-/// - Message = keccak(MAGIC || rlp([chain_id, address, nonce]))
-fn recover_authority(auth: &AuthorizationListEntry) -> Result<H160, ()> {
-	let mut message = Vec::new();
+/// Build the EIP-7702 signing message: `MAGIC || rlp([chain_id, address, nonce])`
+fn signing_message(auth: &AuthorizationListEntry) -> Vec<u8> {
+	let mut message = Vec::with_capacity(1 + 64);
 	message.push(EIP7702_MAGIC);
 	message.extend_from_slice(&auth.rlp_encode_unsigned());
-	recover_eth_address_from_message(&message, &auth.signature())
+	message
+}
+
+/// Recover the authority address from an authorization signature
+fn recover_authority(auth: &AuthorizationListEntry) -> Result<H160, ()> {
+	recover_eth_address_from_message(&signing_message(auth), &auth.signature())
 }
 
 /// Sign an authorization entry
@@ -148,11 +150,7 @@ pub fn sign_authorization(
 	nonce: U256,
 ) -> AuthorizationListEntry {
 	let unsigned = AuthorizationListEntry { chain_id, address, nonce, ..Default::default() };
-	let mut message = Vec::new();
-	message.push(EIP7702_MAGIC);
-	message.extend_from_slice(&unsigned.rlp_encode_unsigned());
-
-	let hash = sp_core::keccak_256(&message);
+	let hash = sp_core::keccak_256(&signing_message(&unsigned));
 	let sig = pair.sign_prehashed(&hash);
 
 	AuthorizationListEntry {

@@ -260,6 +260,17 @@ impl<T: Config> AccountInfo<T> {
 		let mut new_deposit: BalanceOf<T> = Zero::zero();
 		let mut old_deposit: BalanceOf<T> = Zero::zero();
 
+		// Helper: create a fresh ContractInfo for the target and compute its base deposit.
+		let make_contract_info = |new_deposit: &mut BalanceOf<T>| {
+			target_code_hash.map(|ch| {
+				let mut info = ContractInfo::<T>::new_for_delegation(address, ch);
+				if let Some(cd) = code_deposit {
+					*new_deposit = info.update_base_deposit(cd);
+				}
+				info
+			})
+		};
+
 		let old_code_hash = AccountInfoOf::<T>::mutate(address, |account| {
 			let mut old_code_hash = None;
 
@@ -283,27 +294,18 @@ impl<T: Config> AccountInfo<T> {
 						}
 					},
 					_ => {
-						let ci = target_code_hash.map(|ch| {
-							let mut info = ContractInfo::<T>::new_for_delegation(address, ch);
-							if let Some(code_deposit) = code_deposit {
-								new_deposit = info.update_base_deposit(code_deposit);
-							}
-							info
-						});
-						account.account_type =
-							AccountType::EOA { delegate_target: Some(target), contract_info: ci };
+						account.account_type = AccountType::EOA {
+							delegate_target: Some(target),
+							contract_info: make_contract_info(&mut new_deposit),
+						};
 					},
 				}
 			} else {
-				let contract_info = target_code_hash.map(|ch| {
-					let mut info = ContractInfo::<T>::new_for_delegation(address, ch);
-					if let Some(cd) = code_deposit {
-						new_deposit = info.update_base_deposit(cd);
-					}
-					info
-				});
 				*account = Some(AccountInfo {
-					account_type: AccountType::EOA { delegate_target: Some(target), contract_info },
+					account_type: AccountType::EOA {
+						delegate_target: Some(target),
+						contract_info: make_contract_info(&mut new_deposit),
+					},
 					dust: 0,
 				});
 			}
@@ -311,9 +313,9 @@ impl<T: Config> AccountInfo<T> {
 			old_code_hash
 		});
 
-		// Manage code refcounts
+		// Manage code refcounts, skipping when the hash is unchanged
 		if let Some(new_hash) = target_code_hash {
-			if code_deposit.is_some() {
+			if Some(new_hash) != old_code_hash {
 				let _ = CodeInfo::<T>::increment_refcount(new_hash);
 			}
 		}

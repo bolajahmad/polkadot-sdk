@@ -263,22 +263,22 @@ impl GenericTransaction {
 			InvalidTransaction::Payment
 		})?.saturated_into();
 
-		// EIP-7702: Ensure enough gas to cover ED for new accounts
-		// from authorizations (worst case: all authorizations create new accounts).
+		// EIP-7702: Ensure enough gas to cover worst-case deposits for authorizations
+		// (ED + contract storage deposit + code lockup per authorization).
 		if !self.authorization_list.is_empty() {
-			let ed = <Pallet<T>>::min_balance();
-			let auth_ed_cost = ed.saturating_mul(self.authorization_list.len().saturated_into());
+			let auth_cost = <Pallet<T>>::worst_case_delegation_deposit()
+				.saturating_mul(self.authorization_list.len().saturated_into());
 
 			let info = <T as Config>::FeeInfo::dispatch_info(&call);
 			let extra_weight = info.total_weight().saturating_sub(weight_limit);
 			let max_deposit =
 				EthTxInfo::<T>::new(encoded_len, extra_weight).max_deposit(gas.saturated_into());
 
-			if max_deposit < auth_ed_cost {
+			if max_deposit < auth_cost {
 				log::debug!(
 					target: LOG_TARGET,
-					"Not enough gas to cover ED for authorization accounts. \
-					max_deposit={max_deposit:?} required={auth_ed_cost:?}"
+					"Not enough gas to cover deposits for authorization accounts. \
+					max_deposit={max_deposit:?} required={auth_cost:?}"
 				);
 				return Err(InvalidTransaction::Payment);
 			}

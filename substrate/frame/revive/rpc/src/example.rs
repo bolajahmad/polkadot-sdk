@@ -181,7 +181,16 @@ impl<Client: EthRpcClient + Send + Sync> TransactionBuilder<Client> {
 		self,
 		tx_type: TransactionType,
 	) -> anyhow::Result<SubmittedTransaction<Client>> {
-		let TransactionBuilder { client, signer, value, input, to, nonce, authorization_list, mutate } = self;
+		let TransactionBuilder {
+			client,
+			signer,
+			value,
+			input,
+			to,
+			nonce,
+			authorization_list,
+			mutate,
+		} = self;
 
 		let from = signer.address();
 		let chain_id = client.chain_id().await?;

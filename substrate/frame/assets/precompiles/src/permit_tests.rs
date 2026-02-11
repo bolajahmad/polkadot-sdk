@@ -248,7 +248,8 @@ fn permit_digest_changes_with_verifying_contract() {
 fn ecrecover_with_valid_signature() {
 	new_test_ext().execute_with(|| {
 		// Test vector generated with ethers.js:
-		// const wallet = new Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
+		// const wallet = new
+		// Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
 		// const message = "test message";
 		// const messageHash = ethers.keccak256(ethers.toUtf8Bytes(message));
 		// const signature = wallet.signingKey.sign(messageHash);

@@ -22,12 +22,12 @@
 //!
 //! # Security Notes
 //!
-//! - **Nonce management**: Use `use_permit` (not `verify_permit`) to atomically
-//!   verify and consume permits. This prevents replay attacks.
+//! - **Nonce management**: Use `use_permit` (not `verify_permit`) to atomically verify and consume
+//!   permits. This prevents replay attacks.
 //! - **Deadline validation**: Permits are validated against UNIX timestamps.
 //! - **Domain separation**: Each verifying contract has its own domain separator.
-//! - **Signature malleability**: The `s` value is checked to be in the lower half
-//!   of the secp256k1 curve order to prevent signature malleability attacks.
+//! - **Signature malleability**: The `s` value is checked to be in the lower half of the secp256k1
+//!   curve order to prevent signature malleability attacks.
 
 use frame_support::pallet_prelude::*;
 use pallet_revive::precompiles::H160;
@@ -53,9 +53,11 @@ pub const SECP256K1_N_DIV_2: [u8; 32] = [
 ];
 
 /// Encoded length constants for EIP-712 encoding.
-/// Domain separator: typehash(32) + name_hash(32) + version_hash(32) + chainId(32) + verifyingContract(32) = 160 bytes
+/// Domain separator: typehash(32) + name_hash(32) + version_hash(32) + chainId(32) +
+/// verifyingContract(32) = 160 bytes
 pub const DOMAIN_SEPARATOR_ENCODED_LEN: usize = 32 * 5;
-/// Permit struct: typehash(32) + owner(32) + spender(32) + value(32) + nonce(32) + deadline(32) = 192 bytes
+/// Permit struct: typehash(32) + owner(32) + spender(32) + value(32) + nonce(32) + deadline(32) =
+/// 192 bytes
 pub const PERMIT_STRUCT_ENCODED_LEN: usize = 32 * 6;
 /// Digest prefix: \x19\x01(2) + domain_separator(32) + struct_hash(32) = 66 bytes
 pub const DIGEST_PREFIX_LEN: usize = 2 + 32 + 32;
@@ -123,10 +125,7 @@ pub mod pallet {
 
 		/// Increment the nonce for an owner on a specific verifying contract.
 		/// Returns the new nonce value, or an error if overflow would occur.
-		pub fn increment_nonce(
-			verifying_contract: &H160,
-			owner: &H160,
-		) -> Result<U256, Error<T>> {
+		pub fn increment_nonce(verifying_contract: &H160, owner: &H160) -> Result<U256, Error<T>> {
 			Nonces::<T>::try_mutate(verifying_contract, owner, |nonce| {
 				*nonce = nonce.checked_add(U256::one()).ok_or(Error::<T>::NonceOverflow)?;
 				Ok(*nonce)
@@ -151,8 +150,8 @@ pub mod pallet {
 		/// Compute the EIP-712 domain separator for a given verifying contract.
 		///
 		/// DOMAIN_SEPARATOR = keccak256(abi.encode(
-		///   keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-		///   keccak256("Asset Permit"),
+		///   keccak256("EIP712Domain(string name,string version,uint256 chainId,address
+		/// verifyingContract)"),   keccak256("Asset Permit"),
 		///   keccak256("1"),
 		///   chainId,
 		///   verifyingContract
@@ -278,8 +277,7 @@ pub mod pallet {
 			r: &[u8; 32],
 			s: &[u8; 32],
 		) -> Result<H160, Error<T>> {
-			use sp_io::crypto::secp256k1_ecdsa_recover;
-			use sp_io::hashing::keccak_256;
+			use sp_io::{crypto::secp256k1_ecdsa_recover, hashing::keccak_256};
 
 			// Check signature malleability: s must be in lower half of curve order
 			if !Self::is_s_value_valid(s) {

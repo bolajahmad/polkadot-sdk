@@ -54,6 +54,11 @@
 //!   Beneficiary if the bounty is rewarded.
 //! - **Beneficiary:** The account/location to which the total or part of the bounty is assigned to.
 //!
+//! ### Account derivation
+//!
+//! Bounty and child-bounty accounts are derived from the funding source [`PalletId`] using the
+//! sub-account prefixes `"mbt"` (multi-asset bounty) and `"mcb"` (multi-asset child bounty).
+//!
 //! ### Example
 //!
 //! 1. Fund a bounty approved by spend origin of some asset kind with a proposed curator.
@@ -1856,6 +1861,8 @@ where
 /// Derives a bounty `AccountId` from the `PalletId` and the `BountyIndex`,
 /// then converts it into the corresponding bounty `Beneficiary`.
 ///
+/// Uses the prefix `"mbt"` (multi-asset bounty) to derive the account ID.
+///
 /// Used when the [`PalletId`] itself owns the funds (i.e. pallet-treasury id).
 /// # Type Parameters
 /// - `Id`: The pallet ID getter
@@ -1874,13 +1881,16 @@ where
 	fn try_convert(
 		(parent_bounty_id, _asset_kind): (BountyIndex, T::AssetKind),
 	) -> Result<T::Beneficiary, (BountyIndex, T::AssetKind)> {
-		let account: T::AccountId = Id::get().into_sub_account_truncating(("bt", parent_bounty_id));
+		let account: T::AccountId =
+			Id::get().into_sub_account_truncating(("mbt", parent_bounty_id));
 		Ok(C::convert(account))
 	}
 }
 
 /// Derives a child-bounty `AccountId` from the `PalletId`, the parent index,
 /// and the child index, then converts it into the child-bounty `Beneficiary`.
+///
+/// Uses the prefix `"mcb"` (multi-asset child bounty) to derive the account ID.
 ///
 /// Used when the [`PalletId`] itself owns the funds (i.e. pallet-treasury id).
 /// # Type Parameters
@@ -1903,7 +1913,7 @@ where
 		// The prefix is changed to have different AccountId when the index of
 		// parent and child is same.
 		let account: T::AccountId =
-			Id::get().into_sub_account_truncating(("cb", parent_bounty_id, child_bounty_id));
+			Id::get().into_sub_account_truncating(("mcb", parent_bounty_id, child_bounty_id));
 		Ok(C::convert(account))
 	}
 }

@@ -1950,9 +1950,11 @@ impl<T: Config> Pallet<T> {
 				&RuntimeCosts::DelegationRefunds(auth_result.existing_accounts),
 			);
 			base_weight = base_weight.saturating_sub(refund);
-			// Track ED consumed for new accounts so we can include it in the gas estimate
+			// Use worst case (all authorizations create new accounts) to match the
+		// pre-validation ED check in `into_call`, which also uses worst case.
 			let ed = Self::min_balance();
-			auth_deposit = ed.saturating_mul(auth_result.new_accounts.into());
+			auth_deposit =
+				ed.saturating_mul(authorization_list.len().saturated_into());
 		}
 
 		let exec_config =

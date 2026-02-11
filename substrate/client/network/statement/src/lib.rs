@@ -59,6 +59,7 @@ use std::{
 	num::NonZeroUsize,
 	pin::Pin,
 	sync::Arc,
+	time::Instant,
 };
 use tokio::time::timeout;
 pub mod config;
@@ -83,6 +84,8 @@ mod rep {
 	pub const INVALID_STATEMENT: Rep = Rep::new(-(1 << 12), "Invalid statement");
 	/// Reputation change when a peer sends us a duplicate statement.
 	pub const DUPLICATE_STATEMENT: Rep = Rep::new(-(1 << 7), "Duplicate statement");
+	/// Reputation change when a peer floods us with statements.
+	pub const STATEMENT_FLOODING: Rep = Rep::new(-(1 << 12), "Statement flooding");
 }
 
 const LOG_TARGET: &str = "statement-gossip";
@@ -98,6 +101,7 @@ struct Metrics {
 	propagated_statements_chunks: Histogram,
 	pending_statements: Gauge<U64>,
 	ignored_statements: Counter<U64>,
+	statement_flooding_detected: Counter<U64>,
 }
 
 impl Metrics {
@@ -144,6 +148,13 @@ impl Metrics {
 				Counter::new(
 					"substrate_sync_ignored_statements",
 					"Number of statements ignored due to exceeding MAX_PENDING_STATEMENTS limit",
+				)?,
+				r,
+			)?,
+			statement_flooding_detected: register(
+				Counter::new(
+					"substrate_sync_statement_flooding_detected",
+					"Number of peers disconnected for exceeding statement rate limits",
 				)?,
 				r,
 			)?,
@@ -312,6 +323,31 @@ pub struct StatementHandler<
 	initial_sync_peer_queue: VecDeque<PeerId>,
 }
 
+/// Per-peer rate limiter using sliding window.
+#[derive(Debug)]
+struct PeerRateLimiter {
+	/// Sliding window of (timestamp, count)
+	statement_window: VecDeque<(Instant, usize)>,
+}
+
+impl PeerRateLimiter {
+	fn new() -> Self {
+		Self { statement_window: VecDeque::new() }
+	}
+
+	/// Check if peer can send N statements. Returns true if flooding detected.
+	fn is_flooding(&mut self, count: usize) -> bool {
+		let now = Instant::now();
+		let cutoff = now - RATE_LIMIT_WINDOW_DURATION;
+		while self.statement_window.front().is_some_and(|(t, _)| *t < cutoff) {
+			self.statement_window.pop_front();
+		}
+		let window_total: usize = self.statement_window.iter().map(|(_, c)| c).sum();
+		self.statement_window.push_back((now, count));
+		window_total + count > MAX_STATEMENTS_PER_WINDOW as usize
+	}
+}
+
 /// Peer information
 #[cfg_attr(not(any(test, feature = "test-helpers")), doc(hidden))]
 #[derive(Debug)]
@@ -319,6 +355,8 @@ pub struct Peer {
 	/// Holds a set of statements known to this peer.
 	known_statements: LruHashSet<Hash>,
 	role: ObservedRole,
+	/// Rate limiter for statement flooding protection
+	rate_limiter: PeerRateLimiter,
 }
 
 /// Tracks pending initial sync state for a peer (hashes only, statements fetched on-demand).
@@ -398,7 +436,7 @@ impl Peer {
 	/// Create a new peer for testing/benchmarking purposes.
 	#[cfg(any(test, feature = "test-helpers"))]
 	pub fn new_for_testing(known_statements: LruHashSet<Hash>, role: ObservedRole) -> Self {
-		Self { known_statements, role }
+		Self { known_statements, role, rate_limiter: PeerRateLimiter::new() }
 	}
 }
 
@@ -577,6 +615,7 @@ where
 							NonZeroUsize::new(MAX_KNOWN_STATEMENTS).expect("Constant is nonzero"),
 						),
 						role,
+						rate_limiter: PeerRateLimiter::new(),
 					},
 				);
 				debug_assert!(_was_in.is_none());
@@ -619,6 +658,25 @@ where
 	pub fn on_statements(&mut self, who: PeerId, statements: Statements) {
 		log::trace!(target: LOG_TARGET, "Received {} statements from {}", statements.len(), who);
 		if let Some(ref mut peer) = self.peers.get_mut(&who) {
+			if peer.rate_limiter.is_flooding(statements.len()) {
+				log::warn!(
+					target: LOG_TARGET,
+					"Peer {} exceeded statement rate limit: {} statements in {}s window (limit: {}). Disconnecting.",
+					who,
+					statements.len(),
+					RATE_LIMIT_WINDOW_DURATION.as_secs(),
+					MAX_STATEMENTS_PER_WINDOW
+				);
+
+				self.network.report_peer(who, rep::STATEMENT_FLOODING);
+				self.network.disconnect_peer(who, self.protocol_name.clone());
+				if let Some(ref metrics) = self.metrics {
+					metrics.statement_flooding_detected.inc();
+				}
+
+				return;
+			}
+
 			let mut statements_left = statements.len() as u64;
 			for s in statements {
 				if self.pending_statements.len() > MAX_PENDING_STATEMENTS {
@@ -871,6 +929,7 @@ mod tests {
 	struct TestNetwork {
 		reported_peers: Arc<Mutex<Vec<(PeerId, sc_network::ReputationChange)>>>,
 		peer_roles: Arc<Mutex<HashMap<PeerId, ObservedRole>>>,
+		disconnected_peers: Arc<Mutex<Vec<PeerId>>>,
 	}
 
 	impl TestNetwork {
@@ -878,6 +937,7 @@ mod tests {
 			Self {
 				reported_peers: Arc::new(Mutex::new(Vec::new())),
 				peer_roles: Arc::new(Mutex::new(HashMap::new())),
+				disconnected_peers: Arc::new(Mutex::new(Vec::new())),
 			}
 		}
 
@@ -887,6 +947,10 @@ mod tests {
 
 		fn set_peer_role(&self, peer: PeerId, role: ObservedRole) {
 			self.peer_roles.lock().unwrap().insert(peer, role);
+		}
+
+		fn get_disconnected_peers(&self) -> Vec<PeerId> {
+			self.disconnected_peers.lock().unwrap().clone()
 		}
 	}
 
@@ -912,8 +976,8 @@ mod tests {
 			unimplemented!()
 		}
 
-		fn disconnect_peer(&self, _: PeerId, _: sc_network::ProtocolName) {
-			unimplemented!()
+		fn disconnect_peer(&self, peer: PeerId, _: sc_network::ProtocolName) {
+			self.disconnected_peers.lock().unwrap().push(peer);
 		}
 
 		fn accept_unreserved_peers(&self) {
@@ -1229,6 +1293,7 @@ mod tests {
 			Peer {
 				known_statements: LruHashSet::new(NonZeroUsize::new(100).unwrap()),
 				role: ObservedRole::Full,
+				rate_limiter: PeerRateLimiter::new(),
 			},
 		);
 
@@ -1862,5 +1927,39 @@ mod tests {
 
 		// No more pending
 		assert!(!handler.pending_initial_syncs.contains_key(&peer_id));
+	}
+
+	#[tokio::test]
+	async fn test_peer_disconnected_on_flooding() {
+		let (mut handler, _statement_store, network, _notification_service, _queue_receiver) =
+			build_handler();
+
+		let peer_id = *handler.peers.keys().next().unwrap();
+
+		let mut flood_statements = Vec::new();
+		for i in 0..600_000 {
+			let mut statement = Statement::new();
+			statement.set_plain_data(vec![i as u8, (i >> 8) as u8, (i >> 16) as u8]);
+			flood_statements.push(statement);
+		}
+
+		handler.on_statements(peer_id, flood_statements);
+
+		let reports = network.get_reports();
+		assert!(
+			reports
+				.iter()
+				.any(|(id, rep)| *id == peer_id && *rep == rep::STATEMENT_FLOODING),
+			"Expected STATEMENT_FLOODING reputation change, but got: {:?}",
+			reports
+		);
+
+		let disconnected = network.get_disconnected_peers();
+		assert!(
+			disconnected.contains(&peer_id),
+			"Expected peer {} to be disconnected, but it wasn't. Disconnected peers: {:?}",
+			peer_id,
+			disconnected
+		);
 	}
 }

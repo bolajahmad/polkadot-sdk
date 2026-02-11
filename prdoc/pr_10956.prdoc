@@ -1,8 +1,8 @@
 title: '[staking] enhance error logging from voter list updates'
 doc:
-- audience: Runtime Dev
+- audience: Todo
   description: Adds logging for errors encountered during updates to the voter list
     when adding or removing nominators and validators.
 crates:
 - name: pallet-staking-async
-  bump: patch
+  bump: major

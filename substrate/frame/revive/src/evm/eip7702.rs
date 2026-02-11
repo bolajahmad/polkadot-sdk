@@ -103,22 +103,20 @@ pub fn process_authorizations<T: Config>(
 		};
 
 		match deposit {
-			StorageDeposit::Charge(amount) if !amount.is_zero() =>
-				Pallet::<T>::charge_deposit(
-					Some(HoldReason::StorageDepositReserve),
-					origin,
-					&account_id,
-					amount,
-					exec_config,
-				)?,
-			StorageDeposit::Refund(amount) if !amount.is_zero() =>
-				Pallet::<T>::refund_deposit(
-					HoldReason::StorageDepositReserve,
-					&account_id,
-					origin,
-					amount,
-					Some(exec_config),
-				)?,
+			StorageDeposit::Charge(amount) if !amount.is_zero() => Pallet::<T>::charge_deposit(
+				Some(HoldReason::StorageDepositReserve),
+				origin,
+				&account_id,
+				amount,
+				exec_config,
+			)?,
+			StorageDeposit::Refund(amount) if !amount.is_zero() => Pallet::<T>::refund_deposit(
+				HoldReason::StorageDepositReserve,
+				&account_id,
+				origin,
+				amount,
+				Some(exec_config),
+			)?,
 			_ => {},
 		}
 
@@ -142,7 +140,7 @@ fn recover_authority(auth: &AuthorizationListEntry) -> Result<H160, ()> {
 /// Sign an authorization entry
 ///
 /// This is a helper function for benchmarks and tests.
-#[cfg(any(feature = "runtime-benchmarks", test))]
+#[cfg(any(feature = "std", feature = "runtime-benchmarks"))]
 pub fn sign_authorization(
 	pair: &sp_core::ecdsa::Pair,
 	chain_id: U256,

@@ -316,6 +316,7 @@ async fn run_all_eth_rpc_tests_inner() -> anyhow::Result<()> {
 		test_multiple_transactions_in_block,
 		test_mixed_evm_substrate_transactions,
 		test_runtime_pallets_address_upload_code,
+		test_eip7702_delegation_flow,
 	);
 
 	log::debug!(target: LOG_TARGET, "All tests completed successfully!");
@@ -828,6 +829,151 @@ async fn test_runtime_pallets_address_upload_code() -> anyhow::Result<()> {
 	let stored_code = node_client.storage().at(block_hash).fetch(&query).await?;
 	assert!(stored_code.is_some(), "Code with hash {code_hash:?} should exist in storage");
 	assert_eq!(stored_code.unwrap(), bytecode, "Stored code should match the uploaded bytecode");
+
+	Ok(())
+}
+
+/// Full EIP-7702 integration test:
+/// 1. Deploy Counter contract
+/// 2. Delegate Alice → Counter via 7702 tx with authorization list
+/// 3. Call setNumber(42) on Alice (writes to Alice's storage via Counter code)
+/// 4. Read number() from Alice → returns 42
+/// 5. Clear delegation (authorization with zero address)
+/// 6. Read from Alice → returns empty (no code)
+async fn test_eip7702_delegation_flow() -> anyhow::Result<()> {
+	use crate::example::SubmittedTransaction;
+	use pallet_revive::{
+		evm::{Account, Transaction7702Unsigned},
+		precompiles::alloy::sol_types::SolCall,
+	};
+	use pallet_revive_fixtures::Counter;
+
+	let client = Arc::new(SharedResources::client().await);
+	let alith = Account::default();
+
+	// Deploy Counter contract
+	let (counter_code, _) = pallet_revive_fixtures::compile_module_with_type(
+		"Counter",
+		pallet_revive_fixtures::FixtureType::Solc,
+	)?;
+	let nonce = client.get_transaction_count(alith.address(), BlockTag::Latest.into()).await?;
+	let tx = TransactionBuilder::new(client.clone())
+		.input(counter_code.to_vec())
+		.send()
+		.await?;
+	tx.wait_for_receipt().await?;
+	let counter_addr = create1(&alith.address(), nonce.try_into().unwrap());
+
+	// Create authority account with known seed
+	let seed = [0xAA; 32];
+	let authority = Account::from_secret_key(seed);
+	let authority_pair = <sp_core::ecdsa::Pair as sp_core::Pair>::from_seed_slice(&seed).unwrap();
+
+	// Fund the authority so it can hold deposits
+	let tx = TransactionBuilder::new(client.clone())
+		.value(U256::from(10_000_000_000_000_000_000u128))
+		.to(authority.address())
+		.send()
+		.await?;
+	tx.wait_for_receipt().await?;
+
+	let chain_id = client.chain_id().await?;
+	let gas_price = client.gas_price().await?;
+
+	// --- Step 1: Delegate authority → Counter via 7702 tx ---
+	let auth_nonce = client
+		.get_transaction_count(authority.address(), BlockTag::Latest.into())
+		.await?;
+	let auth = pallet_revive::evm::eip7702::sign_authorization(
+		&authority_pair,
+		chain_id,
+		counter_addr,
+		auth_nonce,
+	);
+
+	let nonce = client.get_transaction_count(alith.address(), BlockTag::Latest.into()).await?;
+	// Use a generous gas limit since estimate_gas doesn't forward the authorization list.
+	let gas = U256::from(30_000_000u64);
+	let unsigned: TransactionUnsigned = Transaction7702Unsigned {
+		chain_id,
+		nonce,
+		gas,
+		gas_price,
+		max_fee_per_gas: gas_price,
+		to: alith.address(),
+		authorization_list: vec![auth],
+		..Default::default()
+	}
+	.into();
+	let signed = alith.sign_transaction(unsigned);
+	let hash = client.send_raw_transaction(signed.signed_payload().into()).await?;
+	SubmittedTransaction::from_raw(client.clone(), hash, gas)
+		.wait_for_receipt()
+		.await?;
+
+	// Verify delegation is active: eth_getCode should return the delegation indicator
+	let code = client.get_code(authority.address(), BlockTag::Latest.into()).await?;
+	let mut expected_prefix = vec![0xef, 0x01, 0x00];
+	expected_prefix.extend_from_slice(counter_addr.as_bytes());
+	assert_eq!(code.0, expected_prefix, "authority should have delegation indicator code");
+
+	// --- Step 2: Call setNumber(42) on the authority address ---
+	let tx = TransactionBuilder::new(client.clone())
+		.to(authority.address())
+		.input(Counter::setNumberCall { newNumber: 42u64 }.abi_encode())
+		.send()
+		.await?;
+	tx.wait_for_receipt().await?;
+
+	// --- Step 3: Read number() from authority → should return 42 ---
+	let result = TransactionBuilder::new(client.clone())
+		.to(authority.address())
+		.input(Counter::numberCall {}.abi_encode())
+		.eth_call()
+		.await?;
+	let number = Counter::numberCall::abi_decode_returns(&result).unwrap();
+	assert_eq!(number, 42u64, "number() should return 42 after setNumber");
+
+	// --- Step 4: Clear delegation via 7702 tx with zero address ---
+	let auth_nonce = client
+		.get_transaction_count(authority.address(), BlockTag::Latest.into())
+		.await?;
+	let clear_auth = pallet_revive::evm::eip7702::sign_authorization(
+		&authority_pair,
+		chain_id,
+		pallet_revive::evm::Address::zero(),
+		auth_nonce,
+	);
+
+	let nonce = client.get_transaction_count(alith.address(), BlockTag::Latest.into()).await?;
+	let unsigned: TransactionUnsigned = Transaction7702Unsigned {
+		chain_id,
+		nonce,
+		gas,
+		gas_price,
+		max_fee_per_gas: gas_price,
+		to: alith.address(),
+		authorization_list: vec![clear_auth],
+		..Default::default()
+	}
+	.into();
+	let signed = alith.sign_transaction(unsigned);
+	let hash = client.send_raw_transaction(signed.signed_payload().into()).await?;
+	SubmittedTransaction::from_raw(client.clone(), hash, gas)
+		.wait_for_receipt()
+		.await?;
+
+	// --- Step 5: Verify delegation is cleared ---
+	let code = client.get_code(authority.address(), BlockTag::Latest.into()).await?;
+	assert!(code.0.is_empty(), "authority should have no code after clearing delegation");
+
+	// Calling number() should return empty (no contract code)
+	let result = TransactionBuilder::new(client.clone())
+		.to(authority.address())
+		.input(Counter::numberCall {}.abi_encode())
+		.eth_call()
+		.await?;
+	assert!(result.is_empty(), "call to cleared delegation should return empty data");
 
 	Ok(())
 }

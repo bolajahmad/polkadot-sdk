@@ -150,7 +150,8 @@ impl<T: Config> AccountType<T> {
 	pub fn contract_info(self) -> Option<ContractInfo<T>> {
 		match self {
 			AccountType::Contract(info) => Some(info),
-			AccountType::EOA { contract_info, .. } => contract_info,
+			AccountType::EOA { delegate_target: Some(_), contract_info } => contract_info,
+			AccountType::EOA { delegate_target: None, .. } => None,
 		}
 	}
 }

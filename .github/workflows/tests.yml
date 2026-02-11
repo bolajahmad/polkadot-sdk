@@ -35,7 +35,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: script
-        run: forklift cargo run --locked --release -p staging-node-cli --bin substrate-node --features runtime-benchmarks --quiet -- benchmark pallet --chain dev --pallet "*" --extrinsic "*" --steps 2 --repeat 1 --quiet
+        run: forklift cargo run --locked --release -p staging-node-cli --bin substrate-node --features runtime-benchmarks --quiet -- benchmark pallet --chain dev --pallet "*" --extrinsic "*" --steps 2 --repeat 1 --min-duration 0 --quiet
 
   # cf https://github.com/paritytech/polkadot-sdk/issues/1652
   test-syscalls:

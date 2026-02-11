@@ -152,6 +152,8 @@ pub mod pallet {
 		UnknownOrigin,
 		/// The meta transaction is invalid.
 		Invalid,
+		/// The meta transaction length is invalid.
+		InvalidLength,
 	}
 
 	#[pallet::event]
@@ -177,7 +179,7 @@ pub mod pallet {
 		#[pallet::weight({
 			let dispatch_info = meta_tx.call.get_dispatch_info();
 			let extension_weight = meta_tx.extension.weight(&meta_tx.call);
-			let bare_call_weight = T::WeightInfo::bare_dispatch(core::mem::size_of_val(&*meta_tx) as u32);
+			let bare_call_weight = T::WeightInfo::bare_dispatch(*len);
 			(
 				dispatch_info.call_weight
 					.saturating_add(extension_weight)
@@ -188,18 +190,17 @@ pub mod pallet {
 		pub fn dispatch(
 			_origin: OriginFor<T>,
 			meta_tx: Box<MetaTxFor<T>>,
+			len: u32, // The size of the meta transaction in bytes.
 		) -> DispatchResultWithPostInfo {
 			let origin = SystemOrigin::None;
 			let meta_tx_size = meta_tx.encoded_size();
+			ensure!(meta_tx_size == len as usize, Error::<T>::InvalidLength);
 			// `info` with worst-case call weight and extension weight.
 			let info = {
 				let mut info = meta_tx.call.get_dispatch_info();
 				info.extension_weight = meta_tx.extension.weight(&meta_tx.call);
 				info
 			};
-
-			let meta_tx_len = core::mem::size_of_val(&*meta_tx) as u32;
-
 			// dispatch the meta transaction.
 			let meta_dispatch_res = meta_tx
 				.extension
@@ -220,7 +221,7 @@ pub mod pallet {
 				.unwrap_or(info.total_weight());
 
 			Ok((
-				Some(T::WeightInfo::bare_dispatch(meta_tx_len).saturating_add(meta_weight)),
+				Some(T::WeightInfo::bare_dispatch(meta_tx_size as u32).saturating_add(meta_weight)),
 				true.into(),
 			)
 				.into())

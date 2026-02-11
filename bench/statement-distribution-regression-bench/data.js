@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770827294895,
+  "lastUpdate": 1770835907733,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "13c89a63ced08a8a53248beda238b8ddd02b999d",
-          "message": "`sp-tracing`: Remove `test-utils` feature (#9063)\n\nThe crate is already exposing testing related features by default, so\nthere is no real need to hide the rest behind some feature. Also because\nof feature unification, the feature is enabled always in the workspace.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-02T22:21:51Z",
-          "tree_id": "ee36d6b238db7ed1ae04ae802ce20b18c138375a",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/13c89a63ced08a8a53248beda238b8ddd02b999d"
-        },
-        "date": 1751498835430,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.95999999999995,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.045031312913999956,
-            "unit": "seconds"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.03409913400200001,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.06649311403999988,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bruno.devic@parity.io",
+            "name": "BDevParity",
+            "username": "BDevParity"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b44a93e39116ba68656ed1e8b3354efcab54b588",
+          "message": "[Release|CI/CD] Automate publishing crates (#10913)",
+          "timestamp": "2026-02-11T17:43:31Z",
+          "tree_id": "7635021793139894efb864e32465109f0c2d78f0",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b44a93e39116ba68656ed1e8b3354efcab54b588"
+        },
+        "date": 1770835882899,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 128.04399999999998,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03829879264000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.0656688706099999,
             "unit": "seconds"
           }
         ]

@@ -1152,7 +1152,7 @@ impl FragmentChain {
 			return Err(Error::SchedulingParentNotInScope(
 				scheduling_parent,
 				relay_chain_scope.earliest_relay_parent().hash,
-			))
+			));
 		}
 
 		// Check if the relay parent moved backwards from the latest candidate pending availability.

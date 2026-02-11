@@ -648,7 +648,7 @@ impl Initialized {
 						?err,
 						"Could not retrieve scheduling session info from RuntimeInfo",
 					);
-					return Ok(())
+					return Ok(());
 				},
 			};
 

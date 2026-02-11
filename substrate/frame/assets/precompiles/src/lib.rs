@@ -37,10 +37,32 @@ use pallet_revive::precompiles::{
 };
 
 // ERC20Permit interface extension (EIP-2612)
-// Note: The permit pallet provides the storage and EIP-712 signature verification.
-// To use permit functionality, create a Solidity wrapper contract that calls
-// pallet-assets do_approve_transfer after verifying the permit signature using
-// the permit pallet functions.
+//
+// # Usage
+//
+// The permit pallet provides storage (nonces, domain separators) and EIP-712
+// signature verification for gasless approvals. To implement EIP-2612:
+//
+// 1. **Implement a precompile** that handles the following selectors:
+//    - `0xd505accf` - permit(address,address,uint256,uint256,uint8,bytes32,bytes32)
+//    - `0x7ecebe00` - nonces(address)
+//    - `0x3644e515` - DOMAIN_SEPARATOR()
+//
+// 2. **In the permit handler**, call `permit::Pallet::use_permit()` to:
+//    - Validate the deadline against current timestamp
+//    - Verify the ECDSA signature
+//    - Atomically increment the nonce (preventing replay attacks)
+//
+// 3. **After successful verification**, call `pallet_assets::Pallet::do_approve_transfer()`
+//    to set the actual approval.
+//
+// # Security Notes
+//
+// - **Always use `use_permit()`**, not `verify_permit()`, for state-changing operations.
+//   `verify_permit()` does not consume the permit and leaves it replayable.
+// - The `verifying_contract` parameter must be the precompile's address to ensure
+//   proper EIP-712 domain separation between different assets.
+// - Signatures with high `s` values are rejected to prevent malleability attacks.
 alloy::sol! {
 	interface IERC20Permit {
 		function permit(
@@ -79,7 +101,10 @@ mod tests;
 
 pub use foreign_assets::{pallet, pallet::Config as ForeignAssetsConfig, ForeignAssetId};
 pub use migration::{MigrateForeignAssetPrecompileMappings, MigrationState};
-pub use permit::{pallet::Config as PermitConfig, PERMIT_TYPEHASH};
+pub use permit::{
+	pallet::Config as PermitConfig, DIGEST_PREFIX_LEN, DOMAIN_SEPARATOR_ENCODED_LEN,
+	PERMIT_STRUCT_ENCODED_LEN, PERMIT_TYPEHASH, SECP256K1_N_DIV_2,
+};
 
 /// Mean of extracting the asset id from the precompile address.
 pub trait AssetIdExtractor {

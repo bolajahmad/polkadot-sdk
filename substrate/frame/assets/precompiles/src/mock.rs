@@ -39,6 +39,8 @@ mod runtime {
 	pub type System = frame_system;
 	#[runtime::pallet_index(10)]
 	pub type Balances = pallet_balances;
+	#[runtime::pallet_index(11)]
+	pub type Timestamp = pallet_timestamp;
 	#[runtime::pallet_index(20)]
 	pub type Assets = pallet_assets;
 	#[runtime::pallet_index(21)]
@@ -62,6 +64,17 @@ impl pallet_balances::Config for Test {
 	type AccountStore = System;
 }
 
+parameter_types! {
+	pub const MinimumPeriod: u64 = 1;
+}
+
+impl pallet_timestamp::Config for Test {
+	type Moment = u64;
+	type OnTimestampSet = ();
+	type MinimumPeriod = MinimumPeriod;
+	type WeightInfo = ();
+}
+
 #[derive_impl(pallet_assets::config_preludes::TestDefaultConfig as pallet_assets::DefaultConfig)]
 impl pallet_assets::Config for Test {
 	type CreateOrigin = AsEnsureOriginWithArg<frame_system::EnsureSigned<u64>>;
@@ -74,7 +87,9 @@ impl foreign_assets::pallet::Config for Test {
 }
 
 parameter_types! {
-	pub const ChainId: u64 = 1; // Ethereum mainnet chain ID for testing
+	/// Test chain ID - use a distinct value to avoid masking chain ID handling bugs.
+	/// 31337 is commonly used for local development chains (Hardhat default).
+	pub const ChainId: u64 = 31337;
 }
 
 impl permit::pallet::Config for Test {
@@ -108,6 +123,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut ext: sp_io::TestExternalities = t.into();
 	ext.execute_with(|| {
 		System::set_block_number(1);
+		// Set a reasonable timestamp for tests (e.g., 2024-01-01 00:00:00 UTC = 1704067200)
+		pallet_timestamp::Pallet::<Test>::set_timestamp(1704067200000);
 	});
 
 	ext

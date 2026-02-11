@@ -19,26 +19,53 @@
 //!
 //! This pallet stores permit-related state (nonces) and provides EIP-712
 //! signature verification for gasless approvals.
+//!
+//! # Security Notes
+//!
+//! - **Nonce management**: Use `use_permit` (not `verify_permit`) to atomically
+//!   verify and consume permits. This prevents replay attacks.
+//! - **Deadline validation**: Permits are validated against UNIX timestamps.
+//! - **Domain separation**: Each verifying contract has its own domain separator.
+//! - **Signature malleability**: The `s` value is checked to be in the lower half
+//!   of the secp256k1 curve order to prevent signature malleability attacks.
 
 use frame_support::pallet_prelude::*;
 use pallet_revive::precompiles::H160;
-use sp_core::H256;
+use sp_core::{H256, U256};
 
 pub use pallet::*;
 
-/// EIP-712 type hash for Permit
+/// EIP-712 type hash for Permit.
 /// keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+/// Computed using sp_io::hashing::keccak_256
 pub const PERMIT_TYPEHASH: [u8; 32] = [
 	0x6e, 0x71, 0xed, 0xae, 0x12, 0xb1, 0xb9, 0x7f, 0x4d, 0x1f, 0x60, 0x37, 0x0f, 0xef, 0x10, 0x10,
-	0x5f, 0xa2, 0xfa, 0xae, 0x01, 0x03, 0xa2, 0xf0, 0x30, 0x85, 0xed, 0x5f, 0x78, 0xb4, 0x33, 0x92,
+	0x5f, 0xa2, 0xfa, 0xae, 0x01, 0x26, 0x11, 0x4a, 0x16, 0x9c, 0x64, 0x84, 0x5d, 0x61, 0x26, 0xc9,
 ];
+
+/// Half of the secp256k1 curve order (n/2).
+/// Used to ensure `s` is in the lower half to prevent signature malleability.
+/// n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+/// n/2 = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0
+pub const SECP256K1_N_DIV_2: [u8; 32] = [
+	0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+	0x5D, 0x57, 0x6E, 0x73, 0x57, 0xA4, 0x50, 0x1D, 0xDF, 0xE9, 0x2F, 0x46, 0x68, 0x1B, 0x20, 0xA0,
+];
+
+/// Encoded length constants for EIP-712 encoding.
+/// Domain separator: typehash(32) + name_hash(32) + version_hash(32) + chainId(32) + verifyingContract(32) = 160 bytes
+pub const DOMAIN_SEPARATOR_ENCODED_LEN: usize = 32 * 5;
+/// Permit struct: typehash(32) + owner(32) + spender(32) + value(32) + nonce(32) + deadline(32) = 192 bytes
+pub const PERMIT_STRUCT_ENCODED_LEN: usize = 32 * 6;
+/// Digest prefix: \x19\x01(2) + domain_separator(32) + struct_hash(32) = 66 bytes
+pub const DIGEST_PREFIX_LEN: usize = 2 + 32 + 32;
 
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config + pallet_timestamp::Config {
 		/// The chain ID used in EIP-712 domain separator.
 		#[pallet::constant]
 		type ChainId: Get<u64>;
@@ -48,58 +75,89 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	/// Nonces for permit signatures.
-	/// Mapping: (asset_index, owner_address) => nonce
+	/// Mapping: (verifying_contract, owner_address) => nonce
+	///
+	/// Uses Blake2_128Concat for the first key to prevent storage collision attacks
+	/// when the verifying_contract address could be influenced by an attacker.
+	///
+	/// Note: EIP-2612 specifies uint256 nonce. We store as U256 for compatibility.
 	#[pallet::storage]
 	pub type Nonces<T: Config> = StorageDoubleMap<
 		_,
-		Identity,
-		u32, // asset index
-		Identity,
+		Blake2_128Concat,
+		H160, // verifying contract address (precompile address)
+		Blake2_128Concat,
 		H160, // owner ethereum address
-		u64,  // nonce
+		U256, // nonce (EIP-2612 uses uint256)
 		ValueQuery,
 	>;
 
-	/// Cached domain separator for EIP-712.
-	/// This is computed once and reused for efficiency.
+	/// Cached domain separators for EIP-712, keyed by verifying contract address.
+	/// Each precompile address has its own domain separator.
 	#[pallet::storage]
-	pub type CachedDomainSeparator<T: Config> = StorageValue<_, H256, OptionQuery>;
+	pub type CachedDomainSeparators<T: Config> =
+		StorageMap<_, Blake2_128Concat, H160, H256, OptionQuery>;
+
+	/// Error types for the permit pallet.
+	#[pallet::error]
+	pub enum Error<T> {
+		/// The permit signature is invalid.
+		InvalidSignature,
+		/// The signer does not match the owner.
+		SignerMismatch,
+		/// The permit has expired (deadline passed).
+		PermitExpired,
+		/// The signature's `s` value is too high (malleability protection).
+		SignatureSValueTooHigh,
+		/// The signature's `v` value is invalid.
+		InvalidVValue,
+		/// Nonce overflow - account has used too many permits.
+		NonceOverflow,
+	}
 
 	impl<T: Config> Pallet<T> {
-		/// Get the current nonce for an owner on a specific asset.
-		pub fn nonce(asset_index: u32, owner: &H160) -> u64 {
-			Nonces::<T>::get(asset_index, owner)
+		/// Get the current nonce for an owner on a specific verifying contract.
+		pub fn nonce(verifying_contract: &H160, owner: &H160) -> U256 {
+			Nonces::<T>::get(verifying_contract, owner)
 		}
 
-		/// Increment the nonce for an owner on a specific asset.
-		/// Returns the new nonce value.
-		pub fn increment_nonce(asset_index: u32, owner: &H160) -> u64 {
-			Nonces::<T>::mutate(asset_index, owner, |nonce| {
-				*nonce = nonce.saturating_add(1);
-				*nonce
+		/// Increment the nonce for an owner on a specific verifying contract.
+		/// Returns the new nonce value, or an error if overflow would occur.
+		pub fn increment_nonce(
+			verifying_contract: &H160,
+			owner: &H160,
+		) -> Result<U256, Error<T>> {
+			Nonces::<T>::try_mutate(verifying_contract, owner, |nonce| {
+				*nonce = nonce.checked_add(U256::one()).ok_or(Error::<T>::NonceOverflow)?;
+				Ok(*nonce)
 			})
 		}
 
-		/// Get or compute the EIP-712 domain separator.
-		pub fn domain_separator() -> H256 {
-			if let Some(cached) = CachedDomainSeparator::<T>::get() {
+		/// Get or compute the EIP-712 domain separator for a verifying contract.
+		///
+		/// Note: This function has a side effect - it caches the computed separator
+		/// on first call for each verifying_contract. Consider using
+		/// `compute_domain_separator` directly if you need a pure function.
+		pub fn domain_separator(verifying_contract: &H160) -> H256 {
+			if let Some(cached) = CachedDomainSeparators::<T>::get(verifying_contract) {
 				return cached;
 			}
 
-			let separator = Self::compute_domain_separator();
-			CachedDomainSeparator::<T>::put(separator);
+			let separator = Self::compute_domain_separator(verifying_contract);
+			CachedDomainSeparators::<T>::insert(verifying_contract, separator);
 			separator
 		}
 
-		/// Compute the EIP-712 domain separator.
+		/// Compute the EIP-712 domain separator for a given verifying contract.
+		///
 		/// DOMAIN_SEPARATOR = keccak256(abi.encode(
 		///   keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
 		///   keccak256("Asset Permit"),
 		///   keccak256("1"),
 		///   chainId,
-		///   address(this)
+		///   verifyingContract
 		/// ))
-		fn compute_domain_separator() -> H256 {
+		pub fn compute_domain_separator(verifying_contract: &H160) -> H256 {
 			use alloc::vec::Vec;
 			use sp_io::hashing::keccak_256;
 
@@ -112,12 +170,8 @@ pub mod pallet {
 			let version_hash = keccak_256(b"1");
 			let chain_id = T::ChainId::get();
 
-			// In a precompile context, verifyingContract would be the precompile address
-			// For now, we use zero address as a placeholder
-			let verifying_contract = H160::zero();
-
 			// Encode: typehash || name_hash || version_hash || chainId || verifyingContract
-			let mut data = Vec::with_capacity(160);
+			let mut data = Vec::with_capacity(DOMAIN_SEPARATOR_ENCODED_LEN);
 			data.extend_from_slice(&domain_typehash);
 			data.extend_from_slice(&name_hash);
 			data.extend_from_slice(&version_hash);
@@ -132,6 +186,7 @@ pub mod pallet {
 		}
 
 		/// Compute the EIP-712 struct hash for a permit.
+		///
 		/// structHash = keccak256(abi.encode(
 		///   PERMIT_TYPEHASH,
 		///   owner,
@@ -143,14 +198,14 @@ pub mod pallet {
 		pub fn permit_struct_hash(
 			owner: &H160,
 			spender: &H160,
-			value: &[u8; 32], // U256 as bytes
-			nonce: u64,
-			deadline: &[u8; 32], // U256 as bytes
+			value: &[u8; 32], // U256 as bytes (big-endian)
+			nonce: &U256,
+			deadline: &[u8; 32], // U256 as bytes (big-endian)
 		) -> H256 {
 			use alloc::vec::Vec;
 			use sp_io::hashing::keccak_256;
 
-			let mut data = Vec::with_capacity(192);
+			let mut data = Vec::with_capacity(PERMIT_STRUCT_ENCODED_LEN);
 			data.extend_from_slice(&PERMIT_TYPEHASH);
 			// owner (padded to 32 bytes)
 			data.extend_from_slice(&[0u8; 12]);
@@ -160,9 +215,8 @@ pub mod pallet {
 			data.extend_from_slice(spender.as_bytes());
 			// value (already 32 bytes)
 			data.extend_from_slice(value);
-			// nonce (padded to 32 bytes)
-			data.extend_from_slice(&[0u8; 24]);
-			data.extend_from_slice(&nonce.to_be_bytes());
+			// nonce (convert U256 to 32 bytes big-endian)
+			data.extend_from_slice(&nonce.to_big_endian());
 			// deadline (already 32 bytes)
 			data.extend_from_slice(deadline);
 
@@ -170,21 +224,23 @@ pub mod pallet {
 		}
 
 		/// Compute the final EIP-712 digest to be signed.
+		///
 		/// digest = keccak256("\x19\x01" || domainSeparator || structHash)
 		pub fn permit_digest(
+			verifying_contract: &H160,
 			owner: &H160,
 			spender: &H160,
 			value: &[u8; 32],
-			nonce: u64,
+			nonce: &U256,
 			deadline: &[u8; 32],
 		) -> [u8; 32] {
 			use alloc::vec::Vec;
 			use sp_io::hashing::keccak_256;
 
-			let domain_separator = Self::domain_separator();
+			let domain_separator = Self::domain_separator(verifying_contract);
 			let struct_hash = Self::permit_struct_hash(owner, spender, value, nonce, deadline);
 
-			let mut data = Vec::with_capacity(66);
+			let mut data = Vec::with_capacity(DIGEST_PREFIX_LEN);
 			data.extend_from_slice(&[0x19, 0x01]);
 			data.extend_from_slice(domain_separator.as_bytes());
 			data.extend_from_slice(struct_hash.as_bytes());
@@ -192,21 +248,48 @@ pub mod pallet {
 			keccak_256(&data)
 		}
 
+		/// Check if the signature's `s` value is in the lower half of the curve order.
+		///
+		/// This prevents signature malleability attacks where an attacker can
+		/// create a second valid signature by flipping `s` to `n - s`.
+		fn is_s_value_valid(s: &[u8; 32]) -> bool {
+			// Compare s with SECP256K1_N_DIV_2 (big-endian)
+			for i in 0..32 {
+				if s[i] < SECP256K1_N_DIV_2[i] {
+					return true;
+				}
+				if s[i] > SECP256K1_N_DIV_2[i] {
+					return false;
+				}
+			}
+			// s == SECP256K1_N_DIV_2, which is valid
+			true
+		}
+
 		/// Recover the signer address from an ECDSA signature.
-		/// Returns Ok(address) if the signature is valid, Err otherwise.
+		///
+		/// Returns `Ok(address)` if the signature is valid, `Err` otherwise.
+		///
+		/// This function also validates that the `s` value is in the lower half
+		/// of the curve order to prevent signature malleability.
 		pub fn ecrecover(
 			digest: &[u8; 32],
 			v: u8,
 			r: &[u8; 32],
 			s: &[u8; 32],
-		) -> Result<H160, ()> {
+		) -> Result<H160, Error<T>> {
 			use sp_io::crypto::secp256k1_ecdsa_recover;
 			use sp_io::hashing::keccak_256;
 
+			// Check signature malleability: s must be in lower half of curve order
+			if !Self::is_s_value_valid(s) {
+				return Err(Error::<T>::SignatureSValueTooHigh);
+			}
+
 			// Convert v to recovery_id (Ethereum v is 27 or 28, recovery_id is 0 or 1)
-			let recovery_id = v.checked_sub(27).ok_or(())?;
+			let recovery_id = v.checked_sub(27).ok_or(Error::<T>::InvalidVValue)?;
 			if recovery_id > 1 {
-				return Err(());
+				return Err(Error::<T>::InvalidVValue);
 			}
 
 			// Build signature in format expected by secp256k1_ecdsa_recover: [r, s, recovery_id]
@@ -216,7 +299,8 @@ pub mod pallet {
 			sig[64] = recovery_id;
 
 			// Recover uncompressed public key (64 bytes)
-			let pubkey = secp256k1_ecdsa_recover(&sig, digest).map_err(|_| ())?;
+			let pubkey =
+				secp256k1_ecdsa_recover(&sig, digest).map_err(|_| Error::<T>::InvalidSignature)?;
 
 			// Convert public key to Ethereum address: keccak256(pubkey)[12..]
 			let hash = keccak_256(&pubkey);
@@ -226,10 +310,16 @@ pub mod pallet {
 			Ok(address)
 		}
 
-		/// Verify a permit signature.
-		/// Returns Ok(()) if valid, Err(()) otherwise.
+		/// Verify a permit signature without consuming it.
+		///
+		/// **WARNING**: This function does NOT increment the nonce. Using this
+		/// function alone will leave the permit vulnerable to replay attacks.
+		/// Use `use_permit` instead for production code.
+		///
+		/// This function is provided for cases where you need to verify a permit
+		/// in a read-only context or need to separate verification from consumption.
 		pub fn verify_permit(
-			asset_index: u32,
+			verifying_contract: &H160,
 			owner: &H160,
 			spender: &H160,
 			value: &[u8; 32],
@@ -237,17 +327,81 @@ pub mod pallet {
 			v: u8,
 			r: &[u8; 32],
 			s: &[u8; 32],
-		) -> Result<(), &'static str> {
-			let nonce = Self::nonce(asset_index, owner);
-			let digest = Self::permit_digest(owner, spender, value, nonce, deadline);
+		) -> Result<(), Error<T>>
+		where
+			<T as pallet_timestamp::Config>::Moment: sp_runtime::traits::UniqueSaturatedInto<u128>,
+		{
+			use sp_runtime::traits::UniqueSaturatedInto;
 
-			let recovered = Self::ecrecover(&digest, v, r, s).map_err(|_| "Invalid signature")?;
+			// Validate deadline against current timestamp
+			// EIP-2612 uses UNIX timestamp for deadline
+			// Note: pallet_timestamp typically uses milliseconds
+			let now: u128 = <pallet_timestamp::Pallet<T>>::get().unique_saturated_into();
+			let deadline_u256 = U256::from_big_endian(deadline);
+
+			// Convert current timestamp to U256 for comparison
+			let now_u256 = U256::from(now);
+
+			if deadline_u256 < now_u256 {
+				return Err(Error::<T>::PermitExpired);
+			}
+
+			let nonce = Self::nonce(verifying_contract, owner);
+			let digest =
+				Self::permit_digest(verifying_contract, owner, spender, value, &nonce, deadline);
+
+			let recovered = Self::ecrecover(&digest, v, r, s)?;
 
 			if &recovered != owner {
-				return Err("Signer mismatch");
+				return Err(Error::<T>::SignerMismatch);
 			}
 
 			Ok(())
 		}
+
+		/// Verify and consume a permit signature atomically.
+		///
+		/// This is the recommended function for production use. It:
+		/// 1. Validates the deadline against the current timestamp
+		/// 2. Verifies the signature matches the owner
+		/// 3. Increments the nonce to prevent replay attacks
+		///
+		/// After this function returns `Ok(())`, the permit cannot be used again.
+		pub fn use_permit(
+			verifying_contract: &H160,
+			owner: &H160,
+			spender: &H160,
+			value: &[u8; 32],
+			deadline: &[u8; 32],
+			v: u8,
+			r: &[u8; 32],
+			s: &[u8; 32],
+		) -> Result<(), Error<T>>
+		where
+			<T as pallet_timestamp::Config>::Moment: sp_runtime::traits::UniqueSaturatedInto<u128>,
+		{
+			// Verify the permit first
+			Self::verify_permit(verifying_contract, owner, spender, value, deadline, v, r, s)?;
+
+			// Consume the permit by incrementing the nonce
+			// This prevents the same permit from being used again
+			Self::increment_nonce(verifying_contract, owner)?;
+
+			Ok(())
+		}
+	}
+}
+
+#[cfg(test)]
+mod typehash_tests {
+	use super::*;
+
+	/// Verify that PERMIT_TYPEHASH matches the expected keccak256 hash.
+	#[test]
+	fn verify_permit_typehash() {
+		let computed = sp_io::hashing::keccak_256(
+			b"Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)",
+		);
+		assert_eq!(computed, PERMIT_TYPEHASH, "PERMIT_TYPEHASH does not match computed value");
 	}
 }

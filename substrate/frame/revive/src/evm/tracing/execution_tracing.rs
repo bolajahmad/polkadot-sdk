@@ -15,13 +15,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::{
+	DispatchError, ExecReturnValue, Key, Weight,
 	evm::{
-		tracing::Tracing, Bytes, ExecutionStep, ExecutionStepKind, ExecutionTrace,
-		ExecutionTracerConfig,
+		Bytes, ExecutionStep, ExecutionStepKind, ExecutionTrace, ExecutionTracerConfig,
+		tracing::Tracing,
 	},
 	tracing::{EVMFrameTraceInfo, FrameTraceInfo},
 	vm::pvm::env::lookup_syscall_index,
-	DispatchError, ExecReturnValue, Key, Weight,
 };
 use alloc::{
 	collections::BTreeMap,

@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770835839674,
+  "lastUpdate": 1770892265122,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "oliver.tale-yazdi@parity.io",
-            "name": "Oliver Tale-Yazdi",
-            "username": "ggwpez"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "22714211e4f558abbabae28fc2e8f2c971143638",
-          "message": "[AHM] Derive DecodeWithMemTracking and pub fields (#9067)\n\n- Derive `DecodeWithMemTracking` on structs\n- Make some fields public\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
-          "timestamp": "2025-07-04T10:36:12Z",
-          "tree_id": "0dd0655d92d837e407ee908f523b783ecccc626a",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/22714211e4f558abbabae28fc2e8f2c971143638"
-        },
-        "date": 1751629812606,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.02273290912666667,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013155547026666665,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1576928561066667,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.009164909020000094,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-store",
             "value": 0.14530333858666672,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "skunert49@gmail.com",
+            "name": "Sebastian Kunert",
+            "username": "skunert"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e793fe2670b8c3eacaded7d1ed4f3863e8123c1",
+          "message": "Fix link-checker job: I am not giving up (#11049)\n\nFollow up of https://github.com/paritytech/polkadot-sdk/pull/11038\n\nEven though the job passed in my last PR, I missed this broken link. So\nhere we go again.",
+          "timestamp": "2026-02-12T09:20:55Z",
+          "tree_id": "a499a9c85c9baffb696cb1c1657e470499bc573e",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/1e793fe2670b8c3eacaded7d1ed4f3863e8123c1"
+        },
+        "date": 1770892240737,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009669477979999981,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14601010599333336,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.02324295162666667,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007001020046666667,
             "unit": "seconds"
           }
         ]

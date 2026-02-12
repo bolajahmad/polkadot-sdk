@@ -420,10 +420,12 @@ pub(crate) mod tests {
 		pallet_session::GenesisConfig::<Test> { keys, ..Default::default() }
 			.assimilate_storage(&mut t)
 			.unwrap();
-		BasicExternalities::execute_with_storage(&mut t, || {
+		let mut ext = sp_io::TestExternalities::new(t);
+		ext.execute_with(|| {
 			Session::on_genesis();
 		});
-		sp_io::TestExternalities::new(t)
+		ext.commit_all().expect("Failed to commit on_genesis changes");
+		ext
 	}
 
 	#[test]

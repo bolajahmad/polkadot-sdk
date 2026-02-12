@@ -175,11 +175,11 @@ mod tests {
 			.assimilate_storage(&mut t)
 			.unwrap();
 
-		BasicExternalities::execute_with_storage(&mut t, || {
+		let mut ext = sp_io::TestExternalities::new(t);
+		ext.execute_with(|| {
 			Session::on_genesis();
 		});
-
-		let mut ext = sp_io::TestExternalities::new(t);
+		ext.commit_all().expect("Failed to commit on_genesis changes");
 
 		let (offchain, offchain_state) = TestOffchainExt::with_offchain_db(ext.offchain_db());
 

@@ -11913,7 +11913,6 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-staking",
- "sp-state-machine",
  "sp-tracing 16.0.0",
 ]
 
@@ -12554,7 +12553,6 @@ dependencies = [
  "sp-runtime",
  "sp-session",
  "sp-staking",
- "sp-state-machine",
  "sp-tracing 16.0.0",
 ]
 
@@ -14409,7 +14407,6 @@ dependencies = [
  "sp-core 28.0.0",
  "sp-io",
  "sp-runtime",
- "sp-state-machine",
  "sp-tracing 16.0.0",
  "staging-parachain-info",
  "staging-xcm",

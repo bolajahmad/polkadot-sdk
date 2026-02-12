@@ -202,11 +202,11 @@ pub fn new_test_ext_raw_authorities(authorities: Vec<(u64, BeefyId)>) -> TestExt
 		.assimilate_storage(&mut t)
 		.unwrap();
 
-	BasicExternalities::execute_with_storage(&mut t, || {
+	let mut ext: TestExternalities = t.into();
+	ext.execute_with(|| {
 		<pallet_session::Pallet<Test> as OnGenesis>::on_genesis();
 	});
-
-	let mut ext: TestExternalities = t.into();
+	ext.commit_all().expect("Failed to commit on_genesis changes");
 	let (offchain, _offchain_state) = TestOffchainExt::with_offchain_db(ext.offchain_db());
 	ext.register_extension(OffchainDbExt::new(offchain.clone()));
 	ext.register_extension(OffchainWorkerExt::new(offchain));

@@ -23,7 +23,6 @@ use frame_support::{
 use frame_system as system;
 use frame_system::EnsureSignedBy;
 use sp_runtime::{testing::UintAuthorityId, traits::OpaqueKeys, BuildStorage, RuntimeAppPublic};
-use sp_state_machine::BasicExternalities;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -209,11 +208,12 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	collator_selection.assimilate_storage(&mut t).unwrap();
 	session.assimilate_storage(&mut t).unwrap();
 
-	BasicExternalities::execute_with_storage(&mut t, || {
+	let mut ext: sp_io::TestExternalities = t.into();
+	ext.execute_with(|| {
 		<pallet_session::Pallet<Test> as OnGenesis>::on_genesis();
 	});
-
-	t.into()
+	ext.commit_all().expect("Failed to commit on_genesis changes");
+	ext
 }
 
 pub fn initialize_to_block(n: u64) {

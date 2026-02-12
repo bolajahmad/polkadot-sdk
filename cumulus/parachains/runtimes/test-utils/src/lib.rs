@@ -41,7 +41,6 @@ use sp_runtime::{
 	traits::{Dispatchable, Header},
 	BuildStorage, Digest, DigestItem, DispatchError, Either, SaturatedConversion,
 };
-use sp_state_machine::BasicExternalities;
 use xcm::{
 	latest::{Asset, Location, XcmContext, XcmHash},
 	prelude::*,
@@ -254,10 +253,11 @@ impl<Runtime: BasicParachainRuntime> ExtBuilder<Runtime> {
 			.assimilate_storage(&mut t)
 			.unwrap();
 
-		BasicExternalities::execute_with_storage(&mut t, || {
+		let mut ext = sp_io::TestExternalities::new(t);
+		ext.execute_with(|| {
 			<pallet_session::Pallet<Runtime> as OnGenesis>::on_genesis();
 		});
-		let mut ext = sp_io::TestExternalities::new(t);
+		ext.commit_all().expect("Failed to commit on_genesis changes");
 
 		ext.execute_with(|| {
 			frame_system::Pallet::<Runtime>::set_block_number(1u32.into());

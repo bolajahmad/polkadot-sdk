@@ -36,7 +36,6 @@ use sp_runtime::{
 	BuildStorage,
 };
 use sp_staking::SessionIndex;
-use sp_state_machine::BasicExternalities;
 
 use std::collections::BTreeMap;
 
@@ -265,13 +264,15 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	pallet_session::GenesisConfig::<Test> { keys, ..Default::default() }
 		.assimilate_storage(&mut t)
 		.unwrap();
-	BasicExternalities::execute_with_storage(&mut t, || {
-		<pallet_session::Pallet<Test> as Hooks<BlockNumberFor<Test>>>::on_genesis();
-	});
-
 	let v = NextValidators::get().iter().map(|&i| (i, i)).collect();
 	ValidatorAccounts::mutate(|m| *m = v);
-	sp_io::TestExternalities::new(t)
+
+	let mut ext = sp_io::TestExternalities::new(t);
+	ext.execute_with(|| {
+		<pallet_session::Pallet<Test> as Hooks<BlockNumberFor<Test>>>::on_genesis();
+	});
+	ext.commit_all().expect("Failed to commit on_genesis changes");
+	ext
 }
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]

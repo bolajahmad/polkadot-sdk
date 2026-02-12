@@ -318,11 +318,12 @@ impl ExtBuilder {
 
 		staking_config.assimilate_storage(&mut t).unwrap();
 
-		BasicExternalities::execute_with_storage(&mut t, || {
+		let mut ext: sp_io::TestExternalities = t.into();
+		ext.execute_with(|| {
 			<pallet_session::Pallet<Test> as OnGenesis>::on_genesis();
 		});
-
-		t.into()
+		ext.commit_all().expect("Failed to commit on_genesis changes");
+		ext
 	}
 
 	pub fn build_and_execute(self, test: impl FnOnce() -> ()) {

@@ -229,7 +229,6 @@ where
 			.map_err(|_| Error::Revert(Revert { reason: ERR_BALANCE_CONVERSION_FAILED.into() }))
 	}
 
-	/// Deposit an event to the runtime.
 	fn deposit_event(env: &mut impl Ext<T = Runtime>, event: IERC20Events) -> Result<(), Error> {
 		let (topics, data) = event.into_log_data().split();
 		let topics = topics.into_iter().map(|v| H256(v.0)).collect::<Vec<_>>();
@@ -241,7 +240,6 @@ where
 		Ok(())
 	}
 
-	/// Execute the transfer call.
 	fn transfer(
 		asset_id: <Runtime as Config<Instance>>::AssetId,
 		call: &IERC20::transferCall,
@@ -276,7 +274,6 @@ where
 		return Ok(IERC20::transferCall::abi_encode_returns(&true));
 	}
 
-	/// Execute the total supply call.
 	fn total_supply(
 		asset_id: <Runtime as Config<Instance>>::AssetId,
 		env: &mut impl Ext<T = Runtime>,
@@ -289,7 +286,6 @@ where
 		return Ok(IERC20::totalSupplyCall::abi_encode_returns(&value));
 	}
 
-	/// Execute the balance_of call.
 	fn balance_of(
 		asset_id: <Runtime as Config<Instance>>::AssetId,
 		call: &IERC20::balanceOfCall,
@@ -303,7 +299,6 @@ where
 		return Ok(IERC20::balanceOfCall::abi_encode_returns(&value));
 	}
 
-	/// Execute the allowance call.
 	fn allowance(
 		asset_id: <Runtime as Config<Instance>>::AssetId,
 		call: &IERC20::allowanceCall,
@@ -323,7 +318,6 @@ where
 		return Ok(IERC20::balanceOfCall::abi_encode_returns(&value));
 	}
 
-	/// Execute the approve call.
 	fn approve(
 		asset_id: <Runtime as Config<Instance>>::AssetId,
 		call: &IERC20::approveCall,
@@ -353,7 +347,6 @@ where
 		return Ok(IERC20::approveCall::abi_encode_returns(&true));
 	}
 
-	/// Execute the transfer_from call.
 	fn transfer_from(
 		asset_id: <Runtime as Config<Instance>>::AssetId,
 		call: &IERC20::transferFromCall,
@@ -489,7 +482,7 @@ where
 		// TODO: Add proper weight for domain separator computation
 		env.charge(<Runtime as Config<Instance>>::WeightInfo::balance())?;
 
-		let separator = permit::Pallet::<Runtime>::domain_separator(&verifying_contract);
+		let separator = permit::Pallet::<Runtime>::compute_domain_separator(&verifying_contract);
 		let separator_alloy: alloy::primitives::FixedBytes<32> = separator.0.into();
 
 		Ok(IERC20::DOMAIN_SEPARATORCall::abi_encode_returns(&separator_alloy))

@@ -94,12 +94,6 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Cached domain separators for EIP-712, keyed by verifying contract address.
-	/// Each precompile address has its own domain separator.
-	#[pallet::storage]
-	pub type CachedDomainSeparators<T: Config> =
-		StorageMap<_, Blake2_128Concat, H160, H256, OptionQuery>;
-
 	/// Error types for the permit pallet.
 	#[pallet::error]
 	pub enum Error<T> {
@@ -130,21 +124,6 @@ pub mod pallet {
 				*nonce = nonce.checked_add(U256::one()).ok_or(Error::<T>::NonceOverflow)?;
 				Ok(*nonce)
 			})
-		}
-
-		/// Get or compute the EIP-712 domain separator for a verifying contract.
-		///
-		/// Note: This function has a side effect - it caches the computed separator
-		/// on first call for each verifying_contract. Consider using
-		/// `compute_domain_separator` directly if you need a pure function.
-		pub fn domain_separator(verifying_contract: &H160) -> H256 {
-			if let Some(cached) = CachedDomainSeparators::<T>::get(verifying_contract) {
-				return cached;
-			}
-
-			let separator = Self::compute_domain_separator(verifying_contract);
-			CachedDomainSeparators::<T>::insert(verifying_contract, separator);
-			separator
 		}
 
 		/// Compute the EIP-712 domain separator for a given verifying contract.
@@ -236,7 +215,7 @@ pub mod pallet {
 			use alloc::vec::Vec;
 			use sp_io::hashing::keccak_256;
 
-			let domain_separator = Self::domain_separator(verifying_contract);
+			let domain_separator = Self::compute_domain_separator(verifying_contract);
 			let struct_hash = Self::permit_struct_hash(owner, spender, value, nonce, deadline);
 
 			let mut data = Vec::with_capacity(DIGEST_PREFIX_LEN);
@@ -316,7 +295,7 @@ pub mod pallet {
 		///
 		/// This function is provided for cases where you need to verify a permit
 		/// in a read-only context or need to separate verification from consumption.
-		pub fn verify_permit(
+		pub(crate) fn verify_permit(
 			verifying_contract: &H160,
 			owner: &H160,
 			spender: &H160,

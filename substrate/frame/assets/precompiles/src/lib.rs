@@ -515,11 +515,3 @@ where
 		Ok(IERC20::DOMAIN_SEPARATORCall::abi_encode_returns(&separator_alloy))
 	}
 }
-
-/// Type alias for backwards compatibility with existing code that expects
-/// a separate ERC20WithPermit type. The base ERC20 type already includes
-/// full EIP-2612 permit support, so this alias exists solely to maintain
-/// API compatibility during migration from pre-permit implementations.
-#[deprecated(note = "Use ERC20 directly, which includes permit support")]
-type ERC20WithPermit<Runtime, PrecompileConfig, Instance = ()> =
-	ERC20<Runtime, PrecompileConfig, Instance>;

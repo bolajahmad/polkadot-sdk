@@ -2272,15 +2272,16 @@ mod remote_test {
 	///
 	/// Run with:
 	/// ```bash
-	/// SNAP=<PATH_TO_SNAP> cargo test -r -p asset-hub-westend-runtime claim_trapped_balance \
+	/// SNAP=<PATH_TO_SNAP> cargo test -r -p asset-hub-westend-runtime np_claim_trapped_balance \
 	/// -- --ignored --nocapture
 	/// ```
 	///
-	/// Note: If you want to test this with PAH snapshot, ensure WAH staking pallet indices align
-	/// with PAH.
+	/// Note: If you want to test this with PAH snapshot, ensure (locally, DO NOT COMMIT) WAH
+	/// staking pallet indices align with PAH. Also, ensure WAH ED is same as PAH (decrease it by
+	/// 10x in `../../../constants/src/westend.rs`).
 	#[tokio::test]
 	#[ignore]
-	async fn claim_trapped_balance() {
+	async fn np_claim_trapped_balance() {
 		use remote_externalities::{Builder, Mode, OfflineConfig, SnapshotConfig};
 		use pallet_nomination_pools::PoolMembers;
 

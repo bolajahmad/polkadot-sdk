@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770892331125,
+  "lastUpdate": 1770894878912,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "eresav@me.com",
-            "name": "Andrei Eres",
-            "username": "AndreiEres"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "83b0409093f811acb412b07ac7219b7ad1a514ff",
-          "message": "[subsystem-bench] Add Dispute Coordinator subsystem benchmark (#8828)\n\nFixes https://github.com/paritytech/polkadot-sdk/issues/8811\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-03T12:22:23Z",
-          "tree_id": "7dedca9f4f5317f038bb7713852df1f21eeee806",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/83b0409093f811acb412b07ac7219b7ad1a514ff"
-        },
-        "date": 1751549411025,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 127.95199999999994,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04537352055399995,
-            "unit": "seconds"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.034477675538000005,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.03824137674800002,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@kchr.de",
+            "name": "Bastian Köcher",
+            "username": "bkchr"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "890e5eb532e88c414843393aea3f20c2b0ffe14e",
+          "message": "tracing-subscriber: Pin version to prevent ANSI colour code issues (#11053)\n\nLatest version of tracing-subscriber right now doesn't support ASNI\ncolour codes correctly: https://github.com/tokio-rs/tracing/issues/3378\n\nSo, the workaround right now is to pin it to `0.3.19`.\n\n\nCloses: https://github.com/paritytech/polkadot-sdk/issues/11030\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-12T10:01:27Z",
+          "tree_id": "5bb773a013effddfaef860fda55071ee698cc140",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/890e5eb532e88c414843393aea3f20c2b0ffe14e"
+        },
+        "date": 1770894854657,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 128.10399999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06692709601399989,
+            "unit": "seconds"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03749505007999999,
             "unit": "seconds"
           }
         ]

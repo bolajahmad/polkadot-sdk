@@ -360,8 +360,7 @@ fn prestate_diff_mode_tracing_works() {
 						"nonce": 2,
 						"code": "{{CONTRACT_CODE}}",
 						"storage": {
-							"0x0000000000000000000000000000000000000000000000000000000000000000": "{{CHILD_ADDR_PADDED}}",
-							"0x0000000000000000000000000000000000000000000000000000000000000001": "0x0000000000000000000000000000000000000000000000000000000000000007"
+							"0x0000000000000000000000000000000000000000000000000000000000000000": "{{SLOT0_PACKED_7}}"
 						}
 					},
 					"{{CHILD_ADDR}}": {
@@ -396,8 +395,7 @@ fn prestate_diff_mode_tracing_works() {
 							"nonce": 2,
 							"code": "{{CONTRACT_CODE}}",
 							"storage": {
-								"0x0000000000000000000000000000000000000000000000000000000000000000": "{{CHILD_ADDR_PADDED}}",
-								"0x0000000000000000000000000000000000000000000000000000000000000001": "0x0000000000000000000000000000000000000000000000000000000000000007"
+								"0x0000000000000000000000000000000000000000000000000000000000000000": "{{SLOT0_PACKED_7}}"
 							}
 						},
 						"{{CHILD_ADDR}}": {
@@ -417,7 +415,7 @@ fn prestate_diff_mode_tracing_works() {
 							"nonce": 2,
 							"code": "{{CONTRACT_CODE}}",
 							"storage": {
-								"0x0000000000000000000000000000000000000000000000000000000000000001": "0x0000000000000000000000000000000000000000000000000000000000000007"
+								"0x0000000000000000000000000000000000000000000000000000000000000000": "{{SLOT0_PACKED_7}}"
 							}
 						},
 						"{{CHILD_ADDR}}": {
@@ -432,7 +430,7 @@ fn prestate_diff_mode_tracing_works() {
 					"post": {
 						"{{CONTRACT_ADDR}}": {
 							"storage": {
-								"0x0000000000000000000000000000000000000000000000000000000000000001": "0x0000000000000000000000000000000000000000000000000000000000000008"
+								"0x0000000000000000000000000000000000000000000000000000000000000000": "{{SLOT0_PACKED_8}}"
 							}
 						},
 						"{{CHILD_ADDR}}": {
@@ -460,8 +458,13 @@ fn prestate_diff_mode_tracing_works() {
 			let replace_placeholders = |json: &str| -> String {
 				let alice_balance_post = Pallet::<Test>::evm_balance(&ALICE_ADDR);
 
-				let mut child_addr_bytes = [0u8; 32];
-				child_addr_bytes[12..32].copy_from_slice(child_addr.as_bytes());
+				// Packed slot 0: [4 zero bytes][uint64 number BE][20-byte address]
+				let slot0_packed = |number: u64| -> String {
+					let mut slot = [0u8; 32];
+					slot[4..12].copy_from_slice(&number.to_be_bytes());
+					slot[12..32].copy_from_slice(child_addr.as_bytes());
+					format!("0x{}", hex::encode(slot))
+				};
 
 				json.replace("{{ALICE_ADDR}}", &format!("{:#x}", ALICE_ADDR))
 					.replace("{{CONTRACT_ADDR}}", &format!("{:#x}", contract_addr))
@@ -473,10 +476,8 @@ fn prestate_diff_mode_tracing_works() {
 						&format!("0x{}", hex::encode(&contract_runtime_code)),
 					)
 					.replace("{{CHILD_CODE}}", &format!("0x{}", hex::encode(&child_runtime_code)))
-					.replace(
-						"{{CHILD_ADDR_PADDED}}",
-						&format!("0x{}", hex::encode(child_addr_bytes)),
-					)
+					.replace("{{SLOT0_PACKED_7}}", &slot0_packed(7))
+					.replace("{{SLOT0_PACKED_8}}", &slot0_packed(8))
 			};
 
 			let mut tracer = PrestateTracer::<Test>::new(test_case.config.clone());

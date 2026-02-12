@@ -112,6 +112,8 @@ pub mod pallet {
 		InvalidVValue,
 		/// Nonce overflow - account has used too many permits.
 		NonceOverflow,
+		/// The owner address is invalid (e.g., zero address).
+		InvalidOwner,
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -287,6 +289,8 @@ pub mod pallet {
 		///
 		/// This function is provided for cases where you need to verify a permit
 		/// in a read-only context or need to separate verification from consumption.
+		///
+		/// Made pub(crate) for testing
 		pub(crate) fn verify_permit(
 			verifying_contract: &H160,
 			owner: &H160,
@@ -300,9 +304,14 @@ pub mod pallet {
 		where
 			<T as pallet_timestamp::Config>::Moment: UniqueSaturatedInto<u128>,
 		{
+			if owner.is_zero() {
+				return Err(Error::<T>::InvalidOwner);
+			}
+
 			// Validate deadline against current timestamp
 			// EIP-2612 specifies deadlines in UNIX seconds, but pallet_timestamp
 			// typically returns milliseconds. Convert to seconds for compatibility.
+			// TODO: how to enforce corect time units here?
 			let now_ms: u128 = <pallet_timestamp::Pallet<T>>::get().unique_saturated_into();
 			// Floor division: don't reject permits early due to ms -> s conversion
 			let now_seconds = now_ms / 1000;

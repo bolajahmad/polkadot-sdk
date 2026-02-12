@@ -362,12 +362,13 @@ where
 		let to = call.to.into_array().into();
 		let to = <Runtime as pallet_revive::Config>::AddressMapper::to_account_id(&to);
 
+		let approval_amount = Self::to_balance(call.value)?;
 		pallet_assets::Pallet::<Runtime, Instance>::do_transfer_approved(
 			asset_id,
 			&from,
 			&spender,
 			&to,
-			Self::to_balance(call.value)?,
+			approval_amount,
 		)?;
 
 		Self::deposit_event(
@@ -398,10 +399,7 @@ where
 		// - 2+ keccak256 hashes (domain separator, struct hash, digest)
 		// - secp256k1 ECDSA recovery
 		// - Storage reads (nonce) and writes (nonce increment, approval)
-		// Use a conservative multiplier until proper benchmarks are added.
-		env.charge(
-			<Runtime as Config<Instance>>::WeightInfo::approve_transfer().saturating_mul(5),
-		)?;
+		env.charge(<Runtime as Config<Instance>>::WeightInfo::approve_transfer())?;
 
 		let owner_h160: H160 = call.owner.into_array().into();
 		let spender_h160: H160 = call.spender.into_array().into();
@@ -417,54 +415,71 @@ where
 		let r_bytes: [u8; 32] = call.r.0;
 		let s_bytes: [u8; 32] = call.s.0;
 
-		// Use the permit - this validates deadline, signature, and increments nonce
-		permit::Pallet::<Runtime>::use_permit(
-			&verifying_contract,
-			&owner_h160,
-			&spender_h160,
-			&value_bytes,
-			&deadline_bytes,
-			call.v,
-			&r_bytes,
-			&s_bytes,
-		)
-		.map_err(|e| {
-			let msg = match e {
-				permit::pallet::Error::PermitExpired => "Permit expired",
-				permit::pallet::Error::InvalidSignature => "Invalid signature",
-				permit::pallet::Error::SignerMismatch => "Signer does not match owner",
-				permit::pallet::Error::SignatureSValueTooHigh => "Signature s value too high (malleability)",
-				permit::pallet::Error::InvalidVValue => "Invalid signature v value",
-				permit::pallet::Error::NonceOverflow => "Nonce overflow",
-			};
-			Error::Revert(Revert { reason: msg.into() })
-		})?;
+		let transaction_outcome = frame_support::storage::with_transaction(|| {
+			let result = (|| {
+				// Use the permit - this validates deadline, signature, and increments nonce
+				permit::Pallet::<Runtime>::use_permit(
+					&verifying_contract,
+					&owner_h160,
+					&spender_h160,
+					&value_bytes,
+					&deadline_bytes,
+					call.v,
+					&r_bytes,
+					&s_bytes,
+				)
+				.map_err(|e| {
+					let msg = match e {
+						permit::pallet::Error::PermitExpired => "Permit expired",
+						permit::pallet::Error::InvalidSignature => "Invalid signature",
+						permit::pallet::Error::SignerMismatch => "Signer does not match owner",
+						permit::pallet::Error::SignatureSValueTooHigh =>
+							"Signature s value too high (malleability)",
+						permit::pallet::Error::InvalidVValue => "Invalid signature v value",
+						permit::pallet::Error::NonceOverflow => "Nonce overflow",
+						permit::pallet::Error::InvalidOwner => "Invalid owner address",
+					};
+					Error::Revert(Revert { reason: msg.into() })
+				})?;
 
-		// Set the approval
-		let owner_account =
-			<Runtime as pallet_revive::Config>::AddressMapper::to_account_id(&owner_h160);
-		let spender_account =
-			<Runtime as pallet_revive::Config>::AddressMapper::to_account_id(&spender_h160);
+				// Set the approval
+				let owner_account =
+					<Runtime as pallet_revive::Config>::AddressMapper::to_account_id(&owner_h160);
+				let spender_account =
+					<Runtime as pallet_revive::Config>::AddressMapper::to_account_id(&spender_h160);
 
-		pallet_assets::Pallet::<Runtime, Instance>::do_approve_transfer(
-			asset_id,
-			&owner_account,
-			&spender_account,
-			Self::to_balance(call.value)?,
-		)?;
+				pallet_assets::Pallet::<Runtime, Instance>::do_approve_transfer(
+					asset_id,
+					&owner_account,
+					&spender_account,
+					Self::to_balance(call.value)?,
+				)?;
 
-		// Emit Approval event
-		Self::deposit_event(
-			env,
-			IERC20Events::Approval(IERC20::Approval {
-				owner: call.owner,
-				spender: call.spender,
-				value: call.value,
-			}),
-		)?;
+				// Emit Approval event
+				Self::deposit_event(
+					env,
+					IERC20Events::Approval(IERC20::Approval {
+						owner: call.owner,
+						spender: call.spender,
+						value: call.value,
+					}),
+				)?;
+				Ok::<_, Error>(())
+			})();
+			match result {
+				Ok(_) => frame_support::storage::TransactionOutcome::Commit(Ok(())),
+				Err(e) => {
+					log::trace!(target: frame_support::LOG_TARGET, "Call to permit failed: {e:?}");
+					frame_support::storage::TransactionOutcome::Rollback(Err(e))
+				},
+			}
+		});
 
 		// permit returns void
-		Ok(Vec::new())
+		match transaction_outcome {
+			Ok(()) => Ok(Vec::new()),
+			Err(e) => Err(e),
+		}
 	}
 
 	/// Get the current nonce for an owner address.
@@ -505,6 +520,6 @@ where
 /// a separate ERC20WithPermit type. The base ERC20 type already includes
 /// full EIP-2612 permit support, so this alias exists solely to maintain
 /// API compatibility during migration from pre-permit implementations.
-#[deprecated(since = "1.0.0", note = "Use ERC20 directly, which includes permit support")]
-pub type ERC20WithPermit<Runtime, PrecompileConfig, Instance = ()> =
+#[deprecated(note = "Use ERC20 directly, which includes permit support")]
+type ERC20WithPermit<Runtime, PrecompileConfig, Instance = ()> =
 	ERC20<Runtime, PrecompileConfig, Instance>;

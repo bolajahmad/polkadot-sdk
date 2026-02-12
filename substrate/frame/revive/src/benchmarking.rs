@@ -55,7 +55,6 @@ use frame_support::{
 	weights::{Weight, WeightMeter},
 };
 use frame_system::RawOrigin;
-use k256::ecdsa::SigningKey;
 use pallet_revive_uapi::{
 	pack_hi_lo,
 	precompiles::{storage::IStorage, system::ISystem},
@@ -68,6 +67,7 @@ use sp_consensus_babe::{
 	BABE_ENGINE_ID,
 };
 use sp_consensus_slots::Slot;
+use sp_core::{ecdsa::Pair as EcdsaPair, Pair as _};
 use sp_runtime::{generic::DigestItem, traits::Zero};
 
 /// How many runs we do per API benchmark.
@@ -2670,14 +2670,14 @@ mod benchmarks {
 	}
 
 	/// Helper function to create a test signer for finalize_block benchmark
-	fn create_test_signer<T: Config>() -> (T::AccountId, SigningKey, H160) {
+	fn create_test_signer<T: Config>() -> (T::AccountId, EcdsaPair, H160) {
 		use hex_literal::hex;
 		// dev::alith()
 		let signer_account_id = hex!("f24FF3a9CF04c71Dbc94D0b566f7A27B94566cac");
 		let signer_priv_key =
 			hex!("5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133");
 
-		let signer_key = SigningKey::from_bytes(&signer_priv_key.into()).expect("valid key");
+		let signer_key = EcdsaPair::from_seed_slice(&signer_priv_key).expect("valid key; qed");
 
 		let signer_address = H160::from_slice(&signer_account_id);
 		let signer_caller = T::AddressMapper::to_fallback_account_id(&signer_address);
@@ -2687,7 +2687,7 @@ mod benchmarks {
 
 	/// Helper function to create and sign a transaction for finalize_block benchmark
 	fn create_signed_transaction<T: Config>(
-		signer_key: &SigningKey,
+		signer_key: &EcdsaPair,
 		target_address: H160,
 		value: U256,
 		input_data: Vec<u8>,
@@ -2702,21 +2702,15 @@ mod benchmarks {
 		.into();
 
 		let hashed_payload = sp_io::hashing::keccak_256(&unsigned_tx.unsigned_payload());
-		let (signature, recovery_id) =
-			signer_key.sign_prehash_recoverable(&hashed_payload).expect("signing success");
-
-		let mut sig_bytes = [0u8; 65];
-		sig_bytes[..64].copy_from_slice(&signature.to_bytes());
-		sig_bytes[64] = recovery_id.to_byte();
-
-		let signed_tx = unsigned_tx.with_signature(sig_bytes);
+		let sig = signer_key.sign_prehashed(&hashed_payload);
+		let signed_tx = unsigned_tx.with_signature(sig.0);
 
 		signed_tx.signed_payload()
 	}
 
 	/// Helper function to generate common finalize_block benchmark setup
 	fn setup_finalize_block_benchmark<T>(
-	) -> Result<(Contract<T>, BalanceOf<T>, U256, SigningKey, BlockNumberFor<T>), BenchmarkError>
+	) -> Result<(Contract<T>, BalanceOf<T>, U256, EcdsaPair, BlockNumberFor<T>), BenchmarkError>
 	where
 		BalanceOf<T>: Into<U256> + TryFrom<U256>,
 		T: Config,

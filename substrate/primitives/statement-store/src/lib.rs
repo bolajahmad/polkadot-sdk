@@ -156,7 +156,8 @@ impl StatementAllowance {
 		}
 	}
 
-	pub fn is_depleted(self) -> bool {
+	/// Check if the statement allowance is depleted.
+	pub fn is_depleted(&self) -> bool {
 		self.max_count == 0 || self.max_size == 0
 	}
 }

@@ -28,7 +28,6 @@ ethereum-types = { workspace = true, features = ["codec", "rlp", "serialize"] }
 hex-literal = { workspace = true }
 humantime-serde = { optional = true, workspace = true }
 impl-trait-for-tuples = { workspace = true }
-k256 = { features = ["alloc", "ecdsa"], workspace = true, optional = true }
 log = { workspace = true }
 num-bigint = { workspace = true }
 num-integer = { workspace = true }
@@ -100,7 +99,6 @@ std = [
 	"frame-support/std",
 	"frame-system/std",
 	"humantime-serde",
-	"k256?/std",
 	"log/std",
 	"num-bigint/std",
 	"num-integer/std",
@@ -137,7 +135,6 @@ runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
-	"k256",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-proxy/runtime-benchmarks",
 	"pallet-revive-fixtures",

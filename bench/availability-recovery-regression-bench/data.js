@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770835804792,
+  "lastUpdate": 1770892231530,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "5588131+kianenigma@users.noreply.github.com",
-            "name": "Kian Paimani",
-            "username": "kianenigma"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "252649fc0105efc8b32b2e1a3649bd6d09f8bd53",
-          "message": "add benchmark for prune-era (#9056)\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-04T18:25:54Z",
-          "tree_id": "c4480f0f14cd79f70f4a2733fab6a6d0c4c81f6b",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/252649fc0105efc8b32b2e1a3649bd6d09f8bd53"
-        },
-        "date": 1751657593952,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.1998070050666667,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.150709425900004,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-recovery",
             "value": 11.4135842047,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "skunert49@gmail.com",
+            "name": "Sebastian Kunert",
+            "username": "skunert"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e793fe2670b8c3eacaded7d1ed4f3863e8123c1",
+          "message": "Fix link-checker job: I am not giving up (#11049)\n\nFollow up of https://github.com/paritytech/polkadot-sdk/pull/11038\n\nEven though the job passed in my last PR, I missed this broken link. So\nhere we go again.",
+          "timestamp": "2026-02-12T09:20:55Z",
+          "tree_id": "a499a9c85c9baffb696cb1c1657e470499bc573e",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/1e793fe2670b8c3eacaded7d1ed4f3863e8123c1"
+        },
+        "date": 1770892206964,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12353285633333336,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.45039749653333,
             "unit": "seconds"
           }
         ]

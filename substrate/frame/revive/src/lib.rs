@@ -1600,7 +1600,6 @@ impl<T: Config> Pallet<T> {
 			Ok(transaction_meter) => transaction_meter,
 			Err(error) => return ContractResult { result: Err(error), ..Default::default() },
 		};
-
 		let mut storage_deposit = Default::default();
 
 		let try_call = || {

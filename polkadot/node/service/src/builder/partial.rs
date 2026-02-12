@@ -24,7 +24,7 @@ use crate::{
 };
 use polkadot_primitives::Block;
 use sc_consensus_grandpa::{
-	FinalityProofProvider as GrandpaFinalityProofProvider, GrandpaBlockPruningFilter,
+	FinalityProofProvider as GrandpaFinalityProofProvider, GrandpaPruningFilter,
 };
 use sc_executor::{HeapAllocStrategy, WasmExecutor, DEFAULT_HEAP_ALLOC_STRATEGY};
 use sc_service::{Configuration, Error as SubstrateServiceError, KeystoreContainer, TaskManager};
@@ -122,13 +122,13 @@ pub(crate) fn new_partial_basics(
 		.with_runtime_cache_size(config.executor.runtime_cache_size)
 		.build();
 
-	// Use GrandpaBlockPruningFilter to preserve blocks with GRANDPA justifications during
+	// Use GrandpaPruningFilter to preserve blocks with GRANDPA justifications during
 	// pruning. This is required for warp sync to work on pruned nodes.
 	let (client, backend, keystore_container, task_manager) = sc_service::new_full_parts(
 		&config,
 		telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
 		executor,
-		vec![Arc::new(GrandpaBlockPruningFilter)],
+		vec![Arc::new(GrandpaPruningFilter)],
 	)?;
 	let client = Arc::new(client);
 

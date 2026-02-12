@@ -154,13 +154,13 @@ use std::marker::PhantomData;
 
 /// Filter that preserves blocks with GRANDPA justifications during pruning.
 ///
-/// Use this filter with `DatabaseSettings::block_pruning_filters` to ensure that blocks
+/// Use this filter with `DatabaseSettings::pruning_filters` to ensure that blocks
 /// required for warp sync are not pruned. GRANDPA justifications at authority set change
 /// boundaries are needed to construct warp sync proofs.
 #[derive(Debug, Clone)]
-pub struct GrandpaBlockPruningFilter;
+pub struct GrandpaPruningFilter;
 
-impl sc_client_db::BlockPruningFilter for GrandpaBlockPruningFilter {
+impl sc_client_db::PruningFilter for GrandpaPruningFilter {
 	fn should_preserve(&self, justifications: &sp_runtime::Justifications) -> bool {
 		justifications.get(GRANDPA_ENGINE_ID).is_some()
 	}

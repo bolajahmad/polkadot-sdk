@@ -102,14 +102,17 @@ pub use sp_database::Database;
 pub use bench::BenchmarkingState;
 
 /// Filter to determine if a block should be excluded from pruning.
-pub trait BlockPruningFilter: Send + Sync {
+///
+/// Note: This filter only affects **block body** (and future header) pruning.
+/// It does **not** affect state pruning, which is configured separately.
+pub trait PruningFilter: Send + Sync {
 	/// Check if a block with the given justifications should be preserved.
 	///
 	/// Returns `true` to preserve the block, `false` to allow pruning.
 	fn should_preserve(&self, justifications: &Justifications) -> bool;
 }
 
-impl<F> BlockPruningFilter for F
+impl<F> PruningFilter for F
 where
 	F: Fn(&Justifications) -> bool + Send + Sync,
 {
@@ -333,8 +336,9 @@ pub struct DatabaseSettings {
 	/// Filters to exclude blocks from pruning.
 	///
 	/// If any filter returns `true` for a block's justifications, the block body
-	/// will be preserved even when it falls outside the pruning window.
-	pub block_pruning_filters: Vec<Arc<dyn BlockPruningFilter>>,
+	/// (and in the future, the header) will be preserved even when it falls
+	/// outside the pruning window. Does not affect state pruning.
+	pub pruning_filters: Vec<Arc<dyn PruningFilter>>,
 	/// Prometheus metrics registry.
 	pub metrics_registry: Option<Registry>,
 }
@@ -1142,7 +1146,7 @@ pub struct Backend<Block: BlockT> {
 	state_usage: Arc<StateUsageStats>,
 	genesis_state: RwLock<Option<Arc<DbGenesisStorage<Block>>>>,
 	shared_trie_cache: Option<sp_trie::cache::SharedTrieCache<HashingFor<Block>>>,
-	block_pruning_filters: Vec<Arc<dyn BlockPruningFilter>>,
+	pruning_filters: Vec<Arc<dyn PruningFilter>>,
 }
 
 impl<Block: BlockT> Backend<Block> {
@@ -1186,12 +1190,12 @@ impl<Block: BlockT> Backend<Block> {
 	pub fn new_test_with_pruning_filters(
 		blocks_pruning: u32,
 		canonicalization_delay: u64,
-		block_pruning_filters: Vec<Arc<dyn BlockPruningFilter>>,
+		pruning_filters: Vec<Arc<dyn PruningFilter>>,
 	) -> Self {
 		Self::new_test_with_tx_storage_and_filters(
 			BlocksPruning::Some(blocks_pruning),
 			canonicalization_delay,
-			block_pruning_filters,
+			pruning_filters,
 		)
 	}
 
@@ -1213,7 +1217,7 @@ impl<Block: BlockT> Backend<Block> {
 	pub fn new_test_with_tx_storage_and_filters(
 		blocks_pruning: BlocksPruning,
 		canonicalization_delay: u64,
-		block_pruning_filters: Vec<Arc<dyn BlockPruningFilter>>,
+		pruning_filters: Vec<Arc<dyn PruningFilter>>,
 	) -> Self {
 		let db = kvdb_memorydb::create(crate::utils::NUM_COLUMNS);
 		let db = sp_database::as_database(db);
@@ -1227,7 +1231,7 @@ impl<Block: BlockT> Backend<Block> {
 			state_pruning: Some(state_pruning),
 			source: DatabaseSource::Custom { db, require_create_flag: true },
 			blocks_pruning,
-			block_pruning_filters,
+			pruning_filters,
 			metrics_registry: None,
 		};
 
@@ -1320,7 +1324,7 @@ impl<Block: BlockT> Backend<Block> {
 			blocks_pruning: config.blocks_pruning,
 			genesis_state: RwLock::new(None),
 			shared_trie_cache,
-			block_pruning_filters: config.block_pruning_filters.clone(),
+			pruning_filters: config.pruning_filters.clone(),
 		};
 
 		// Older DB versions have no last state key. Check if the state is available and set it.
@@ -1997,18 +2001,14 @@ impl<Block: BlockT> Backend<Block> {
 					// Check if any pruning filter wants to preserve this block.
 					// We need to check both the current transaction justifications (not yet in DB)
 					// and the DB itself (for justifications from previous transactions).
-					if !self.block_pruning_filters.is_empty() {
+					if !self.pruning_filters.is_empty() {
 						let should_preserve = if let Some(justification) =
 							current_transaction_justifications.get(&hash)
 						{
 							let justifications = Justifications::from(justification.clone());
-							self.block_pruning_filters
-								.iter()
-								.any(|f| f.should_preserve(&justifications))
+							self.pruning_filters.iter().any(|f| f.should_preserve(&justifications))
 						} else if let Some(justifications) = self.blockchain.justifications(hash)? {
-							self.block_pruning_filters
-								.iter()
-								.any(|f| f.should_preserve(&justifications))
+							self.pruning_filters.iter().any(|f| f.should_preserve(&justifications))
 						} else {
 							false
 						};
@@ -2937,7 +2937,7 @@ pub(crate) mod tests {
 				state_pruning: Some(PruningMode::blocks_pruning(1)),
 				source: DatabaseSource::Custom { db: backing, require_create_flag: false },
 				blocks_pruning: BlocksPruning::KeepFinalized,
-				block_pruning_filters: Default::default(),
+				pruning_filters: Default::default(),
 				metrics_registry: None,
 			},
 			0,

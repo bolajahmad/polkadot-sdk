@@ -3,7 +3,7 @@
 use futures::FutureExt;
 use sc_client_api::{Backend, BlockBackend};
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
-use sc_consensus_grandpa::{GrandpaBlockPruningFilter, SharedVoterState};
+use sc_consensus_grandpa::{GrandpaPruningFilter, SharedVoterState};
 use sc_service::{error::Error as ServiceError, Configuration, TaskManager, WarpSyncConfig};
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
@@ -55,7 +55,7 @@ pub fn new_partial(config: &Configuration) -> Result<Service, ServiceError> {
 			config,
 			telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
 			executor,
-			vec![Arc::new(GrandpaBlockPruningFilter)],
+			vec![Arc::new(GrandpaPruningFilter)],
 		)?;
 	let client = Arc::new(client);
 

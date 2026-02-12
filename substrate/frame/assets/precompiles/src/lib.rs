@@ -85,7 +85,7 @@ impl AssetIdExtractor for InlineAssetIdExtractor {
 	fn asset_id_from_address(addr: &[u8; 20]) -> Result<Self::AssetId, Error> {
 		let bytes: [u8; 4] = addr[0..4].try_into().expect("slice is 4 bytes; qed");
 		let index = u32::from_be_bytes(bytes);
-		return Ok(index.into());
+		Ok(index.into())
 	}
 }
 
@@ -271,7 +271,7 @@ where
 			}),
 		)?;
 
-		return Ok(IERC20::transferCall::abi_encode_returns(&true));
+		Ok(IERC20::transferCall::abi_encode_returns(&true))
 	}
 
 	fn total_supply(
@@ -283,7 +283,7 @@ where
 
 		let value =
 			Self::to_u256(pallet_assets::Pallet::<Runtime, Instance>::total_issuance(asset_id))?;
-		return Ok(IERC20::totalSupplyCall::abi_encode_returns(&value));
+		Ok(IERC20::totalSupplyCall::abi_encode_returns(&value))
 	}
 
 	fn balance_of(
@@ -296,7 +296,7 @@ where
 		let account = <Runtime as pallet_revive::Config>::AddressMapper::to_account_id(&account);
 		let value =
 			Self::to_u256(pallet_assets::Pallet::<Runtime, Instance>::balance(asset_id, account))?;
-		return Ok(IERC20::balanceOfCall::abi_encode_returns(&value));
+		Ok(IERC20::balanceOfCall::abi_encode_returns(&value))
 	}
 
 	fn allowance(
@@ -315,7 +315,7 @@ where
 			asset_id, &owner, &spender,
 		))?;
 
-		return Ok(IERC20::balanceOfCall::abi_encode_returns(&value));
+		Ok(IERC20::allowanceCall::abi_encode_returns(&value))
 	}
 
 	fn approve(
@@ -344,7 +344,7 @@ where
 			}),
 		)?;
 
-		return Ok(IERC20::approveCall::abi_encode_returns(&true));
+		Ok(IERC20::approveCall::abi_encode_returns(&true))
 	}
 
 	fn transfer_from(
@@ -379,7 +379,7 @@ where
 			}),
 		)?;
 
-		return Ok(IERC20::transferFromCall::abi_encode_returns(&true));
+		Ok(IERC20::transferFromCall::abi_encode_returns(&true))
 	}
 
 	// ==================== ERC20Permit Functions (EIP-2612) ====================
@@ -394,11 +394,22 @@ where
 		call: &IERC20::permitCall,
 		env: &mut impl Ext<T = Runtime>,
 	) -> Result<Vec<u8>, Error> {
-		// TODO: Add proper weight for permit operation
-		env.charge(<Runtime as Config<Instance>>::WeightInfo::approve_transfer())?;
+		// Permit operation is more expensive than approve_transfer:
+		// - 2+ keccak256 hashes (domain separator, struct hash, digest)
+		// - secp256k1 ECDSA recovery
+		// - Storage reads (nonce) and writes (nonce increment, approval)
+		// Use a conservative multiplier until proper benchmarks are added.
+		env.charge(
+			<Runtime as Config<Instance>>::WeightInfo::approve_transfer().saturating_mul(5),
+		)?;
 
 		let owner_h160: H160 = call.owner.into_array().into();
 		let spender_h160: H160 = call.spender.into_array().into();
+
+		// EIP-2612: spender cannot be the zero address
+		if spender_h160.is_zero() {
+			return Err(Error::Revert(Revert { reason: "Spender cannot be zero address".into() }));
+		}
 
 		// Convert U256 values to byte arrays
 		let value_bytes: [u8; 32] = call.value.to_be_bytes();
@@ -421,9 +432,10 @@ where
 			let msg = match e {
 				permit::pallet::Error::PermitExpired => "Permit expired",
 				permit::pallet::Error::InvalidSignature => "Invalid signature",
-				permit::pallet::Error::SignatureSValueTooHigh => "Signature malleability",
+				permit::pallet::Error::SignerMismatch => "Signer does not match owner",
+				permit::pallet::Error::SignatureSValueTooHigh => "Signature s value too high (malleability)",
+				permit::pallet::Error::InvalidVValue => "Invalid signature v value",
 				permit::pallet::Error::NonceOverflow => "Nonce overflow",
-				_ => "Permit verification failed",
 			};
 			Error::Revert(Revert { reason: msg.into() })
 		})?;
@@ -489,6 +501,10 @@ where
 	}
 }
 
-// Type alias for backwards compatibility
+/// Type alias for backwards compatibility with existing code that expects
+/// a separate ERC20WithPermit type. The base ERC20 type already includes
+/// full EIP-2612 permit support, so this alias exists solely to maintain
+/// API compatibility during migration from pre-permit implementations.
+#[deprecated(since = "1.0.0", note = "Use ERC20 directly, which includes permit support")]
 pub type ERC20WithPermit<Runtime, PrecompileConfig, Instance = ()> =
 	ERC20<Runtime, PrecompileConfig, Instance>;

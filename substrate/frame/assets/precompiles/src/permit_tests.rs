@@ -26,19 +26,17 @@ fn test_verifying_contract() -> H160 {
 }
 
 /// Helper to create a future deadline (far in the future).
-/// Note: pallet_timestamp uses milliseconds, so deadlines should be in milliseconds too.
+/// EIP-2612 specifies deadlines in UNIX seconds.
 fn future_deadline() -> [u8; 32] {
-	// Unix timestamp for year 2100 in milliseconds
-	// 4102444800 seconds * 1000 = 4102444800000 milliseconds
-	U256::from(4102444800000u64).to_big_endian()
+	// Unix timestamp for year 2100 in seconds
+	U256::from(4102444800u64).to_big_endian()
 }
 
 /// Helper to create a past deadline.
-/// Note: pallet_timestamp uses milliseconds, so deadlines should be in milliseconds too.
+/// EIP-2612 specifies deadlines in UNIX seconds.
 fn past_deadline() -> [u8; 32] {
-	// Unix timestamp for year 2020 in milliseconds
-	// 1577836800 seconds * 1000 = 1577836800000 milliseconds
-	U256::from(1577836800000u64).to_big_endian()
+	// Unix timestamp for year 2020 in seconds
+	U256::from(1577836800u64).to_big_endian()
 }
 
 // =============================================================================
@@ -111,19 +109,19 @@ fn nonces_are_independent_per_owner() {
 fn domain_separator_is_computed() {
 	new_test_ext().execute_with(|| {
 		let verifying_contract = test_verifying_contract();
-		let separator = permit::Pallet::<Test>::domain_separator(&verifying_contract);
+		let separator = permit::Pallet::<Test>::compute_domain_separator(&verifying_contract);
 		// Should be a non-zero hash
 		assert_ne!(separator, H256::zero());
 	});
 }
 
 #[test]
-fn domain_separator_is_cached() {
+fn domain_separator_is_deterministic() {
 	new_test_ext().execute_with(|| {
 		let verifying_contract = test_verifying_contract();
-		let separator1 = permit::Pallet::<Test>::domain_separator(&verifying_contract);
-		let separator2 = permit::Pallet::<Test>::domain_separator(&verifying_contract);
-		// Should return the same value (cached)
+		let separator1 = permit::Pallet::<Test>::compute_domain_separator(&verifying_contract);
+		let separator2 = permit::Pallet::<Test>::compute_domain_separator(&verifying_contract);
+		// Should return the same value for same inputs
 		assert_eq!(separator1, separator2);
 	});
 }
@@ -134,8 +132,8 @@ fn domain_separators_differ_per_verifying_contract() {
 		let contract_1 = H160::from_low_u64_be(0x1111);
 		let contract_2 = H160::from_low_u64_be(0x2222);
 
-		let separator1 = permit::Pallet::<Test>::domain_separator(&contract_1);
-		let separator2 = permit::Pallet::<Test>::domain_separator(&contract_2);
+		let separator1 = permit::Pallet::<Test>::compute_domain_separator(&contract_1);
+		let separator2 = permit::Pallet::<Test>::compute_domain_separator(&contract_2);
 
 		// Domain separators should be different for different verifying contracts
 		assert_ne!(separator1, separator2);

@@ -29,9 +29,12 @@
 //! - **Signature malleability**: The `s` value is checked to be in the lower half of the secp256k1
 //!   curve order to prevent signature malleability attacks.
 
+use alloc::vec::Vec;
 use frame_support::pallet_prelude::*;
 use pallet_revive::precompiles::H160;
 use sp_core::{H256, U256};
+use sp_io::{crypto::secp256k1_ecdsa_recover, hashing::keccak_256};
+use sp_runtime::traits::UniqueSaturatedInto;
 
 pub use pallet::*;
 
@@ -136,9 +139,6 @@ pub mod pallet {
 		///   verifyingContract
 		/// ))
 		pub fn compute_domain_separator(verifying_contract: &H160) -> H256 {
-			use alloc::vec::Vec;
-			use sp_io::hashing::keccak_256;
-
 			// EIP712Domain typehash
 			let domain_typehash = keccak_256(
 				b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)",
@@ -180,9 +180,6 @@ pub mod pallet {
 			nonce: &U256,
 			deadline: &[u8; 32], // U256 as bytes (big-endian)
 		) -> H256 {
-			use alloc::vec::Vec;
-			use sp_io::hashing::keccak_256;
-
 			let mut data = Vec::with_capacity(PERMIT_STRUCT_ENCODED_LEN);
 			data.extend_from_slice(&PERMIT_TYPEHASH);
 			// owner (padded to 32 bytes)
@@ -212,9 +209,6 @@ pub mod pallet {
 			nonce: &U256,
 			deadline: &[u8; 32],
 		) -> [u8; 32] {
-			use alloc::vec::Vec;
-			use sp_io::hashing::keccak_256;
-
 			let domain_separator = Self::compute_domain_separator(verifying_contract);
 			let struct_hash = Self::permit_struct_hash(owner, spender, value, nonce, deadline);
 
@@ -256,8 +250,6 @@ pub mod pallet {
 			r: &[u8; 32],
 			s: &[u8; 32],
 		) -> Result<H160, Error<T>> {
-			use sp_io::{crypto::secp256k1_ecdsa_recover, hashing::keccak_256};
-
 			// Check signature malleability: s must be in lower half of curve order
 			if !Self::is_s_value_valid(s) {
 				return Err(Error::<T>::SignatureSValueTooHigh);
@@ -306,18 +298,16 @@ pub mod pallet {
 			s: &[u8; 32],
 		) -> Result<(), Error<T>>
 		where
-			<T as pallet_timestamp::Config>::Moment: sp_runtime::traits::UniqueSaturatedInto<u128>,
+			<T as pallet_timestamp::Config>::Moment: UniqueSaturatedInto<u128>,
 		{
-			use sp_runtime::traits::UniqueSaturatedInto;
-
 			// Validate deadline against current timestamp
-			// EIP-2612 uses UNIX timestamp for deadline
-			// Note: pallet_timestamp typically uses milliseconds
-			let now: u128 = <pallet_timestamp::Pallet<T>>::get().unique_saturated_into();
+			// EIP-2612 specifies deadlines in UNIX seconds, but pallet_timestamp
+			// typically returns milliseconds. Convert to seconds for compatibility.
+			let now_ms: u128 = <pallet_timestamp::Pallet<T>>::get().unique_saturated_into();
+			// Floor division: don't reject permits early due to ms -> s conversion
+			let now_seconds = now_ms / 1000;
 			let deadline_u256 = U256::from_big_endian(deadline);
-
-			// Convert current timestamp to U256 for comparison
-			let now_u256 = U256::from(now);
+			let now_u256 = U256::from(now_seconds);
 
 			if deadline_u256 < now_u256 {
 				return Err(Error::<T>::PermitExpired);
@@ -355,7 +345,7 @@ pub mod pallet {
 			s: &[u8; 32],
 		) -> Result<(), Error<T>>
 		where
-			<T as pallet_timestamp::Config>::Moment: sp_runtime::traits::UniqueSaturatedInto<u128>,
+			<T as pallet_timestamp::Config>::Moment: UniqueSaturatedInto<u128>,
 		{
 			// Verify the permit first
 			Self::verify_permit(verifying_contract, owner, spender, value, deadline, v, r, s)?;

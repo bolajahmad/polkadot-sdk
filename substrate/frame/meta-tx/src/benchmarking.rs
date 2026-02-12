@@ -87,7 +87,9 @@ mod benchmarks {
 
 	#[benchmark]
 	fn bare_dispatch(n: Linear<4, 100>) {
-		let meta_call = frame_system::Call::<T>::remark { remark: vec![0x11u8; n.saturating_sub(4) as usize] }.into();
+		let meta_call =
+			frame_system::Call::<T>::remark { remark: vec![0x11u8; n.saturating_sub(4) as usize] }
+				.into();
 		let meta_ext = T::Extension::default();
 		let meta_ext_weight = meta_ext.weight(&meta_call);
 
@@ -104,8 +106,11 @@ mod benchmarks {
 		let caller = whitelisted_caller();
 		let origin: <T as frame_system::Config>::RuntimeOrigin =
 			frame_system::RawOrigin::Signed(caller).into();
-		let call = Call::<T>::dispatch { meta_tx: Box::new(meta_tx.clone()), len: meta_tx.encoded_size() as u32 };
-	
+		let call = Call::<T>::dispatch {
+			meta_tx: Box::new(meta_tx.clone()),
+			len: meta_tx.encoded_size() as u32,
+		};
+
 		#[block]
 		{
 			let _ = meta_tx.encoded_size();

@@ -47,7 +47,7 @@ use sc_service::{Configuration, SpawnTaskHandle, TaskManager, WarpSyncConfig};
 use sc_telemetry::{log, TelemetryWorkerHandle};
 use sc_tracing::block::TracingExecuteBlock;
 use sc_utils::mpsc::TracingUnboundedSender;
-use sp_api::{ApiExt, Core, ProofRecorder, ProvideRuntimeApi};
+use sp_api::{ApiExt, CallApiAt, Core, ProofRecorder, ProvideRuntimeApi};
 use sp_blockchain::{HeaderBackend, HeaderMetadata};
 use sp_core::Decode;
 use sp_runtime::{
@@ -618,13 +618,16 @@ impl<Client> ParachainTracingExecuteBlock<Client> {
 impl<Block, Client> TracingExecuteBlock<Block> for ParachainTracingExecuteBlock<Client>
 where
 	Block: BlockT,
-	Client: ProvideRuntimeApi<Block> + Send + Sync,
+	Client: ProvideRuntimeApi<Block> + CallApiAt<Block> + Send + Sync,
 	Client::Api: Core<Block>,
 {
 	fn execute_block(&self, _: Block::Hash, block: Block) -> sp_blockchain::Result<()> {
 		let mut runtime_api = self.client.runtime_api();
-		let storage_proof_recorder = ProofRecorder::<Block>::default();
-		runtime_api.register_extension(ProofSizeExt::new(storage_proof_recorder.clone()));
+
+		let storage_proof_recorder = ProofRecorder::<Block>::new(self.client.backend_type());
+
+		// TODO: handle `ProofSizeExt`.
+		// runtime_api.register_extension(ProofSizeExt::new(storage_proof_recorder.clone()));
 		runtime_api.record_proof_with_recorder(storage_proof_recorder);
 
 		runtime_api

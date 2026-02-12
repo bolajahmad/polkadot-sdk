@@ -206,7 +206,9 @@ impl RelayChainInterface for RelayChainRpcInterface {
 			.state_get_read_proof(storage_keys, Some(relay_parent))
 			.await
 			.map(|read_proof| {
-				StorageProof::new(read_proof.proof.into_iter().map(|bytes| bytes.to_vec()))
+				// TODO: adapt to sp_state_machine::StorageProof usage
+				todo!()
+				// StorageProof::new(read_proof.proof.into_iter().map(|bytes| bytes.to_vec()))
 			})
 	}
 

@@ -341,6 +341,10 @@ pub fn open_database(db_source: &DatabaseSource) -> Result<Arc<dyn Database>, Er
 		DatabaseSource::Custom { .. } => {
 			unimplemented!("No polkadot subsystem db for custom source.");
 		},
+		DatabaseSource::Nomt { .. } => {
+			// TODO: handle a polkadot node spawned with nomt as backend.
+			todo!()
+		},
 	};
 	Ok(parachains_db)
 }

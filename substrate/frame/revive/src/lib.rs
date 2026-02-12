@@ -1647,7 +1647,7 @@ impl<T: Config> Pallet<T> {
 					eth_tx_info: EthTxInfo::new(encoded_len, extra_weight),
 				},
 				data,
-				ExecConfig::new_eth_tx(effective_gas_price, encoded_len, extra_weight),
+				&ExecConfig::new_eth_tx(effective_gas_price, encoded_len, extra_weight),
 			);
 
 			block_storage::EthereumCallResult::new::<T>(

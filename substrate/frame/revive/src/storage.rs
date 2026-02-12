@@ -18,6 +18,8 @@
 //! This module contains routines for accessing and altering a contract related state.
 
 use crate::{
+	AccountInfoOf, BalanceOf, BalanceWithDust, CodeInfoOf, Config, DeletionQueue,
+	DeletionQueueCounter, Error, SENTINEL, TrieId,
 	address::AddressMapper,
 	exec::{AccountIdOf, Key},
 	metering::FrameMeter,
@@ -25,27 +27,25 @@ use crate::{
 	tracing::if_tracing,
 	vm::CodeInfo,
 	weights::WeightInfo,
-	AccountInfoOf, BalanceOf, BalanceWithDust, CodeInfoOf, Config, DeletionQueue,
-	DeletionQueueCounter, Error, TrieId, SENTINEL,
 };
 use alloc::vec::Vec;
 use codec::{Decode, Encode, MaxEncodedLen};
 use core::marker::PhantomData;
 use frame_support::{
+	CloneNoBound, DebugNoBound, DefaultNoBound,
 	storage::child::{self, ChildInfo},
 	traits::{
 		fungible::Inspect,
 		tokens::{Fortitude, Preservation},
 	},
 	weights::{Weight, WeightMeter},
-	CloneNoBound, DebugNoBound, DefaultNoBound,
 };
 use scale_info::TypeInfo;
 use sp_core::{Get, H160};
 use sp_io::KillStorageResult;
 use sp_runtime::{
-	traits::{Hash, Saturating, Zero},
 	Debug, DispatchError,
+	traits::{Hash, Saturating, Zero},
 };
 
 use crate::metering::Diff;
@@ -197,7 +197,7 @@ impl<T: Config> AccountInfo<T> {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {
 				match &mut account.account_type {
-					AccountType::EOA { delegate_target: Some(_), ref mut contract_info } => {
+					AccountType::EOA { delegate_target: Some(_), contract_info } => {
 						*contract_info = Some(contract.clone());
 					},
 					_ => account.account_type = contract.clone().into(),
@@ -213,9 +213,8 @@ impl<T: Config> AccountInfo<T> {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			if let Some(account) = account {
 				match &mut account.account_type {
-					AccountType::Contract(ref mut info) => *info = contract_info,
-					AccountType::EOA { contract_info: ref mut info, .. } =>
-						*info = Some(contract_info),
+					AccountType::Contract(info) => *info = contract_info,
+					AccountType::EOA { contract_info: info, .. } => *info = Some(contract_info),
 				}
 			}
 		});
@@ -277,7 +276,7 @@ impl<T: Config> AccountInfo<T> {
 
 			if let Some(account) = account {
 				match &mut account.account_type {
-					AccountType::EOA { ref mut delegate_target, ref mut contract_info } => {
+					AccountType::EOA { delegate_target, contract_info } => {
 						old_code_hash = contract_info.as_ref().map(|ci| ci.code_hash);
 						old_deposit = contract_info
 							.as_ref()
@@ -347,8 +346,8 @@ impl<T: Config> AccountInfo<T> {
 		AccountInfoOf::<T>::mutate(address, |account| {
 			let mut refund: BalanceOf<T> = Zero::zero();
 			if let Some(account) = account {
-				if let AccountType::EOA { ref mut delegate_target, ref mut contract_info } =
-					account.account_type
+				if let AccountType::EOA { delegate_target, contract_info } =
+					&mut account.account_type
 				{
 					*delegate_target = None;
 					if let Some(ci) = contract_info.as_mut() {

@@ -22,16 +22,16 @@
 //! authorization tuples attached to transactions.
 
 use crate::{
+	Config, ExecConfig, HoldReason, LOG_TARGET, Pallet,
 	address::AddressMapper,
-	evm::api::{recover_eth_address_from_message, AuthorizationListEntry},
+	evm::api::{AuthorizationListEntry, recover_eth_address_from_message},
 	primitives::StorageDeposit,
 	storage::AccountInfo,
-	Config, ExecConfig, HoldReason, Pallet, LOG_TARGET,
 };
 use alloc::vec::Vec;
 use frame_support::traits::fungible::Inspect;
 use sp_core::{Get, H160, U256};
-use sp_runtime::{traits::Zero, SaturatedConversion};
+use sp_runtime::{SaturatedConversion, traits::Zero};
 
 /// EIP-7702: Magic value for authorization signature message
 const EIP7702_MAGIC: u8 = 0x05;

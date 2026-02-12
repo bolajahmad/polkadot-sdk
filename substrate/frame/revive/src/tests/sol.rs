@@ -16,25 +16,23 @@
 // limitations under the License.
 
 use crate::{
-	assert_refcount,
+	BalanceOf, Code, Config, Error, EthBlockBuilderFirstValues, GenesisConfig, Origin, Pallet,
+	PristineCode, assert_refcount,
 	call_builder::VmBinaryModule,
 	debug::DebugSettings,
 	evm::{PrestateTrace, PrestateTracer, PrestateTracerConfig},
-	test_utils::{builder::Contract, ALICE, ALICE_ADDR, BOB},
+	test_utils::{ALICE, ALICE_ADDR, BOB, builder::Contract},
 	tests::{
-		builder,
+		AllowEvmBytecode, DebugFlag, ExtBuilder, RuntimeOrigin, Test, builder,
 		test_utils::{contract_base_deposit, ensure_stored, get_contract},
-		AllowEvmBytecode, DebugFlag, ExtBuilder, RuntimeOrigin, Test,
 	},
 	tracing::trace,
-	BalanceOf, Code, Config, Error, EthBlockBuilderFirstValues, GenesisConfig, Origin, Pallet,
-	PristineCode,
 };
 use alloy_core::sol_types::{SolCall, SolInterface};
 use frame_support::{
 	assert_err, assert_noop, assert_ok, dispatch::GetDispatchInfo, traits::fungible::Mutate,
 };
-use pallet_revive_fixtures::{compile_module_with_type, Fibonacci, FixtureType, NestedCounter};
+use pallet_revive_fixtures::{Fibonacci, FixtureType, NestedCounter, compile_module_with_type};
 use pretty_assertions::assert_eq;
 use sp_runtime::Weight;
 use test_case::test_case;
@@ -221,10 +219,10 @@ fn eth_contract_too_large() {
 #[test]
 fn upload_evm_runtime_code_works() {
 	use crate::{
+		Pallet, TransactionMeter,
 		exec::Executable,
 		primitives::ExecConfig,
 		storage::{AccountInfo, ContractInfo},
-		Pallet, TransactionMeter,
 	};
 
 	let (runtime_code, _runtime_hash) =

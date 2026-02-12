@@ -22,7 +22,7 @@
 extern crate alloc;
 
 use super::PALLET_MIGRATIONS_ID;
-use crate::{storage::AccountType, weights::WeightInfo, AccountInfo, AccountInfoOf, Config, H160};
+use crate::{AccountInfo, AccountInfoOf, Config, H160, storage::AccountType, weights::WeightInfo};
 use frame_support::{
 	migrations::{MigrationId, SteppedMigration, SteppedMigrationError},
 	pallet_prelude::PhantomData,
@@ -35,9 +35,9 @@ use alloc::vec::Vec;
 /// Old storage types as they exist on master (before EIP-7702 changes).
 pub mod old {
 	use super::Config;
-	use crate::{pallet::Pallet, storage::ContractInfo, H160};
+	use crate::{H160, pallet::Pallet, storage::ContractInfo};
 	use codec::{Decode, Encode, MaxEncodedLen};
-	use frame_support::{storage_alias, CloneNoBound, DefaultNoBound, Identity};
+	use frame_support::{CloneNoBound, DefaultNoBound, Identity, storage_alias};
 	use scale_info::TypeInfo;
 
 	#[derive(
@@ -100,8 +100,9 @@ impl<T: Config> SteppedMigration for Migration<T> {
 			if let Some((last_key, value)) = iter.into_iter().next() {
 				let new_account_type = match value.account_type {
 					old::AccountType::Contract(ci) => AccountType::Contract(ci),
-					old::AccountType::EOA =>
-						AccountType::EOA { delegate_target: None, contract_info: None },
+					old::AccountType::EOA => {
+						AccountType::EOA { delegate_target: None, contract_info: None }
+					},
 				};
 				AccountInfoOf::<T>::insert(
 					last_key,
@@ -138,8 +139,8 @@ impl<T: Config> SteppedMigration for Migration<T> {
 #[test]
 fn migrate_to_v3() {
 	use crate::{
-		tests::{ExtBuilder, Test},
 		ContractInfo,
+		tests::{ExtBuilder, Test},
 	};
 
 	ExtBuilder::default().genesis_config(None).build().execute_with(|| {

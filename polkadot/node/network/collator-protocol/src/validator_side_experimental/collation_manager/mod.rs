@@ -23,7 +23,7 @@ use crate::{
 		common::{
 			Advertisement, CanSecond, CollationFetchError, CollationFetchResponse,
 			ProspectiveCandidate, Score, SecondingRejectionInfo, FAILED_FETCH_SLASH,
-			MAX_FETCH_DELAY,
+			INSTANT_FETCH_REP_THRESHOLD, MAX_FETCH_DELAY,
 		},
 		error::{Error, FatalResult, Result},
 	},
@@ -57,8 +57,6 @@ use std::{
 	collections::{BTreeSet, HashMap, VecDeque},
 	time::{Duration, Instant},
 };
-
-use super::common::INSTANT_FETCH_REP_THRESHOLD;
 
 mod requests;
 
@@ -279,6 +277,10 @@ impl CollationManager {
 		self.claim_queue_state.all_assignments()
 	}
 
+	pub fn all_free_slots(&self) -> BTreeSet<ParaId> {
+		self.claim_queue_state.all_free_slots()
+	}
+
 	pub async fn try_accept_advertisement<Sender: CollatorProtocolSenderTrait>(
 		&mut self,
 		sender: &mut Sender,
@@ -335,6 +337,7 @@ impl CollationManager {
 	>(
 		&mut self,
 		connected_rep_query_fn: RepQueryFn,
+		max_scores: HashMap<ParaId, Score>,
 		mut create_timer_fn: TimerFn,
 	) -> (Vec<Requests>, Option<Duration>) {
 		let now = Instant::now();
@@ -364,11 +367,14 @@ impl CollationManager {
 			}
 
 			for para_id in free_slots {
+				let highest_rep_of_para = max_scores.get(&para_id).copied().unwrap_or_default();
+
 				let advertisement = match self.pick_best_advertisement(
 					now,
 					leaf,
 					allowed_parents,
 					para_id,
+					highest_rep_of_para,
 					&connected_rep_query_fn,
 				) {
 					Either::Left(Some(advertisement)) => advertisement,
@@ -594,8 +600,8 @@ impl CollationManager {
 
 	// Returns max delay for unknown collators and zero delay if the collator has provided at least
 	// one good collation (it's score is >= INSTANT_FETCH_REP_THRESHOLD).
-	fn calculate_delay(collator_score: Score) -> Duration {
-		if collator_score >= INSTANT_FETCH_REP_THRESHOLD {
+	fn calculate_delay(collator_score: Score, max_score_for_para: Score) -> Duration {
+		if collator_score >= INSTANT_FETCH_REP_THRESHOLD || collator_score >= max_score_for_para {
 			return Duration::ZERO;
 		}
 
@@ -614,6 +620,7 @@ impl CollationManager {
 		leaf: Hash,
 		allowed_rps: &[Hash],
 		para_id: ParaId,
+		highest_rep_of_para: Score,
 		connected_rep_query_fn: &RepQueryFn,
 	) -> Either<Option<Advertisement>, Duration> {
 		let advertisements = self
@@ -641,7 +648,7 @@ impl CollationManager {
 			None => return Either::Left(None),
 		};
 
-		let delay = Self::calculate_delay(best_advertisement.score);
+		let delay = Self::calculate_delay(best_advertisement.score, highest_rep_of_para);
 
 		if *best_advertisement.timestamp + delay <= now {
 			Either::Left(Some(*best_advertisement.adv))
@@ -1187,6 +1194,7 @@ fn process_collation_fetch_result(
 
 #[cfg(test)]
 mod tests {
+	use crate::validator_side_experimental::common::MAX_SCORE;
 
 	use super::*;
 	use std::sync::Arc;
@@ -1195,16 +1203,29 @@ mod tests {
 	fn calculate_delay_works() {
 		let score = |val: u16| Score::new(val);
 
-		// collator score == INSTANT_FETCH_REP_THRESHOLD => zero delay
-		assert_eq!(CollationManager::calculate_delay(INSTANT_FETCH_REP_THRESHOLD), Duration::ZERO);
+		// collator score == max score => zero delay
+		assert_eq!(
+			CollationManager::calculate_delay(score(MAX_SCORE), score(MAX_SCORE)),
+			Duration::ZERO
+		);
 
-		// collator score == 0 => MAX_FETCH_DELAY
-		assert_eq!(CollationManager::calculate_delay(score(0)), MAX_FETCH_DELAY);
+		// collator score >= INSTANT_FETCH_REP_THRESHOLD => zero delay
+		assert_eq!(
+			CollationManager::calculate_delay(INSTANT_FETCH_REP_THRESHOLD, score(MAX_SCORE)),
+			Duration::ZERO
+		);
 
 		// collator score > INSTANT_FETCH_REP_THRESHOLD => zero delay
-		let mut above_threshold = INSTANT_FETCH_REP_THRESHOLD;
-		above_threshold.saturating_add(1);
-		assert_eq!(CollationManager::calculate_delay(above_threshold), Duration::ZERO);
+		assert_eq!(CollationManager::calculate_delay(score(100), score(MAX_SCORE)), Duration::ZERO);
+
+		// collator score >= max_score_for_para => zero delay
+		assert_eq!(CollationManager::calculate_delay(score(50), score(50)), Duration::ZERO);
+
+		// collator score == 0 and max_score_for_para > 0 => MAX_FETCH_DELAY
+		assert_eq!(CollationManager::calculate_delay(score(0), score(MAX_SCORE)), MAX_FETCH_DELAY);
+
+		// collator score == 0 and max_score_for_para == 0 => zero delay (no one has rep yet)
+		assert_eq!(CollationManager::calculate_delay(score(0), score(0)), Duration::ZERO);
 	}
 
 	#[test]
@@ -1350,6 +1371,7 @@ mod tests {
 					relay_parent,
 					&[relay_parent],
 					para_id,
+					score(100),
 					&get_rep,
 				),
 				Either::Left(None)
@@ -1373,6 +1395,7 @@ mod tests {
 					relay_parent,
 					&[relay_parent],
 					para_id,
+					score(100), // highest_rep == peer's score, so delay = 0
 					&get_rep,
 				),
 				Either::Left(Some(make_adv(peer_a)))
@@ -1390,12 +1413,14 @@ mod tests {
 				.unwrap()
 				.add_advertisement(make_adv(peer_a), recent_timestamp);
 
-			// Peer's score is below threshold, so delay = MAX_FETCH_DELAY
+			// highest_rep = 100, peer's score = 0 (< INSTANT_FETCH_REP_THRESHOLD), so delay =
+			// MAX_FETCH_DELAY
 			let result = collation_manager.pick_best_advertisement(
 				now,
 				relay_parent,
 				&[relay_parent],
 				para_id,
+				score(100),
 				&get_rep,
 			);
 
@@ -1432,6 +1457,7 @@ mod tests {
 					relay_parent,
 					&[relay_parent],
 					para_id,
+					score(100),
 					&get_rep,
 				),
 				Either::Left(Some(make_adv(peer_b)))
@@ -1457,6 +1483,7 @@ mod tests {
 					relay_parent,
 					&[relay_parent],
 					para_id,
+					score(100),
 					&get_rep,
 				),
 				Either::Left(Some(make_adv(peer_b)))
@@ -1480,6 +1507,7 @@ mod tests {
 					relay_parent,
 					&[relay_parent],
 					para_id,
+					score(100),
 					&get_rep,
 				),
 				Either::Left(None)
@@ -1505,6 +1533,7 @@ mod tests {
 					relay_parent,
 					&[other_relay_parent], // relay_parent not included
 					para_id,
+					score(100),
 					&get_rep,
 				),
 				Either::Left(None)

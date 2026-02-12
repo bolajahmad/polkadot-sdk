@@ -109,14 +109,14 @@ pub trait PruningFilter: Send + Sync {
 	/// Check if a block with the given justifications should be preserved.
 	///
 	/// Returns `true` to preserve the block, `false` to allow pruning.
-	fn should_preserve(&self, justifications: &Justifications) -> bool;
+	fn should_retain(&self, justifications: &Justifications) -> bool;
 }
 
 impl<F> PruningFilter for F
 where
 	F: Fn(&Justifications) -> bool + Send + Sync,
 {
-	fn should_preserve(&self, justifications: &Justifications) -> bool {
+	fn should_retain(&self, justifications: &Justifications) -> bool {
 		(self)(justifications)
 	}
 }
@@ -2012,20 +2012,19 @@ impl<Block: BlockT> Backend<Block> {
 					// We need to check both the current transaction justifications (not yet in DB)
 					// and the DB itself (for justifications from previous transactions).
 					if !self.pruning_filters.is_empty() {
-						let should_preserve = if let Some(justification) =
-							current_transaction_justifications.get(&hash)
+						let justifications = match current_transaction_justifications.get(&hash)
 						{
-							let justifications = Justifications::from(justification.clone());
-							self.pruning_filters.iter().any(|f| f.should_preserve(&justifications))
-						} else if let Some(justifications) = self.blockchain.justifications(hash)? {
-							self.pruning_filters.iter().any(|f| f.should_preserve(&justifications))
-						} else {
-							false
+							Some(j) => Some(Justifications::from(j.clone())),
+							None => self.blockchain.justifications(hash)?,
 						};
+
+						let should_retain = justifications
+							.map(|j| self.pruning_filters.iter().any(|f| f.should_retain(&j)))
+							.unwrap_or(false);
 
 						// We can just return here, pinning can be ignored since the block will
 						// remain in the DB.
-						if should_preserve {
+						if should_retain {
 							debug!(
 								target: "db",
 								"Preserving block #{number} ({hash}) due to keep predicate match"

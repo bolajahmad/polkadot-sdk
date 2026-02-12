@@ -161,7 +161,7 @@ use std::marker::PhantomData;
 pub struct GrandpaPruningFilter;
 
 impl sc_client_db::PruningFilter for GrandpaPruningFilter {
-	fn should_preserve(&self, justifications: &sp_runtime::Justifications) -> bool {
+	fn should_retain(&self, justifications: &sp_runtime::Justifications) -> bool {
 		justifications.get(GRANDPA_ENGINE_ID).is_some()
 	}
 }

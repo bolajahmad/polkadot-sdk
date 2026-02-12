@@ -797,7 +797,7 @@ where
 			match <Sender as SendXcm>::validate(&mut Some(Destination::get()), &mut Some(first_xcm))
 			{
 				Ok((_ticket, price)) => {
-					log::debug!(target: "runtime::staking-async::xcm", "📨 validated, price: {:?}", price);
+					log::debug!(target: "runtime::staking-async::xcm", "📨 validated, price: {price:?}");
 					return Ok(current_messages
 						.into_iter()
 						.map(ToXcm::convert)

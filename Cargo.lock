@@ -1438,8 +1438,8 @@ dependencies = [
  "snowbridge-outbound-queue-primitives",
  "snowbridge-pallet-system-frontend",
  "snowbridge-runtime-common",
- "sp-api",
- "sp-arithmetic",
+ "sp-api 26.0.0",
+ "sp-arithmetic 23.0.0",
  "sp-authority-discovery",
  "sp-block-builder",
  "sp-consensus-aura",
@@ -8197,7 +8197,6 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "futures-channel",
- "futures-core",
  "futures-util",
  "http 1.4.0",
  "http-body 1.0.1",
@@ -10801,8 +10800,8 @@ dependencies = [
  "sp-consensus 0.32.0",
  "sp-consensus-babe",
  "sp-consensus-beefy",
- "sp-keystore",
- "sp-runtime",
+ "sp-keystore 0.34.0",
+ "sp-runtime 31.0.1",
  "substrate-frame-rpc-system",
  "substrate-state-trie-migration-rpc",
 ]
@@ -13729,8 +13728,8 @@ dependencies = [
  "primitive-types 0.13.1",
  "scale-info",
  "serde_json",
- "sp-api",
- "sp-arithmetic",
+ "sp-api 26.0.0",
+ "sp-arithmetic 23.0.0",
  "sp-authority-discovery",
  "sp-block-builder",
  "sp-consensus-aura",
@@ -15251,8 +15250,8 @@ dependencies = [
  "polkadot-primitives-test-helpers",
  "rstest",
  "sc-keystore",
- "sc-network",
- "sc-network-types",
+ "sc-network 0.34.0",
+ "sc-network-types 0.10.0",
  "schnellru",
  "sp-core 28.0.0",
  "sp-keyring",
@@ -20849,8 +20848,8 @@ dependencies = [
  "parking_lot 0.12.5",
  "pretty_assertions",
  "sc-block-builder",
- "sc-chain-spec",
- "sc-client-api",
+ "sc-chain-spec 28.0.0",
+ "sc-client-api 28.0.0",
  "sc-keystore",
  "sc-mixnet",
  "sc-network 0.34.0",
@@ -21121,9 +21120,9 @@ dependencies = [
  "sc-client-api 28.0.0",
  "sc-keystore",
  "sc-network-statement",
- "sc-utils",
- "sp-api",
- "sp-blockchain",
+ "sc-utils 14.0.0",
+ "sp-api 26.0.0",
+ "sp-blockchain 28.0.0",
  "sp-core 28.0.0",
  "sp-runtime 31.0.1",
  "sp-statement-store",
@@ -24477,7 +24476,7 @@ dependencies = [
  "bounded-collections 0.3.2",
  "parity-scale-codec",
  "scale-info",
- "schemars 1.2.0",
+ "schemars 1.2.1",
  "serde",
  "smallvec",
  "sp-arithmetic 23.0.0",
@@ -24874,7 +24873,7 @@ dependencies = [
  "impl-trait-for-tuples",
  "parity-scale-codec",
  "scale-info",
- "schemars 1.2.0",
+ "schemars 1.2.1",
  "serde",
  "sp-io 30.0.0",
  "sp-runtime 31.0.1",
@@ -28096,18 +28095,18 @@ version = "0.26.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75c7f0ef91146ebfb530314f5f1d24528d7f0767efbfd31dce919275413e393e"
 dependencies = [
- "webpki-root-certs 1.0.6",
+ "webpki-root-certs 1.0.5",
 ]
 
 [[package]]
 name = "webpki-root-certs"
-<<<<<<< HEAD
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36a29fc0408b113f68cf32637857ab740edfafdf460c326cd2afaa2d84cc05dc"
 dependencies = [
  "rustls-pki-types",
 ]
+
 [[package]]
 name = "webpki-roots"
 version = "0.25.4"

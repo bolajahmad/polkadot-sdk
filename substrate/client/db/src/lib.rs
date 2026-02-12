@@ -2012,8 +2012,7 @@ impl<Block: BlockT> Backend<Block> {
 					// We need to check both the current transaction justifications (not yet in DB)
 					// and the DB itself (for justifications from previous transactions).
 					if !self.pruning_filters.is_empty() {
-						let justifications = match current_transaction_justifications.get(&hash)
-						{
+						let justifications = match current_transaction_justifications.get(&hash) {
 							Some(j) => Some(Justifications::from(j.clone())),
 							None => self.blockchain.justifications(hash)?,
 						};

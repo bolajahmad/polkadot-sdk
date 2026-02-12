@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770909135903,
+  "lastUpdate": 1770935596715,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "cb12563ae4e532876c29b67be9a7f5d06fdc9fc3",
-          "message": "Replace `assert_para_throughput` with `assert_finalized_para_throughput` (#9117)\n\nThere is no need to have two functions which are essentially doing the\nsame. It is also better to oberserve the finalized blocks, which also\nsimplifies the code. So, this pull request is replacing the\n`assert_para_throughput` with `assert_finalized_para_throughput`. It\nalso replaces any usage of `assert_finalized_para_throughput` with\n`assert_para_throughput`.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-08T16:04:23Z",
-          "tree_id": "faed545176a9de8b004b29e5ee7e4b5c2ccecef6",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/cb12563ae4e532876c29b67be9a7f5d06fdc9fc3"
-        },
-        "date": 1751994925618,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19686394316666664,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.2646338965,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12400224553333332,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "84690100+metricaez@users.noreply.github.com",
+            "name": "Emiliano",
+            "username": "metricaez"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3d6768bb613732a2dc29fa87f64e2da88c4d05d7",
+          "message": "Feat: Add API and mechanism to retrieve additional top-level and child proofs via the relay state proof (#10678)\n\n## Purpose\n\nThis pull request introduces a new runtime API and implements the full\nfeature pipeline for requesting additional relay-chain storage proofs in\nlookahead collators. The API allows parachain runtimes to specify extra\ntop-level storage keys or child-trie data that must be included in the\nrelay-chain state proof. The collator collects these additional proofs\nand merges them into the relay-chain state proof provided to the runtime\nduring block execution, enabling the runtime to later process custom\nrelay-chain data.\n\n## Rationale \n\nImmediate application in pubsub mechanism proposed in #9994\n\nThis is a narrow down of scope for easier review of PR #10679 \n\nDue to early exits when defaulted it adds no significant overhead to\ncurrent flows.\n\n## What this PR adds\n### Runtime API\n\n- Introduces `KeyToIncludeInRelayProofApi`. (_Suggestions for better\nnaming are very welcome._)\n\n- Adds supporting types` RelayProofRequest` and `RelayStorageKey`.\n\n- Allows runtimes to declare which relay-chain storage entries must be\nincluded in the relay state proof.\n\n### Collator integration\n\n- The lookahead collator calls the runtime API before block production.\n\n- Requested relay-chain proofs are collected, batched, and merged in a\nsingle operation.\n\n- The additional proofs are merged into the existing relay-chain state\nproof and passed to the runtime via parachain inherent data.\n\n### Proof extraction\n\n- `parachain-system` exposes an extraction method for processing this\nadditional proofs.\n\n- Uses a handler pattern:\n\n  - `parachain-system` manages proof lifecycle and initial validation.\n\n- Application pallets consume proofs (data extraction or additional\nvalidation) by implementing `ProcessRelayProofKeys`.\n\n- Keeps extra proofs processing logic out of parachain-system.\n\n### About RelayStorageKey\n\n`RelayStorageKey` is an enum with two variants:\n\n- `Top`: a `Vec<u8>` representing a top-level relay-chain storage key.\n\n- `Child`, which contains:\n\n- `storage_key`: an unprefixed identifier of the child trie root (the\ndefault _:child_storage:default:_ prefix is applied automatically),\n\n  - `key`: the specific key within that child trie.\n\nOn the client side, child trie access is performed via\nChildInfo::new_default(&storage_key).\n\nWhy `storage_key` instead of `ChildInfo`:\n\n- `ChildInfo` from `sp-storage` does not implement `TypeInfo`, which\nruntime APIs require.\n\n- Adding `TypeInfo` to `sp-storage` (or introducing a wrapper to avoid\nbloating a critical core component like `sp-storage`) would\nsignificantly expand the scope of this PR.\n\nAs a result, the current design:\n\n- Uses raw `storage_key` bytes.\n\n- Is limited to child tries using the default prefix.\n\n## Future improvements\n\n- Full `ChildInfo` support if `TypeInfo` is added to `sp-storage`\n(directly or via a wrapper), enabling arbitrary child-trie prefixes.\n\n- Possible unification with `additional_relay_state_keys` for top-level\nproofs, subject to careful analysis of semantics and backward\ncompatibility.\n\n- Integration with additional collator implementations beyond lookahead\ncollators.\n\n---------\n\nCo-authored-by: Bastian Köcher <git@kchr.de>",
+          "timestamp": "2026-02-12T21:20:43Z",
+          "tree_id": "ce83e45aa5c1043f464e55380ff5599433a180ea",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3d6768bb613732a2dc29fa87f64e2da88c4d05d7"
+        },
+        "date": 1770935574745,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12070438399999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.256205661166664,
             "unit": "seconds"
           }
         ]

@@ -1425,9 +1425,8 @@ construct_runtime!(
 
 		// Staking
 		// NOTE: Following pallet indices differ from PAH. For remote snapshot testing with PAH data,
-		// temporarily align to PAH indices (DO NOT COMMIT):
-  		// Staking: 89, NominationPools: 80, VoterList: 82, DelegatedStaking: 83,
-		// StakingRcClient: 84
+		// temporarily align to PAH indices (DO NOT COMMIT): Staking: 89, NominationPools: 80,
+		// VoterList: 82, DelegatedStaking: 83, StakingRcClient: 84
 		// Refer: https://github.com/polkadot-fellows/runtimes/blob/main/system-parachains/asset-hubs/asset-hub-polkadot/src/lib.rs#L1545
 		Staking: pallet_staking_async = 80,
 		NominationPools: pallet_nomination_pools = 81,

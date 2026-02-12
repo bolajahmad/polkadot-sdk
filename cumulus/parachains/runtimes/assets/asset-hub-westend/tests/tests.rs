@@ -2282,8 +2282,8 @@ mod remote_test {
 	#[tokio::test]
 	#[ignore]
 	async fn np_claim_trapped_balance() {
-		use remote_externalities::{Builder, Mode, OfflineConfig, SnapshotConfig};
 		use pallet_nomination_pools::PoolMembers;
+		use remote_externalities::{Builder, Mode, OfflineConfig, SnapshotConfig};
 
 		// Get snapshot path from environment (required)
 		let snap_path =
@@ -2292,9 +2292,7 @@ mod remote_test {
 		println!("Loading snapshot from: {}", snap_path);
 
 		let mut ext = Builder::<Block>::new()
-			.mode(Mode::Offline(OfflineConfig {
-				state_snapshot: SnapshotConfig::new(snap_path),
-			}))
+			.mode(Mode::Offline(OfflineConfig { state_snapshot: SnapshotConfig::new(snap_path) }))
 			.build()
 			.await
 			.expect("Failed to load snapshot");

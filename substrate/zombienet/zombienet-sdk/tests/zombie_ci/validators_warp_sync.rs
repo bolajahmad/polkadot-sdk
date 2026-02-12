@@ -187,15 +187,10 @@ fn build_network_config() -> Result<NetworkConfig> {
 						.with_args(vec!["--sync=warp".into(), "--log=beefy=debug".into()])
 				})
 				.with_fullnode(|node| {
-					node.with_name("charlie")
-						.with_db_snapshot(db_snapshot.as_str())
+					node.with_name("charlie").with_db_snapshot(db_snapshot.as_str())
 				})
-				.with_fullnode(|node| {
-					node.with_name("dave").with_db_snapshot(db_snapshot.as_str())
-				})
-				.with_fullnode(|node| {
-					node.with_name("eve").with_db_snapshot(db_snapshot.as_str())
-				})
+				.with_fullnode(|node| node.with_name("dave").with_db_snapshot(db_snapshot.as_str()))
+				.with_fullnode(|node| node.with_name("eve").with_db_snapshot(db_snapshot.as_str()))
 		})
 		.with_global_settings(|global_settings| match std::env::var("ZOMBIENET_SDK_BASE_DIR") {
 			Ok(val) => global_settings.with_base_dir(val),

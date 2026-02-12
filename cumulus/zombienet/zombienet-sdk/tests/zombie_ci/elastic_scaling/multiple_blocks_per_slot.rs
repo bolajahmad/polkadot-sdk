@@ -77,10 +77,12 @@ async fn build_network_config() -> Result<NetworkConfig, anyhow::Error> {
 						}
 					}
 				}))
-				// Have to set a `with_validator` outside of the loop below, so that `r` has the right
-				// type.
+				// Have to set a `with_validator` outside of the loop below, so that `r` has the
+				// right type.
 				.with_validator(|node| node.with_name("validator-0"));
-			(1..9).fold(r, |acc, i| acc.with_validator(|node| node.with_name(&format!("validator-{i}"))))
+			(1..9).fold(r, |acc, i| {
+				acc.with_validator(|node| node.with_name(&format!("validator-{i}")))
+			})
 		})
 		.with_parachain(|p| {
 			p.with_id(PARA_ID)

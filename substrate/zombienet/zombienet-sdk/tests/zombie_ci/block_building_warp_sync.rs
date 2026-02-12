@@ -70,9 +70,7 @@ fn build_network_config() -> Result<NetworkConfig> {
 				.with_validator(|node| {
 					node.with_name("alice").with_db_snapshot(db_snapshot.as_str())
 				})
-				.with_validator(|node| {
-					node.with_name("bob").with_db_snapshot(db_snapshot.as_str())
-				})
+				.with_validator(|node| node.with_name("bob").with_db_snapshot(db_snapshot.as_str()))
 				.with_fullnode(|node| {
 					node.with_name("charlie").with_db_snapshot(db_snapshot.as_str())
 				})

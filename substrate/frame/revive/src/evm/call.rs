@@ -242,9 +242,9 @@ impl GenericTransaction {
 
 		// the leftover we make available to the deposit collection system
 		let storage_deposit = eth_fee.checked_sub(tx_fee.into()).ok_or_else(|| {
-		log::error!(target: LOG_TARGET, "The eth_fee={eth_fee:?} is smaller than the tx_fee={tx_fee:?}. This is a bug.");
-		InvalidTransaction::Payment
-	})?.saturated_into();
+			log::error!(target: LOG_TARGET, "The eth_fee={eth_fee:?} is smaller than the tx_fee={tx_fee:?}. This is a bug.");
+			InvalidTransaction::Payment
+		})?.saturated_into();
 
 		Ok(CallInfo {
 			call,

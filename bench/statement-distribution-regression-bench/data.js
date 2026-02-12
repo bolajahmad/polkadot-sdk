@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770909238695,
+  "lastUpdate": 1770935679853,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "10196091+Ank4n@users.noreply.github.com",
-            "name": "Ankan",
-            "username": "Ank4n"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "f1ba2a1c7206c70ad66168859c90ab4e4327aab6",
-          "message": "Optimize buffered offence storage and prevent unbounded growth in staking-async ah-client pallet (#9049)\n\n## 🤔 Why\nThis addresses potential memory issues and improves efficiency of\noffence handling during buffered operating mode (see\nhttps://github.com/paritytech-secops/srlabs_findings/issues/525)\n\n\n## 🔑 Key changes\n\n- Prevents duplicate offences for the same offender in the same session\nby keeping only the highest slash fraction\n- Introduces `BufferedOffence` struct with optional reporter and slash\nfraction fields\n- Restructures buffered offences storage from `Vec<(SessionIndex,\nVec<Offence>)>` to nested `BTreeMap<SessionIndex, BTreeMap<AccountId,\nBufferedOffence>>`\n- Adds `MaxOffenceBatchSize` configuration parameter for batching\ncontrol\n- Processes offences in batches with configurable size limits, sending\nonly first session's offences per block\n- Implements proper benchmarking infrastructure for\n`process_buffered_offences` function\n- Adds WeightInfo trait with benchmarked weights for batch processing in\n`on_initialize` hook\n\n## ✍️ Co-authors\n@Ank4n \n@sigurpol\n\n---------\n\nCo-authored-by: Paolo La Camera <paolo@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-04T09:02:33Z",
-          "tree_id": "410487862394418dd87119db2954a36e4de0c43c",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/f1ba2a1c7206c70ad66168859c90ab4e4327aab6"
-        },
-        "date": 1751623960468,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 127.94999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.045815038075999966,
-            "unit": "seconds"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.034305435944,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.06978839884399994,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "84690100+metricaez@users.noreply.github.com",
+            "name": "Emiliano",
+            "username": "metricaez"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3d6768bb613732a2dc29fa87f64e2da88c4d05d7",
+          "message": "Feat: Add API and mechanism to retrieve additional top-level and child proofs via the relay state proof (#10678)\n\n## Purpose\n\nThis pull request introduces a new runtime API and implements the full\nfeature pipeline for requesting additional relay-chain storage proofs in\nlookahead collators. The API allows parachain runtimes to specify extra\ntop-level storage keys or child-trie data that must be included in the\nrelay-chain state proof. The collator collects these additional proofs\nand merges them into the relay-chain state proof provided to the runtime\nduring block execution, enabling the runtime to later process custom\nrelay-chain data.\n\n## Rationale \n\nImmediate application in pubsub mechanism proposed in #9994\n\nThis is a narrow down of scope for easier review of PR #10679 \n\nDue to early exits when defaulted it adds no significant overhead to\ncurrent flows.\n\n## What this PR adds\n### Runtime API\n\n- Introduces `KeyToIncludeInRelayProofApi`. (_Suggestions for better\nnaming are very welcome._)\n\n- Adds supporting types` RelayProofRequest` and `RelayStorageKey`.\n\n- Allows runtimes to declare which relay-chain storage entries must be\nincluded in the relay state proof.\n\n### Collator integration\n\n- The lookahead collator calls the runtime API before block production.\n\n- Requested relay-chain proofs are collected, batched, and merged in a\nsingle operation.\n\n- The additional proofs are merged into the existing relay-chain state\nproof and passed to the runtime via parachain inherent data.\n\n### Proof extraction\n\n- `parachain-system` exposes an extraction method for processing this\nadditional proofs.\n\n- Uses a handler pattern:\n\n  - `parachain-system` manages proof lifecycle and initial validation.\n\n- Application pallets consume proofs (data extraction or additional\nvalidation) by implementing `ProcessRelayProofKeys`.\n\n- Keeps extra proofs processing logic out of parachain-system.\n\n### About RelayStorageKey\n\n`RelayStorageKey` is an enum with two variants:\n\n- `Top`: a `Vec<u8>` representing a top-level relay-chain storage key.\n\n- `Child`, which contains:\n\n- `storage_key`: an unprefixed identifier of the child trie root (the\ndefault _:child_storage:default:_ prefix is applied automatically),\n\n  - `key`: the specific key within that child trie.\n\nOn the client side, child trie access is performed via\nChildInfo::new_default(&storage_key).\n\nWhy `storage_key` instead of `ChildInfo`:\n\n- `ChildInfo` from `sp-storage` does not implement `TypeInfo`, which\nruntime APIs require.\n\n- Adding `TypeInfo` to `sp-storage` (or introducing a wrapper to avoid\nbloating a critical core component like `sp-storage`) would\nsignificantly expand the scope of this PR.\n\nAs a result, the current design:\n\n- Uses raw `storage_key` bytes.\n\n- Is limited to child tries using the default prefix.\n\n## Future improvements\n\n- Full `ChildInfo` support if `TypeInfo` is added to `sp-storage`\n(directly or via a wrapper), enabling arbitrary child-trie prefixes.\n\n- Possible unification with `additional_relay_state_keys` for top-level\nproofs, subject to careful analysis of semantics and backward\ncompatibility.\n\n- Integration with additional collator implementations beyond lookahead\ncollators.\n\n---------\n\nCo-authored-by: Bastian Köcher <git@kchr.de>",
+          "timestamp": "2026-02-12T21:20:43Z",
+          "tree_id": "ce83e45aa5c1043f464e55380ff5599433a180ea",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/3d6768bb613732a2dc29fa87f64e2da88c4d05d7"
+        },
+        "date": 1770935658569,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 128.06399999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06484050632599991,
+            "unit": "seconds"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03715936719600001,
             "unit": "seconds"
           }
         ]

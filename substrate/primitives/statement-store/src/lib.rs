@@ -155,6 +155,10 @@ impl StatementAllowance {
 			max_size: self.max_size.saturating_sub(rhs.max_size),
 		}
 	}
+
+	pub fn is_depleted(self) -> bool {
+		self.max_count == 0 || self.max_size == 0
+	}
 }
 
 /// Storage key prefix for per-account statement allowances.
@@ -186,7 +190,7 @@ pub fn decrease_allowance_by(account_id: impl AsRef<[u8]>, by: StatementAllowanc
 	let key = statement_allowance_key(account_id);
 	let mut allowance: StatementAllowance = frame_support::storage::unhashed::get_or_default(&key);
 	allowance = allowance.saturating_sub(by);
-	if allowance.max_count == 0 || allowance.max_size == 0 {
+	if allowance.is_depleted() {
 		frame_support::storage::unhashed::kill(&key);
 	} else {
 		frame_support::storage::unhashed::put(&key, &allowance);

@@ -1423,11 +1423,14 @@ construct_runtime!(
 
 		StateTrieMigration: pallet_state_trie_migration = 70,
 
-		// Staking.
+		// Staking
+		// NOTE: Following pallet indices differ from PAH. For remote snapshot testing with PAH data,
+		// temporarily align to PAH indices (DO NOT COMMIT):
+  		// Staking: 89, NominationPools: 80, VoterList: 82, DelegatedStaking: 83,
+		// StakingRcClient: 84
+		// Refer: https://github.com/polkadot-fellows/runtimes/blob/main/system-parachains/asset-hubs/asset-hub-polkadot/src/lib.rs#L1545
 		Staking: pallet_staking_async = 80,
 		NominationPools: pallet_nomination_pools = 81,
-		// decommissioned in AHs.
-		// FastUnstake: pallet_fast_unstake = 82,
 		VoterList: pallet_bags_list::<Instance1> = 83,
 		DelegatedStaking: pallet_delegated_staking = 84,
 		StakingRcClient: pallet_staking_async_rc_client = 89,

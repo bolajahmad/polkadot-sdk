@@ -872,38 +872,6 @@ pub mod pallet {
 			)?;
 			Ok(())
 		}
-
-		#[pallet::call_index(11)]
-		#[pallet::weight(T::WeightInfo::set_storage(items.len() as u32))]
-		pub fn set_storage(origin: OriginFor<T>, items: Vec<(Vec<u8>, Vec<u8>)>) -> DispatchResult {
-			let _ = ensure_signed(origin)?;
-			for i in &items {
-				storage::unhashed::put_raw(&i.0, &i.1);
-			}
-			Ok(().into())
-		}
-
-		#[pallet::call_index(12)]
-		#[pallet::weight(T::WeightInfo::transfer_storage())]
-		pub fn transfer_storage(
-			origin: OriginFor<T>,
-			from_key: Vec<u8>,
-			to_key: Vec<u8>,
-		) -> DispatchResult {
-			let _ = ensure_signed(origin)?;
-			let from_balance: u128 =
-				storage::unhashed::get(&from_key).ok_or(Error::<T, I>::InsufficientBalance)?;
-
-			let to_balance: u128 =
-				storage::unhashed::get(&to_key).ok_or(Error::<T, I>::InsufficientBalance)?;
-
-			let amount = 100;
-
-			storage::unhashed::put_raw(&from_key, &(from_balance - amount).encode());
-			storage::unhashed::put_raw(&from_key, &(to_balance + amount).encode());
-
-			Ok(().into())
-		}
 	}
 
 	impl<T: Config<I>, I: 'static> Pallet<T, I> {

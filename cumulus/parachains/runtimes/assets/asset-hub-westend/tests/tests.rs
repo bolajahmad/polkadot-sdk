@@ -2260,3 +2260,103 @@ fn pure_proxy_stash_can_delegate_to_staking_operator() {
 			);
 		});
 }
+
+mod remote_test {
+	use super::*;
+	use sp_runtime::traits::Dispatchable;
+
+	/// Test claim_trapped_balance for all pool members using a state snapshot.
+	///
+	/// The test iterates through all pool members and attempts to claim trapped balance.
+	/// Only successful claims are printed.
+	///
+	/// Run with:
+	/// ```bash
+	/// SNAP=<PATH_TO_SNAP> cargo test -r -p asset-hub-westend-runtime claim_trapped_balance \
+	/// -- --ignored --nocapture
+	/// ```
+	///
+	/// Note: If you want to test this with PAH snapshot, ensure WAH staking pallet indices align
+	/// with PAH.
+	#[tokio::test]
+	#[ignore]
+	async fn claim_trapped_balance() {
+		use remote_externalities::{Builder, Mode, OfflineConfig, SnapshotConfig};
+		use pallet_nomination_pools::PoolMembers;
+
+		// Get snapshot path from environment (required)
+		let snap_path =
+			std::env::var("SNAP").expect("SNAP env var not set. Please provide snapshot path.");
+
+		println!("Loading snapshot from: {}", snap_path);
+
+		let mut ext = Builder::<Block>::new()
+			.mode(Mode::Offline(OfflineConfig {
+				state_snapshot: SnapshotConfig::new(snap_path),
+			}))
+			.build()
+			.await
+			.expect("Failed to load snapshot");
+
+		ext.execute_with(|| {
+			const DOT_DECIMALS: u128 = 10_000_000_000; // 10 decimals for DOT
+
+			println!("\n🔍 Checking trapped balance for all pool members...\n");
+
+			// Track event count before dispatching any calls
+			let event_count_before = System::event_count();
+			let total_members = PoolMembers::<Runtime>::iter().count();
+
+			// Dispatch claim_trapped_balance for all members
+			for (member_account, _pool_member) in PoolMembers::<Runtime>::iter() {
+				let call = RuntimeCall::NominationPools(
+					pallet_nomination_pools::Call::claim_trapped_balance {
+						member_account: member_account.clone().into(),
+					},
+				);
+
+				// Dispatch and ignore result - we'll check events instead
+				let _ = call.dispatch(RuntimeOrigin::signed(member_account.clone()));
+			}
+
+			// Process all new events emitted during the dispatches
+			let all_events = System::events();
+			let new_events = &all_events[event_count_before as usize..];
+
+			let mut total_claimed = 0u128;
+			let mut success_count = 0u32;
+
+			// Print table header
+			println!("| Member | Pool | Trapped DOT |");
+			println!("|--------|------|-------------|");
+
+			for event_record in new_events {
+				if let RuntimeEvent::NominationPools(
+					pallet_nomination_pools::Event::TrappedBalanceClaimed {
+						member,
+						pool_id,
+						amount,
+					},
+				) = &event_record.event
+				{
+					success_count += 1;
+					total_claimed += amount;
+
+					// Format with 10 decimals for DOT
+					let whole = amount / DOT_DECIMALS;
+					let fraction = amount % DOT_DECIMALS;
+
+					println!("| {:?} | {} | {}.{:010} |", member, pool_id, whole, fraction);
+				}
+			}
+
+			// Print summary
+			let total_whole = total_claimed / DOT_DECIMALS;
+			let total_fraction = total_claimed % DOT_DECIMALS;
+
+			println!("Total members: {}", total_members);
+			println!("Successful claims: {}", success_count);
+			println!("Total claimed: {}.{:010} DOT", total_whole, total_fraction);
+		});
+	}
+}

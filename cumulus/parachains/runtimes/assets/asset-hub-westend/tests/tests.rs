@@ -2342,21 +2342,21 @@ mod remote_test {
 					success_count += 1;
 					total_claimed += amount;
 
-					// Format with 10 decimals for DOT
+					// Format with 2 decimal places for DOT
 					let whole = amount / DOT_DECIMALS;
-					let fraction = amount % DOT_DECIMALS;
+					let fraction = (amount % DOT_DECIMALS) / (DOT_DECIMALS / 100);
 
-					println!("| {:?} | {} | {}.{:010} |", member, pool_id, whole, fraction);
+					println!("| {:?} | {} | {}.{:02} |", member, pool_id, whole, fraction);
 				}
 			}
 
 			// Print summary
 			let total_whole = total_claimed / DOT_DECIMALS;
-			let total_fraction = total_claimed % DOT_DECIMALS;
+			let total_fraction = (total_claimed % DOT_DECIMALS) / (DOT_DECIMALS / 100);
 
 			println!("Total members: {}", total_members);
 			println!("Successful claims: {}", success_count);
-			println!("Total claimed: {}.{:010} DOT", total_whole, total_fraction);
+			println!("Total claimed: {}.{:02} DOT", total_whole, total_fraction);
 		});
 	}
 }

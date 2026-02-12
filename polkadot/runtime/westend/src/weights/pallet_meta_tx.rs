@@ -46,7 +46,7 @@ use core::marker::PhantomData;
 /// Weight functions for `pallet_meta_tx`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_meta_tx::WeightInfo for WeightInfo<T> {
-	fn bare_dispatch() -> Weight {
+	fn bare_dispatch(_n: u32) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`

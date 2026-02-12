@@ -319,7 +319,6 @@ impl pallet_broker::Config for Runtime {
 	type Currency = Balances;
 	type OnRevenue = BurnCoretimeRevenue;
 	type TimeslicePeriod = ConstU32<{ coretime::TIMESLICE_PERIOD }>;
-	// We don't actually need any leases at launch but set to 10 in case we want to sudo some in.
 	type MaxLeasedCores = ConstU32<50>;
 	type MaxReservedCores = ConstU32<50>;
 	type Coretime = CoretimeAllocator;

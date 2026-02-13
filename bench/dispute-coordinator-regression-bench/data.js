@@ -1,57 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1771006979779,
+  "lastUpdate": 1771009087488,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "14218860+iulianbarbu@users.noreply.github.com",
-            "name": "Iulian Barbu",
-            "username": "iulianbarbu"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "436b4935b52562f79a83b6ecadeac7dcbc1c2367",
-          "message": "`polkadot-omni-node`: pass timestamp inherent data for block import (#9102)\n\n# Description\n\nThis should allow aura runtimes to check timestamp inherent data to\nsync/import blocks that include timestamp inherent data.\n\nCloses #8907 \n\n## Integration\n\nRuntime developers can check timestamp inherent data while using\n`polkadot-omni-node-lib`/`polkadot-omni-node`/`polkadot-parachain`\nbinaries. This change is backwards compatible and doesn't require\nruntimes to check the timestamp inherent, but they are able to do it now\nif needed.\n\n## Review Notes\n\nN/A\n\n---------\n\nSigned-off-by: Iulian Barbu <iulian.barbu@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-06T09:32:11Z",
-          "tree_id": "239ba865d190c48c06af7d1fa35ceb411cc31cea",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/436b4935b52562f79a83b6ecadeac7dcbc1c2367"
-        },
-        "date": 1751798589854,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 227.09999999999997,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 23.800000000000004,
-            "unit": "KiB"
-          },
-          {
-            "name": "dispute-distribution",
-            "value": 0.00855703834999999,
-            "unit": "seconds"
-          },
-          {
-            "name": "dispute-coordinator",
-            "value": 0.002733640860000001,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.005003881119999989,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -24499,6 +24450,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.006487216749999997,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pgherveou@gmail.com",
+            "name": "PG Herveou",
+            "username": "pgherveou"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6ed951984c065c843dfbe292c11b1c38d22083e2",
+          "message": "pallet-revive: minor cleanups and fixes (#11054)\n\n## Summary\n\nPreparatory cleanup PR extracted from the EIP-7702 branch to simplify\nreview.\n\n- **Counter.sol uint64**: Change `uint256` to `uint64` in\nCounter/NestedCounter fixtures, to avoid U256 conversion in tests.\n- **Debug log**: Add debug log for `eth_transact` substrate tx hash\n- **RLP fix**: Fix `Transaction7702Signed` decoder field order (removed\nincorrect `gas_price` field at index 4, aligned with encoder)\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T17:42:01Z",
+          "tree_id": "924edcd8a7b4426c4410e7250615f9c07bac8fd1",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/6ed951984c065c843dfbe292c11b1c38d22083e2"
+        },
+        "date": 1771009063227,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0026401642600000002,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006354847550000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009021117459999986,
             "unit": "seconds"
           }
         ]

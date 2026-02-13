@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770935596715,
+  "lastUpdate": 1770979804522,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "49718502+alexggh@users.noreply.github.com",
-            "name": "Alexandru Gheorghe",
-            "username": "alexggh"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "88fc41c9cf5e46277b7cab53a72c650b75377d25",
-          "message": "make 0002-parachains-disputes a bit more robust (#9074)\n\nThere is inherently a race between the time we snapshot\nfinality_lag/disputes_finality_lag metrics and if the dispute/approvals\nfinished, so sometimes the test was failing because it was reporting 1\nwhich is in no way a problem, so let's make it a bit more robust by\nsimply waiting more time to reach 0.\n\nFixes: https://github.com/paritytech/polkadot-sdk/issues/8941.\n\n---------\n\nSigned-off-by: Alexandru Gheorghe <alexandru.gheorghe@parity.io>",
-          "timestamp": "2025-07-08T16:10:51Z",
-          "tree_id": "8a90317b0febd3a60f76b56d7a854edcf7a4085d",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/88fc41c9cf5e46277b7cab53a72c650b75377d25"
-        },
-        "date": 1751997012925,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.25637011226667,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.20489628119999997,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-recovery",
             "value": 11.256205661166664,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "117115317+lrubasze@users.noreply.github.com",
+            "name": "Lukasz Rubaszewski",
+            "username": "lrubasze"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b2a4296a96f7c7465d469c1fca0895d40ee1de5e",
+          "message": "Block import improvements (#10373)\n\nThis PR fixes block import during Warp sync, which was silently failing\ndue to \"Unknown parent\" errors - a typical case during Warp sync and the\n`full_node_warp_sync` test was not detecting such failure.\n\nChanges\n - Relaxed verification for Warp synced blocks:\nThe fix relaxes verification requirements for Warp synced blocks by not\nperforming full verification, with the assumption that these blocks are\npart of the finalized chain and have already been verified using the\nprovided warp sync proof.\n- New `BlockOrigin` variants:\nFor improved clarity, two additional `BlockOrigin` items have been\nintroduced:\n  - `WarpSync`\n  - `GapSync`\n- Gap sync improvements:\nWarp synced blocks are now skipped during the gap sync block import\nphase, which required improvements to gap handling when committing the\nblock import operation in the database.\n- Enhanced testing:\nThe Warp sync zombienet test has been modified to more thoroughly assert\nboth warp and gap sync phases.\n\nThis PR builds on changes by @sistemd in #9678\n\n---------\n\nCo-authored-by: sistemd <enntheprogrammer@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T09:44:10Z",
+          "tree_id": "1e75e4c4365950adcbcd2009129ffde387ecfafa",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b2a4296a96f7c7465d469c1fca0895d40ee1de5e"
+        },
+        "date": 1770979783893,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.3354041616,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.1196793626,
             "unit": "seconds"
           }
         ]

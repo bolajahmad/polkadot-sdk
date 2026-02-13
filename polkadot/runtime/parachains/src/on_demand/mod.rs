@@ -414,6 +414,11 @@ where
 	///
 	/// The returned `OrderQueue` allows for simulating upcoming
 	/// `pop_assignment_for_cores` calls.
+	///
+	/// **Note**: The current implementation returns the entire queue (up to 10,000 orders).
+	/// Callers typically only need `num_cores * scheduling_lookahead` orders (e.g., 10 cores *
+	/// 5 lookahead = 50 orders). Future implementations should consider adding a limit parameter
+	/// to avoid returning unnecessary data and enable more efficient storage schemes.
 	pub fn peek_order_queue() -> OrderQueue<BlockNumberFor<T>> {
 		pallet::OrderStatus::<T>::get().queue
 	}

@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770935679853,
+  "lastUpdate": 1770979883239,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "oliver.tale-yazdi@parity.io",
-            "name": "Oliver Tale-Yazdi",
-            "username": "ggwpez"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "22714211e4f558abbabae28fc2e8f2c971143638",
-          "message": "[AHM] Derive DecodeWithMemTracking and pub fields (#9067)\n\n- Derive `DecodeWithMemTracking` on structs\n- Make some fields public\n\n---------\n\nSigned-off-by: Oliver Tale-Yazdi <oliver.tale-yazdi@parity.io>",
-          "timestamp": "2025-07-04T10:36:12Z",
-          "tree_id": "0dd0655d92d837e407ee908f523b783ecccc626a",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/22714211e4f558abbabae28fc2e8f2c971143638"
-        },
-        "date": 1751629862178,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 127.94199999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.03425662153,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04503571138599995,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.03715936719600001,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "117115317+lrubasze@users.noreply.github.com",
+            "name": "Lukasz Rubaszewski",
+            "username": "lrubasze"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b2a4296a96f7c7465d469c1fca0895d40ee1de5e",
+          "message": "Block import improvements (#10373)\n\nThis PR fixes block import during Warp sync, which was silently failing\ndue to \"Unknown parent\" errors - a typical case during Warp sync and the\n`full_node_warp_sync` test was not detecting such failure.\n\nChanges\n - Relaxed verification for Warp synced blocks:\nThe fix relaxes verification requirements for Warp synced blocks by not\nperforming full verification, with the assumption that these blocks are\npart of the finalized chain and have already been verified using the\nprovided warp sync proof.\n- New `BlockOrigin` variants:\nFor improved clarity, two additional `BlockOrigin` items have been\nintroduced:\n  - `WarpSync`\n  - `GapSync`\n- Gap sync improvements:\nWarp synced blocks are now skipped during the gap sync block import\nphase, which required improvements to gap handling when committing the\nblock import operation in the database.\n- Enhanced testing:\nThe Warp sync zombienet test has been modified to more thoroughly assert\nboth warp and gap sync phases.\n\nThis PR builds on changes by @sistemd in #9678\n\n---------\n\nCo-authored-by: sistemd <enntheprogrammer@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T09:44:10Z",
+          "tree_id": "1e75e4c4365950adcbcd2009129ffde387ecfafa",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b2a4296a96f7c7465d469c1fca0895d40ee1de5e"
+        },
+        "date": 1770979862626,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 128.086,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06781227038999997,
+            "unit": "seconds"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03795936475,
             "unit": "seconds"
           }
         ]

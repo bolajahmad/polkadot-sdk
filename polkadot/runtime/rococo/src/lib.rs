@@ -1585,6 +1585,7 @@ construct_runtime! {
 		ParasSlashing: parachains_slashing = 63,
 		MessageQueue: pallet_message_queue = 64,
 		OnDemandAssignmentProvider: parachains_on_demand = 66,
+		// RIP CoretimeAssignmentProvider 68 - Moved to scheduler::assigner_coretime submodule in PR #10184
 
 		// Parachain Onboarding Pallets. Start indices at 70 to leave room.
 		Registrar: paras_registrar = 70,

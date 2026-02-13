@@ -3328,7 +3328,6 @@ mod sanitizers {
 			]);
 
 			// Update scheduler's claimqueue with the parachains
-			// Update scheduler's claimqueue with the parachains
 			for (core_num, para_id) in
 				[(0, 1), (1, 1), (2, 2), (3, 2), (4, 2), (5, 3), (6, 3), (7, 4), (8, 4)]
 			{
@@ -3770,7 +3769,6 @@ mod sanitizers {
 				vec![ValidatorIndex(5)],
 			]);
 
-			// Update scheduler's claimqueue with the parachains
 			// Update scheduler's claimqueue with the parachains
 			for (core_num, para_id) in [(0, 1), (1, 1), (2, 1), (3, 2), (4, 2), (5, 2)] {
 				Scheduler::assign_core(

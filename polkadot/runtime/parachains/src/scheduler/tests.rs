@@ -690,7 +690,7 @@ fn session_change_increasing_number_of_cores() {
 	let para_c = ParaId::from(5_u32);
 
 	new_test_ext(genesis_config).execute_with(|| {
-		// Add 2 paras
+		// Add 3 paras
 		register_para(para_a);
 		register_para(para_b);
 		register_para(para_c);

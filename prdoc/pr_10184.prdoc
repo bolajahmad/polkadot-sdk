@@ -48,3 +48,13 @@ crates:
     bump: major
   - name: polkadot-test-runtime
     bump: major
+  - name: cumulus-pallet-parachain-system
+    bump: patch
+  - name: polkadot-parachain-bin
+    bump: patch
+  - name: asset-hub-rococo-runtime
+    bump: patch
+  - name: asset-hub-westend-runtime
+    bump: patch
+  - name: emulated-integration-tests-common
+    bump: patch

@@ -190,8 +190,6 @@ impl<T: Config> Pallet<T> {
 		assignment: Vec<(CoreAssignment, PartsOf57600)>,
 		end_hint: Option<BlockNumberFor<T>>,
 	) -> DispatchResult {
-		// assigner_coretime::assign_core::<T>(core, begin, assignment,
-		// end_hint).map_err(Error::from)?;
 		assigner_coretime::assign_core::<T>(core, begin, assignment, end_hint)
 			.map_err(Error::<T>::from)?;
 		Ok(())

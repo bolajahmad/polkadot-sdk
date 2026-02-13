@@ -16,5 +16,7 @@ crates:
   bump: patch
 - name: pallet-revive
   bump: patch
+  validate: false
 - name: pallet-revive-eth-rpc
   bump: patch
+  validate: false

@@ -76,10 +76,10 @@ impl EthereumCallResult {
 	) -> Self {
 		let effective_gas_price = effective_gas_price.max(Pallet::<T>::evm_base_fee());
 
-		if let Ok(retval) = &output.result {
-			if retval.did_revert() {
-				output.result = Err(<Error<T>>::ContractReverted.into());
-			}
+		if let Ok(retval) = &output.result &&
+			retval.did_revert()
+		{
+			output.result = Err(<Error<T>>::ContractReverted.into());
 		}
 
 		// Refund pre-charged revert event weight if the call succeeds.

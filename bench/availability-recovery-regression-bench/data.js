@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1771006849543,
+  "lastUpdate": 1771008953677,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "Sajjon@users.noreply.github.com",
-            "name": "Alexander Cyon",
-            "username": "Sajjon"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "7ab0dcd62887ea3c5e50cfb5b1b01beb09d0ec92",
-          "message": "Add `para_ids` Runtime API (#9055)\n\nImplementation of https://github.com/paritytech/polkadot-sdk/issues/9053\n\n---------\n\nCo-authored-by: alindima <alin@parity.io>",
-          "timestamp": "2025-07-09T07:17:25Z",
-          "tree_id": "efefbe78f8e545dae503496bbc822b03e32d1e13",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/7ab0dcd62887ea3c5e50cfb5b1b01beb09d0ec92"
-        },
-        "date": 1752049498060,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19842620640000003,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.348029605899999,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.12245193133333332,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pgherveou@gmail.com",
+            "name": "PG Herveou",
+            "username": "pgherveou"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6ed951984c065c843dfbe292c11b1c38d22083e2",
+          "message": "pallet-revive: minor cleanups and fixes (#11054)\n\n## Summary\n\nPreparatory cleanup PR extracted from the EIP-7702 branch to simplify\nreview.\n\n- **Counter.sol uint64**: Change `uint256` to `uint64` in\nCounter/NestedCounter fixtures, to avoid U256 conversion in tests.\n- **Debug log**: Add debug log for `eth_transact` substrate tx hash\n- **RLP fix**: Fix `Transaction7702Signed` decoder field order (removed\nincorrect `gas_price` field at index 4, aligned with encoder)\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T17:42:01Z",
+          "tree_id": "924edcd8a7b4426c4410e7250615f9c07bac8fd1",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/6ed951984c065c843dfbe292c11b1c38d22083e2"
+        },
+        "date": 1771008929200,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12820778973333333,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.0974337255,
             "unit": "seconds"
           }
         ]

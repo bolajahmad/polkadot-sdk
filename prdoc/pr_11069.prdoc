@@ -1,0 +1,9 @@
+title: 'frame-omni-bencher: enable jemalloc-allocator'
+doc:
+- audience: Runtime Dev
+  description: "Fix huge benchmark regression for storage-heavy extrinsics, enabling\
+    \ jemalloc-allocator for benchmarking, marked as option in the scope of PR #10590.\r\
+    \n"
+crates:
+- name: frame-omni-bencher
+  bump: patch

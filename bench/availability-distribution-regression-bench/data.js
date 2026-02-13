@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1771006881932,
+  "lastUpdate": 1771008986355,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "dharjeezy@gmail.com",
-            "name": "dharjeezy",
-            "username": "dharjeezy"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "cc972542e0df0266cde2ead4cfac3b1558c860af",
-          "message": "pallet bounties v2 benchmark (#8952)\n\ncloses #8649\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Bastian Köcher <git@kchr.de>",
-          "timestamp": "2025-07-08T21:47:29Z",
-          "tree_id": "92ea303bb8df02e5752f9903f5541e35918ac3a9",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/cc972542e0df0266cde2ead4cfac3b1558c860af"
-        },
-        "date": 1752015601841,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1572868741733333,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.012947722246666665,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022326029273333332,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.007293085559999967,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "bitfield-distribution",
             "value": 0.024790878026666664,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pgherveou@gmail.com",
+            "name": "PG Herveou",
+            "username": "pgherveou"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6ed951984c065c843dfbe292c11b1c38d22083e2",
+          "message": "pallet-revive: minor cleanups and fixes (#11054)\n\n## Summary\n\nPreparatory cleanup PR extracted from the EIP-7702 branch to simplify\nreview.\n\n- **Counter.sol uint64**: Change `uint256` to `uint64` in\nCounter/NestedCounter fixtures, to avoid U256 conversion in tests.\n- **Debug log**: Add debug log for `eth_transact` substrate tx hash\n- **RLP fix**: Fix `Transaction7702Signed` decoder field order (removed\nincorrect `gas_price` field at index 4, aligned with encoder)\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T17:42:01Z",
+          "tree_id": "924edcd8a7b4426c4410e7250615f9c07bac8fd1",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/6ed951984c065c843dfbe292c11b1c38d22083e2"
+        },
+        "date": 1771008962341,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.024758244586666672,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.01005050178666665,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007045236960000001,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14427063441333332,
             "unit": "seconds"
           }
         ]

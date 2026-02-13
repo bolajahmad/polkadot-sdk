@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770935624352,
+  "lastUpdate": 1770979830844,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "git@kchr.de",
-            "name": "Bastian Köcher",
-            "username": "bkchr"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "cb12563ae4e532876c29b67be9a7f5d06fdc9fc3",
-          "message": "Replace `assert_para_throughput` with `assert_finalized_para_throughput` (#9117)\n\nThere is no need to have two functions which are essentially doing the\nsame. It is also better to oberserve the finalized blocks, which also\nsimplifies the code. So, this pull request is replacing the\n`assert_para_throughput` with `assert_finalized_para_throughput`. It\nalso replaces any usage of `assert_finalized_para_throughput` with\n`assert_para_throughput`.\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-08T16:04:23Z",
-          "tree_id": "faed545176a9de8b004b29e5ee7e4b5c2ccecef6",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/cb12563ae4e532876c29b67be9a7f5d06fdc9fc3"
-        },
-        "date": 1751994949584,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.007551906233333301,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1578040388266667,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.02251095306666667,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013107952380000003,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "bitfield-distribution",
             "value": 0.025122347186666668,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "117115317+lrubasze@users.noreply.github.com",
+            "name": "Lukasz Rubaszewski",
+            "username": "lrubasze"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b2a4296a96f7c7465d469c1fca0895d40ee1de5e",
+          "message": "Block import improvements (#10373)\n\nThis PR fixes block import during Warp sync, which was silently failing\ndue to \"Unknown parent\" errors - a typical case during Warp sync and the\n`full_node_warp_sync` test was not detecting such failure.\n\nChanges\n - Relaxed verification for Warp synced blocks:\nThe fix relaxes verification requirements for Warp synced blocks by not\nperforming full verification, with the assumption that these blocks are\npart of the finalized chain and have already been verified using the\nprovided warp sync proof.\n- New `BlockOrigin` variants:\nFor improved clarity, two additional `BlockOrigin` items have been\nintroduced:\n  - `WarpSync`\n  - `GapSync`\n- Gap sync improvements:\nWarp synced blocks are now skipped during the gap sync block import\nphase, which required improvements to gap handling when committing the\nblock import operation in the database.\n- Enhanced testing:\nThe Warp sync zombienet test has been modified to more thoroughly assert\nboth warp and gap sync phases.\n\nThis PR builds on changes by @sistemd in #9678\n\n---------\n\nCo-authored-by: sistemd <enntheprogrammer@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T09:44:10Z",
+          "tree_id": "1e75e4c4365950adcbcd2009129ffde387ecfafa",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/b2a4296a96f7c7465d469c1fca0895d40ee1de5e"
+        },
+        "date": 1770979810067,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.00696784793333333,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14439162980666664,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.024933463513333334,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.010047815759999985,
             "unit": "seconds"
           }
         ]

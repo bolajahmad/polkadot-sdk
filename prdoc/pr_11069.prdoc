@@ -3,6 +3,9 @@ doc:
 - audience: Runtime Dev
   description: |-
     Fix huge benchmark regression for storage-heavy extrinsics, enabling sc-client-db with jemalloc-allocator for omni-bencher, marked as optional in the scope of PR #10590.
+    Revert also the dummy write/read workaround at the end of commit_db() introduced by #10947.
 crates:
 - name: frame-omni-bencher
+  bump: patch
+- name: frame-benchmarking
   bump: patch

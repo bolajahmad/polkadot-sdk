@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770998880280,
+  "lastUpdate": 1771006881932,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "franciscoaguirreperez@gmail.com",
-            "name": "Francisco Aguirre",
-            "username": "franciscoaguirre"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "ba2a8dc536db30397c332a2aa2cd9f9863027093",
-          "message": "XCM precompile: small cleanup (#9135)\n\nFollow-up to\nhttps://github.com/paritytech/polkadot-sdk/pull/9125#discussion_r2192896809",
-          "timestamp": "2025-07-08T19:47:45Z",
-          "tree_id": "e7aeb64bf7cbd7d415bc142f30193c7d6ec3f579",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/ba2a8dc536db30397c332a2aa2cd9f9863027093"
-        },
-        "date": 1752008599449,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013157049193333336,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022340325826666663,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1576770344866667,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.007334885880000016,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "availability-store",
             "value": 0.14781327954000004,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "pgherveou@gmail.com",
+            "name": "PG Herveou",
+            "username": "pgherveou"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "e9b9f740fab72060252628ebce5a5e30c1c5da2a",
+          "message": "Fix delegatecall callTracer addresses (#10918)\n\n## Summary\n- Fix address tracking in delegatecall operations for callTracer\n\n## Changes\n- Update callTracer to correctly track addresses during delegatecall\noperations\n\n## Test plan\n- Existing tests should pass\n- Verify callTracer correctly reports addresses for delegatecall\noperations\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>\nCo-authored-by: Robert van Eerdewijk <robertvaneerdewijk@gmail.com>",
+          "timestamp": "2026-02-13T17:05:07Z",
+          "tree_id": "66e1df46dd29065e796d19322c083a20cd5ac214",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/e9b9f740fab72060252628ebce5a5e30c1c5da2a"
+        },
+        "date": 1771006858527,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.006959790279999999,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14441415312000008,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.00994141572666666,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.024790878026666664,
             "unit": "seconds"
           }
         ]

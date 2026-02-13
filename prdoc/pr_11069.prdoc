@@ -1,9 +1,8 @@
-title: 'frame-omni-bencher: enable jemalloc-allocator'
+title: 'frame-omni-bencher: enable sc-client-db with jemalloc-allocator'
 doc:
 - audience: Runtime Dev
-  description: "Fix huge benchmark regression for storage-heavy extrinsics, enabling\
-    \ jemalloc-allocator for benchmarking, marked as option in the scope of PR #10590.\r\
-    \n"
+  description: |-
+    Fix huge benchmark regression for storage-heavy extrinsics, enabling sc-client-db with jemalloc-allocator for omni-bencher, marked as optional in the scope of PR #10590.
 crates:
 - name: frame-omni-bencher
   bump: patch

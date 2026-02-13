@@ -1,57 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770979909936,
+  "lastUpdate": 1770982254897,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "dispute-coordinator-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "10196091+Ank4n@users.noreply.github.com",
-            "name": "Ankan",
-            "username": "Ank4n"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "f1ba2a1c7206c70ad66168859c90ab4e4327aab6",
-          "message": "Optimize buffered offence storage and prevent unbounded growth in staking-async ah-client pallet (#9049)\n\n## 🤔 Why\nThis addresses potential memory issues and improves efficiency of\noffence handling during buffered operating mode (see\nhttps://github.com/paritytech-secops/srlabs_findings/issues/525)\n\n\n## 🔑 Key changes\n\n- Prevents duplicate offences for the same offender in the same session\nby keeping only the highest slash fraction\n- Introduces `BufferedOffence` struct with optional reporter and slash\nfraction fields\n- Restructures buffered offences storage from `Vec<(SessionIndex,\nVec<Offence>)>` to nested `BTreeMap<SessionIndex, BTreeMap<AccountId,\nBufferedOffence>>`\n- Adds `MaxOffenceBatchSize` configuration parameter for batching\ncontrol\n- Processes offences in batches with configurable size limits, sending\nonly first session's offences per block\n- Implements proper benchmarking infrastructure for\n`process_buffered_offences` function\n- Adds WeightInfo trait with benchmarked weights for batch processing in\n`on_initialize` hook\n\n## ✍️ Co-authors\n@Ank4n \n@sigurpol\n\n---------\n\nCo-authored-by: Paolo La Camera <paolo@parity.io>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-04T09:02:33Z",
-          "tree_id": "410487862394418dd87119db2954a36e4de0c43c",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/f1ba2a1c7206c70ad66168859c90ab4e4327aab6"
-        },
-        "date": 1751623985007,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 23.800000000000004,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 227.09999999999997,
-            "unit": "KiB"
-          },
-          {
-            "name": "dispute-coordinator",
-            "value": 0.002641694280000002,
-            "unit": "seconds"
-          },
-          {
-            "name": "dispute-distribution",
-            "value": 0.00871780210999999,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.005657479960000001,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -24499,6 +24450,55 @@ window.BENCHMARK_DATA = {
           {
             "name": "dispute-distribution",
             "value": 0.00919620205999999,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robertvaneerdewijk@gmail.com",
+            "name": "0xRVE",
+            "username": "0xRVE"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bab8ed7347e783af162d0921d476ab61af2f68ce",
+          "message": "Consolidate pallet-assets metadata benchmarks into single get_metadata benchmark (#11037)\n\n## Summary\n\nConsolidates the three identical `get_name`, `get_symbol`, and\n`get_decimals` benchmarks into a single `get_metadata` benchmark. This\naddresses the follow-up from #10971 where it was noted that these\nbenchmarks perform the same operation (`Pallet::get_metadata()`).\n\n## Changes\n\n### Benchmarks\n- **`substrate/frame/assets/src/benchmarking.rs`**\n- Replaced `get_name`, `get_symbol`, `get_decimals` with single\n`get_metadata` benchmark\n- Updated verification to check all three metadata fields (name, symbol,\ndecimals)\n\n### Weight Functions\n- **`substrate/frame/assets/src/weights.rs`**\n- Replaced `get_name()`, `get_symbol()`, `get_decimals()` with single\n`get_metadata()` in `WeightInfo` trait\n  - Updated implementations for `SubstrateWeight<T>` and `()`\n\n### Precompile\n- **`substrate/frame/assets/precompiles/src/lib.rs`**\n- Updated `name()`, `symbol()`, and `decimals()` methods to all charge\n`get_metadata()` weight\n\n### Cumulus Runtimes\nUpdated weight implementations in:\n- `asset-hub-rococo`: `pallet_assets_foreign.rs`,\n`pallet_assets_local.rs`, `pallet_assets_pool.rs`\n- `asset-hub-westend`: `pallet_assets_foreign.rs`,\n`pallet_assets_local.rs`, `pallet_assets_pool.rs`\n\n## Rationale\n\nAll three original benchmarks were measuring the exact same operation -\na single metadata storage read. Consolidating them:\n1. Reduces code duplication\n2. Simplifies the `WeightInfo` trait\n3. Accurately reflects that `name()`, `symbol()`, and `decimals()` have\nidentical costs\n\nCloses follow-up from\nhttps://github.com/paritytech/polkadot-sdk/pull/10971#discussion_r2782977769\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T10:18:25Z",
+          "tree_id": "23a183c194e6dc101de6273eeff05b420e8a96ae",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/bab8ed7347e783af162d0921d476ab61af2f68ce"
+        },
+        "date": 1770982231050,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 227.09999999999997,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 23.800000000000004,
+            "unit": "KiB"
+          },
+          {
+            "name": "dispute-coordinator",
+            "value": 0.0026896188700000013,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.006422999100000007,
+            "unit": "seconds"
+          },
+          {
+            "name": "dispute-distribution",
+            "value": 0.009181069839999985,
             "unit": "seconds"
           }
         ]

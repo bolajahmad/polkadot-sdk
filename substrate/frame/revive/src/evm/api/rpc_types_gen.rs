@@ -799,11 +799,6 @@ pub struct Transaction7702Unsigned {
 	pub chain_id: U256,
 	/// gas limit
 	pub gas: U256,
-	/// gas price
-	/// The effective gas price paid by the sender in wei. For transactions not yet included in a
-	/// block, this value should be set equal to the max fee per gas. This field is DEPRECATED,
-	/// please transition to using effectiveGasPrice in the receipt object going forward.
-	pub gas_price: U256,
 	/// input data
 	pub input: Bytes,
 	/// max fee per gas

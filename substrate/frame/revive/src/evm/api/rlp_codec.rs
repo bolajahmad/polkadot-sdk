@@ -408,7 +408,6 @@ impl Decodable for Transaction7702Signed {
 					access_list: rlp.list_at(8)?,
 					authorization_list: rlp.list_at(9)?,
 					r#type: Default::default(),
-					..Default::default()
 				}
 			},
 			y_parity: rlp.val_at(10)?,
@@ -653,6 +652,43 @@ mod test {
 			let expected_tx = serde_json::from_str(json).unwrap();
 			assert_eq!(tx, expected_tx);
 		}
+	}
+
+	#[test]
+	fn encode_decode_7702_tx_works() {
+		let tx = TransactionSigned::Transaction7702Signed(Transaction7702Signed {
+			transaction_7702_unsigned: Transaction7702Unsigned {
+				chain_id: U256::from(1),
+				nonce: U256::zero(),
+				max_priority_fee_per_gas: U256::zero(),
+				max_fee_per_gas: U256::from(1),
+				gas: U256::from(0x1e241),
+				to: "0x095e7baea6a6c7c4c2dfeb977efac326af552d87".parse().unwrap(),
+				value: U256::zero(),
+				input: Bytes(vec![]),
+				access_list: vec![AccessListEntry {
+					address: H160::from_low_u64_be(1),
+					storage_keys: vec![H256::zero()],
+				}],
+				authorization_list: vec![AuthorizationListEntry {
+					chain_id: U256::from(1),
+					address: H160::from_low_u64_be(42),
+					nonce: U256::zero(),
+					y_parity: U256::zero(),
+					r: U256::from(1),
+					s: U256::from(2),
+				}],
+				r#type: TypeEip7702 {},
+			},
+			y_parity: U256::zero(),
+			r: U256::from(1),
+			s: U256::from(2),
+			v: None,
+		});
+
+		let encoded = tx.signed_payload();
+		let decoded = TransactionSigned::decode(&encoded).unwrap();
+		assert_eq!(tx, decoded);
 	}
 
 	#[test]

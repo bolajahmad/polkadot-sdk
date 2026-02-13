@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770979804522,
+  "lastUpdate": 1770982124255,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "franciscoaguirreperez@gmail.com",
-            "name": "Francisco Aguirre",
-            "username": "franciscoaguirre"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "4d5e95217831fb75942d8153a22f6864858c1d71",
-          "message": "XCM precompile: don't support older xcm versions (#9126)\n\nThe latest XCM version is 5. A lot of parachains are still running V3 or\nV4 which is why we haven't removed them, but the XCM precompile is new\nand should only have to deal with versions 5 and onwards. No need to\nkeep dragging 3 and 4 in contracts.",
-          "timestamp": "2025-07-08T17:27:43Z",
-          "tree_id": "2944a79e52968a0f54da0a246a07867b8f95dffe",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/4d5e95217831fb75942d8153a22f6864858c1d71"
-        },
-        "date": 1751999940807,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.25129063346667,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19824556243333336,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.1196793626,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robertvaneerdewijk@gmail.com",
+            "name": "0xRVE",
+            "username": "0xRVE"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bab8ed7347e783af162d0921d476ab61af2f68ce",
+          "message": "Consolidate pallet-assets metadata benchmarks into single get_metadata benchmark (#11037)\n\n## Summary\n\nConsolidates the three identical `get_name`, `get_symbol`, and\n`get_decimals` benchmarks into a single `get_metadata` benchmark. This\naddresses the follow-up from #10971 where it was noted that these\nbenchmarks perform the same operation (`Pallet::get_metadata()`).\n\n## Changes\n\n### Benchmarks\n- **`substrate/frame/assets/src/benchmarking.rs`**\n- Replaced `get_name`, `get_symbol`, `get_decimals` with single\n`get_metadata` benchmark\n- Updated verification to check all three metadata fields (name, symbol,\ndecimals)\n\n### Weight Functions\n- **`substrate/frame/assets/src/weights.rs`**\n- Replaced `get_name()`, `get_symbol()`, `get_decimals()` with single\n`get_metadata()` in `WeightInfo` trait\n  - Updated implementations for `SubstrateWeight<T>` and `()`\n\n### Precompile\n- **`substrate/frame/assets/precompiles/src/lib.rs`**\n- Updated `name()`, `symbol()`, and `decimals()` methods to all charge\n`get_metadata()` weight\n\n### Cumulus Runtimes\nUpdated weight implementations in:\n- `asset-hub-rococo`: `pallet_assets_foreign.rs`,\n`pallet_assets_local.rs`, `pallet_assets_pool.rs`\n- `asset-hub-westend`: `pallet_assets_foreign.rs`,\n`pallet_assets_local.rs`, `pallet_assets_pool.rs`\n\n## Rationale\n\nAll three original benchmarks were measuring the exact same operation -\na single metadata storage read. Consolidating them:\n1. Reduces code duplication\n2. Simplifies the `WeightInfo` trait\n3. Accurately reflects that `name()`, `symbol()`, and `decimals()` have\nidentical costs\n\nCloses follow-up from\nhttps://github.com/paritytech/polkadot-sdk/pull/10971#discussion_r2782977769\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T10:18:25Z",
+          "tree_id": "23a183c194e6dc101de6273eeff05b420e8a96ae",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/bab8ed7347e783af162d0921d476ab61af2f68ce"
+        },
+        "date": 1770982100749,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.13092951679999998,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 10.991225467066664,
             "unit": "seconds"
           }
         ]

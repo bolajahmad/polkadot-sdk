@@ -22,12 +22,18 @@ use frame_benchmarking::v2::*;
 use pallet_revive::precompiles::H160;
 use sp_core::U256;
 
+/// Test owner address (Hardhat account #0: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)
+const TEST_OWNER: [u8; 20] = [
+	0xf3, 0x9f, 0xd6, 0xe5, 0x1a, 0xad, 0x88, 0xf6, 0xf4, 0xce, 0x6a, 0xb8, 0x82, 0x72, 0x79, 0xcf,
+	0xff, 0xb9, 0x22, 0x66,
+];
+
 fn test_verifying_contract() -> H160 {
 	H160::from_low_u64_be(0x1234_5678)
 }
 
 fn test_owner() -> H160 {
-	H160::from_low_u64_be(0xABCD_EF01)
+	H160::from_slice(&TEST_OWNER)
 }
 
 #[benchmarks]
@@ -62,28 +68,36 @@ mod benchmarks {
 
 	#[benchmark]
 	fn use_permit() {
+		// Pre-computed valid permit signature for chain_id=31337
+		// Generated using Hardhat account #0 private key
+		//
+		// Parameters:
+		// - Chain ID: 31337
+		// - Owner: 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
+		// - Verifying Contract: 0x0000000000000000000000000000000012345678
+		// - Spender: 0x0000000000000000000000000000000098765432
+		// - Value: 1000
+		// - Nonce: 0
+		// - Deadline: 18446744073709551615 (u64::MAX)
 		let verifying_contract = test_verifying_contract();
 		let owner = test_owner();
 		let spender = H160::from_low_u64_be(0x9876_5432);
 		let value: [u8; 32] = U256::from(1000).to_big_endian();
 		let deadline: [u8; 32] = U256::from(u64::MAX).to_big_endian();
 
-		// Synthetic signature - valid format but won't verify
+		let v = 27u8;
 		let r: [u8; 32] = [
-			0x9e, 0x9b, 0x5e, 0x0b, 0x89, 0x7f, 0x40, 0x5b, 0x7c, 0x3a, 0x8c, 0x6a, 0x5b, 0x3c,
-			0x4d, 0x5e, 0x6f, 0x7a, 0x8b, 0x9c, 0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f, 0x6a, 0x7b,
-			0x8c, 0x9d, 0x0e, 0x1f,
+			175, 252, 243, 1, 254, 212, 189, 22, 49, 158, 63, 188, 243, 21, 56, 240, 124, 215, 220,
+			121, 137, 153, 208, 70, 123, 109, 221, 94, 191, 131, 210, 111,
 		];
 		let s: [u8; 32] = [
-			0x1c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b, 0x7c, 0x8d, 0x9e, 0xaf, 0xb0, 0xc1, 0xd2, 0xe3,
-			0xf4, 0x05, 0x16, 0x27, 0x38, 0x49, 0x5a, 0x6b, 0x7c, 0x8d, 0x9e, 0xaf, 0xb0, 0xc1,
-			0xd2, 0xe3, 0xf4, 0x05,
+			21, 240, 201, 4, 59, 104, 154, 99, 230, 111, 29, 9, 150, 225, 57, 209, 15, 222, 27, 5,
+			147, 40, 44, 246, 24, 108, 82, 129, 121, 73, 44, 234,
 		];
-		let v = 27u8;
 
 		#[block]
 		{
-			let _ = Pallet::<T>::use_permit(
+			Pallet::<T>::use_permit(
 				&verifying_contract,
 				&owner,
 				&spender,
@@ -92,8 +106,12 @@ mod benchmarks {
 				v,
 				&r,
 				&s,
-			);
+			)
+			.expect("permit should be valid");
 		}
+
+		// Verify nonce was incremented
+		assert_eq!(Pallet::<T>::nonce(&verifying_contract, &owner), U256::one());
 	}
 
 	impl_benchmark_test_suite!(Pallet, crate::mock::new_test_ext(), crate::mock::Test);

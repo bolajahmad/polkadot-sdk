@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770984978629,
+  "lastUpdate": 1770998852979,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-recovery-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "franciscoaguirreperez@gmail.com",
-            "name": "Francisco Aguirre",
-            "username": "franciscoaguirre"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "ba2a8dc536db30397c332a2aa2cd9f9863027093",
-          "message": "XCM precompile: small cleanup (#9135)\n\nFollow-up to\nhttps://github.com/paritytech/polkadot-sdk/pull/9125#discussion_r2192896809",
-          "timestamp": "2025-07-08T19:47:45Z",
-          "tree_id": "e7aeb64bf7cbd7d415bc142f30193c7d6ec3f579",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/ba2a8dc536db30397c332a2aa2cd9f9863027093"
-        },
-        "date": 1752008574844,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 1.6666666666666665,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 307203,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-recovery",
-            "value": 11.272050175033332,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.19616532426666672,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.1317452164,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "117115317+lrubasze@users.noreply.github.com",
+            "name": "Lukasz Rubaszewski",
+            "username": "lrubasze"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "e23e645c4e1c57ba2b40ef95b51e5015ad940cba",
+          "message": "  Gap Sync: Skip Body Requests for Non-Archive Nodes (#10752)\n\n### Summary\nThis PR optimizes gap sync bandwidth usage by skipping body requests for\nnon-archive nodes. Bodies are unnecessary during gap sync when the node\ndoesn't maintain full block history, while archive nodes continue to\nrequest bodies to preserve complete history.\nIt reduces bandwidth consumption and database size significantly for\ntypical validator/full nodes.\n\nAdditionally added some gap sync statistics for observability:\n- Introduced `GapSyncStats` to track bandwidth usage: header bytes, body\nbytes, justification bytes\n- Logged on gap sync completion to provide visibility into bandwidth\nsavings\n\n---------\n\nCo-authored-by: sistemd <enntheprogrammer@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T15:01:49Z",
+          "tree_id": "0aeca6e0c5c392f43263ad5e5e87b94831e39bc3",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/e23e645c4e1c57ba2b40ef95b51e5015ad940cba"
+        },
+        "date": 1770998832085,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Received from peers",
+            "value": 307203,
+            "unit": "KiB"
+          },
+          {
+            "name": "Sent to peers",
+            "value": 1.6666666666666665,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-recovery",
+            "value": 11.158902899800001,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.12021615753333337,
             "unit": "seconds"
           }
         ]

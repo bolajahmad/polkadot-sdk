@@ -223,6 +223,7 @@ impl StatementHandlerPrototype {
 		metrics_registry: Option<&Registry>,
 		executor: impl Fn(Pin<Box<dyn Future<Output = ()> + Send>>) + Send,
 		mut num_submission_workers: usize,
+		statements_per_second: u32,
 	) -> error::Result<StatementHandler<N, S>> {
 		let sync_event_stream = sync.event_stream("statement-handler-sync");
 		let (queue_sender, queue_receiver) = async_channel::bounded(MAX_PENDING_STATEMENTS);
@@ -234,6 +235,18 @@ impl StatementHandlerPrototype {
 			);
 			num_submission_workers = 1;
 		}
+
+		let statements_per_second = if statements_per_second == 0 {
+			log::warn!(
+				target: LOG_TARGET,
+				"statements_per_second is 0, defaulting to {}",
+				DEFAULT_STATEMENTS_PER_SECOND
+			);
+			NonZeroU32::new(DEFAULT_STATEMENTS_PER_SECOND)
+				.expect("DEFAULT_STATEMENTS_PER_SECOND is nonzero")
+		} else {
+			NonZeroU32::new(statements_per_second).expect("checked above")
+		};
 
 		for _ in 0..num_submission_workers {
 			let store = statement_store.clone();
@@ -275,6 +288,7 @@ impl StatementHandlerPrototype {
 			peers: HashMap::new(),
 			statement_store,
 			queue_sender,
+			statements_per_second,
 			metrics: if let Some(r) = metrics_registry {
 				Some(Metrics::register(r)?)
 			} else {
@@ -317,6 +331,8 @@ pub struct StatementHandler<
 	peers: HashMap<PeerId, Peer>,
 	statement_store: Arc<dyn StatementStore>,
 	queue_sender: async_channel::Sender<(Statement, oneshot::Sender<SubmitResult>)>,
+	/// Maximum statements per second per peer.
+	statements_per_second: NonZeroU32,
 	/// Prometheus metrics.
 	metrics: Option<Metrics>,
 	/// Timeout for sending next statement batch during initial sync.
@@ -334,10 +350,8 @@ struct PeerRateLimiter {
 }
 
 impl PeerRateLimiter {
-	fn new() -> Self {
-		let quota = Quota::per_second(
-			NonZeroU32::new(STATEMENTS_PER_SECOND).expect("STATEMENTS_PER_SECOND is nonzero"),
-		);
+	fn new(statements_per_second: NonZeroU32) -> Self {
+		let quota = Quota::per_second(statements_per_second);
 		Self { limiter: RateLimiter::direct(quota) }
 	}
 
@@ -437,8 +451,12 @@ fn find_sendable_chunk(statements: &[&Statement]) -> ChunkResult {
 impl Peer {
 	/// Create a new peer for testing/benchmarking purposes.
 	#[cfg(any(test, feature = "test-helpers"))]
-	pub fn new_for_testing(known_statements: LruHashSet<Hash>, role: ObservedRole) -> Self {
-		Self { known_statements, role, rate_limiter: PeerRateLimiter::new() }
+	pub fn new_for_testing(
+		known_statements: LruHashSet<Hash>,
+		role: ObservedRole,
+		statements_per_second: NonZeroU32,
+	) -> Self {
+		Self { known_statements, role, rate_limiter: PeerRateLimiter::new(statements_per_second) }
 	}
 }
 
@@ -459,6 +477,7 @@ where
 		peers: HashMap<PeerId, Peer>,
 		statement_store: Arc<dyn StatementStore>,
 		queue_sender: async_channel::Sender<(Statement, oneshot::Sender<SubmitResult>)>,
+		statements_per_second: NonZeroU32,
 	) -> Self {
 		Self {
 			protocol_name,
@@ -472,6 +491,7 @@ where
 			peers,
 			statement_store,
 			queue_sender,
+			statements_per_second,
 			metrics: None,
 			initial_sync_timeout: Box::pin(pending().fuse()),
 			pending_initial_syncs: HashMap::new(),
@@ -617,7 +637,7 @@ where
 							NonZeroUsize::new(MAX_KNOWN_STATEMENTS).expect("Constant is nonzero"),
 						),
 						role,
-						rate_limiter: PeerRateLimiter::new(),
+						rate_limiter: PeerRateLimiter::new(self.statements_per_second),
 					},
 				);
 				debug_assert!(_was_in.is_none());
@@ -665,7 +685,7 @@ where
 					target: LOG_TARGET,
 					"Peer {} exceeded statement rate limit ({} statements/sec). Disconnecting.",
 					who,
-					STATEMENTS_PER_SECOND
+					self.statements_per_second
 				);
 
 				self.network.report_peer(who, rep::STATEMENT_FLOODING);
@@ -1298,7 +1318,10 @@ mod tests {
 			Peer {
 				known_statements: LruHashSet::new(NonZeroUsize::new(100).unwrap()),
 				role: ObservedRole::Full,
-				rate_limiter: PeerRateLimiter::new(),
+				rate_limiter: PeerRateLimiter::new(
+					NonZeroU32::new(DEFAULT_STATEMENTS_PER_SECOND)
+						.expect("DEFAULT_STATEMENTS_PER_SECOND is nonzero"),
+				),
 			},
 		);
 
@@ -1318,6 +1341,8 @@ mod tests {
 			peers,
 			statement_store: Arc::new(statement_store.clone()),
 			queue_sender,
+			statements_per_second: NonZeroU32::new(DEFAULT_STATEMENTS_PER_SECOND)
+				.expect("DEFAULT_STATEMENTS_PER_SECOND is nonzero"),
 			metrics: None,
 			initial_sync_timeout: Box::pin(futures::future::pending()),
 			pending_initial_syncs: HashMap::new(),
@@ -1523,6 +1548,8 @@ mod tests {
 			peers: HashMap::new(),
 			statement_store: Arc::new(statement_store.clone()),
 			queue_sender,
+			statements_per_second: NonZeroU32::new(DEFAULT_STATEMENTS_PER_SECOND)
+				.expect("DEFAULT_STATEMENTS_PER_SECOND is nonzero"),
 			metrics: None,
 			initial_sync_timeout: Box::pin(futures::future::pending()),
 			pending_initial_syncs: HashMap::new(),

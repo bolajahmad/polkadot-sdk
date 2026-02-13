@@ -32,6 +32,5 @@ pub const MAX_STATEMENT_NOTIFICATION_SIZE: u64 = 1024 * 1024;
 /// Maximum number of statement validation request we keep at any moment.
 pub const MAX_PENDING_STATEMENTS: usize = 2 * 1024 * 1024;
 
-/// Maximum statements per second before rate limiting kicks in.
-/// This translates to 500,000 statements per 10-second window equivalent.
-pub const STATEMENTS_PER_SECOND: u32 = 50_000;
+/// Default maximum statements per second before rate limiting kicks in.
+pub const DEFAULT_STATEMENTS_PER_SECOND: u32 = 50_000;

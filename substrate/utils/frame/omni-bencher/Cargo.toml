@@ -15,8 +15,8 @@ workspace = true
 clap = { features = ["derive"], workspace = true }
 cumulus-primitives-proof-size-hostfunction = { workspace = true, default-features = true }
 frame-benchmarking-cli = { workspace = true }
+polkadot-jemalloc-shim = { workspace = true, features = ["jemalloc-allocator"] }
 sc-cli = { workspace = true, default-features = true }
-sc-client-db = { features = ["jemalloc-allocator"], workspace = true }
 sp-runtime = { workspace = true, default-features = true }
 sp-statement-store = { workspace = true, default-features = true }
 tracing-subscriber = { workspace = true }

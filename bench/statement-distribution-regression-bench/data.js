@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770982222096,
+  "lastUpdate": 1770985074471,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "james@jsdw.me",
-            "name": "James Wilson",
-            "username": "jsdw"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "771c9988e2a636a150d97c10e3122af8068d1687",
-          "message": "Bump CI to Rustc 1.88 to support 2024 edition crates (#8592)\n\nAs one example, this allows us to use the latest version of Subxt: 0.42.\nAlso if-let chains :)\n\nMain changes:\n- Update CI image\n- Remove `forklift` from Build step in\n`check-revive-stable-uapi-polkavm`; it seemed to [cause an\nerror](https://github.com/paritytech/polkadot-sdk/actions/runs/16004536662/job/45148002314?pr=8592).\nPerhaps we can open an issue for this to fix/try again after this\nmerges.\n- Bump `polkavm` deps to 0.26 to avoid [this\nerror](https://github.com/paritytech/polkadot-sdk/actions/runs/16004991577/job/45150325849?pr=8592#step:5:1967)\n(thanks @koute!)\n- Add `result_large_err` clippy to avoid a bunch of clippy warnings\nabout a 176 byte error (again, we could fix this later more properly).\n- Clippy fixes (mainly inlining args into `format!`s where possible),\nremove one `#[no_mangle]` on a `#[panic_hook]` and a few other misc\nautomatic fixes.\n- `#[allow(clippy::useless_conversion)]` in frame macro to avoid the\ngenerated `.map(Into::into).map_err(Into::into)` code causing an issue\nwhen not necessary (it is sometimes; depends on the return type in\npallet calls)\n- UI test updates\n\nAs a side note, I haven't added a `prdoc` since I'm not making any\nbreaking changes (despite touching a bunch of pallets), just clippy/fmt\ntype things. Please comment if this isn't ok!\n\nAlso, thankyou @bkchr for the wasmtime update PR which fixed a blocker\nhere!\n\n---------\n\nCo-authored-by: Evgeny Snitko <evgeny@parity.io>\nCo-authored-by: Bastian Köcher <git@kchr.de>",
-          "timestamp": "2025-07-04T21:54:27Z",
-          "tree_id": "bbce6a530538cfc5d3328f5239b16d133890b86d",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/771c9988e2a636a150d97c10e3122af8068d1687"
-        },
-        "date": 1751670321554,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 127.96199999999997,
-            "unit": "KiB"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.03414638382200001,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04442088284199997,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.038125758019999983,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "40807189+AlexandruCihodaru@users.noreply.github.com",
+            "name": "Alexandru Cihodaru",
+            "username": "AlexandruCihodaru"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "744acf5599bcf978350015a73c75e05455a4d8f3",
+          "message": "Implement persistent reputation database for collator protocol (#7751) (#10917)\n\nImplements persistent storage for the experimental collator protocol's\nreputation database.\n\nChanges:\n\n- Adds `PersistentDb` wrapper that persists the in-memory reputation DB\nto disk\n  - Periodic persistence every 10 minutes (30s in test mode)\n  - Immediate persistence on slashes and parachain deregistration\n  - Loads existing state on startup with lookback for missed blocks\n  \nImplementation:\n  \n  `PersistentDb` wraps the existing `Db` and adds persistence on top:\n\n    - All reputation logic (scoring, decay, LRU) stays in `Db`\n    - Persistence layer handles disk I/O and serialization\n    - Per-para data stored in parachains_db\n    \nTests:\n\n- `basic_persistence.rs`: Validates persistence across restarts and\nstartup lookback\n- `pruning.rs`: Validates automatic cleanup on parachain deregistration\n\n---------\n\nSigned-off-by: Alexandru Cihodaru <alexandru.cihodaru@parity.io>\nCo-authored-by: alindima <alin@parity.io>\nCo-authored-by: Tsvetomir Dimitrov <tsvetomir@parity.io>\nCo-authored-by: Serban Iorga <serban@parity.io>\nCo-authored-by: Serban Iorga <serban300@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T11:09:46Z",
+          "tree_id": "c5ea4bb300af28d1a2569244ef9ce654a0da4602",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/744acf5599bcf978350015a73c75e05455a4d8f3"
+        },
+        "date": 1770985051017,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 128.05799999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.03797156357,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06577442002199993,
             "unit": "seconds"
           }
         ]

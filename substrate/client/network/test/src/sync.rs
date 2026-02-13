@@ -1376,3 +1376,52 @@ async fn syncs_blocks_with_large_headers() {
 	assert_eq!(net.peer(2).client.info().best_number, 512);
 	assert!(net.peers()[0].blockchain_canon_equals(&net.peers()[2]));
 }
+
+/// It sometimes happens that a node is producing a fork, then connects to some other node. Both of
+/// these nodes share the same best block. Then the node produces a block that is his new best block
+/// on this fork. The other node sees this best block and tries to download it, but fails on import
+/// because it has not imported all the fork blocks. This test ensures that this can not happen
+/// again.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn fork_block_announcement_does_not_cause_unknown_parent() {
+	sp_tracing::try_init_simple();
+	let mut net = TestNet::new(2);
+
+	// Both peers build the same canonical chain of 20 blocks.
+	net.peer(0).push_blocks(20, false);
+	net.peer(1).push_blocks(20, false);
+
+	let best_hash_20 = net.peer(0).client().info().best_hash;
+	assert_eq!(best_hash_20, net.peer(1).client().info().best_hash);
+	assert_eq!(net.peer(1).client().info().best_number, 20);
+	assert!(net.peers()[0].blockchain_canon_equals(&net.peers()[1]));
+
+	// Peer 0 creates a fork from block 10 (fork blocks 11..20) without making it the best.
+	let fork_hashes =
+		net.peer(0)
+			.push_blocks_at_without_informing_sync(BlockId::Number(10), 10, true, false);
+	let fork_tip = *fork_hashes.last().unwrap();
+
+	// Peer 0's best is still canonical block 20.
+	assert_eq!(net.peer(0).client().info().best_hash, best_hash_20);
+
+	// Connect the peers. Both handshake with best=20 (canonical).
+	net.run_until_connected().await;
+	net.run_until_idle().await;
+
+	// Peer 0 produces block 21 on the fork. This makes the fork the new best chain
+	// (height 21 > 20) and announces it.
+	net.peer(0).push_blocks_at(BlockId::Hash(fork_tip), 1, false);
+	assert_eq!(net.peer(0).client().info().best_number, 21);
+
+	// Wait for peer 1 to sync. It should resolve the fork via ancestor search back to
+	// common block 10, download fork blocks 11..21, and switch to the fork as best.
+	net.run_until_sync().await;
+
+	assert_eq!(net.peer(1).client().info().best_number, 21);
+	assert!(net.peers()[0].blockchain_canon_equals(&net.peers()[1]));
+
+	// Ensure it did not first tried to import the fork block without having downloaded the full
+	// fork.
+	assert_eq!(net.peer(1).import_error_count(), 0);
+}

@@ -1,107 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770985042623,
+  "lastUpdate": 1770998908450,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "approval-voting-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "49718502+alexggh@users.noreply.github.com",
-            "name": "Alexandru Gheorghe",
-            "username": "alexggh"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "88fc41c9cf5e46277b7cab53a72c650b75377d25",
-          "message": "make 0002-parachains-disputes a bit more robust (#9074)\n\nThere is inherently a race between the time we snapshot\nfinality_lag/disputes_finality_lag metrics and if the dispute/approvals\nfinished, so sometimes the test was failing because it was reporting 1\nwhich is in no way a problem, so let's make it a bit more robust by\nsimply waiting more time to reach 0.\n\nFixes: https://github.com/paritytech/polkadot-sdk/issues/8941.\n\n---------\n\nSigned-off-by: Alexandru Gheorghe <alexandru.gheorghe@parity.io>",
-          "timestamp": "2025-07-08T16:10:51Z",
-          "tree_id": "8a90317b0febd3a60f76b56d7a854edcf7a4085d",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/88fc41c9cf5e46277b7cab53a72c650b75377d25"
-        },
-        "date": 1751997062116,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 63630.31999999999,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 52937.3,
-            "unit": "KiB"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-0",
-            "value": 2.5330454829099995,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-gather-signatures",
-            "value": 0.005667662929999999,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-1",
-            "value": 2.5030359572699985,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel",
-            "value": 12.5344730602,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting/test-environment",
-            "value": 0.00001764004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution/test-environment",
-            "value": 0.00001792075,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-2",
-            "value": 2.5533602503800004,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-3",
-            "value": 2.5216048299500016,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-db",
-            "value": 1.954933949589997,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
-            "value": 0.46282492717000245,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 2.656242823730941,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-distribution",
-            "value": 0.00001792075,
-            "unit": "seconds"
-          },
-          {
-            "name": "approval-voting",
-            "value": 0.00001764004,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -49499,6 +49400,105 @@ window.BENCHMARK_DATA = {
           {
             "name": "approval-voting-parallel/approval-voting-parallel-0",
             "value": 2.6621567066400003,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "117115317+lrubasze@users.noreply.github.com",
+            "name": "Lukasz Rubaszewski",
+            "username": "lrubasze"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "e23e645c4e1c57ba2b40ef95b51e5015ad940cba",
+          "message": "  Gap Sync: Skip Body Requests for Non-Archive Nodes (#10752)\n\n### Summary\nThis PR optimizes gap sync bandwidth usage by skipping body requests for\nnon-archive nodes. Bodies are unnecessary during gap sync when the node\ndoesn't maintain full block history, while archive nodes continue to\nrequest bodies to preserve complete history.\nIt reduces bandwidth consumption and database size significantly for\ntypical validator/full nodes.\n\nAdditionally added some gap sync statistics for observability:\n- Introduced `GapSyncStats` to track bandwidth usage: header bytes, body\nbytes, justification bytes\n- Logged on gap sync completion to provide visibility into bandwidth\nsavings\n\n---------\n\nCo-authored-by: sistemd <enntheprogrammer@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T15:01:49Z",
+          "tree_id": "0aeca6e0c5c392f43263ad5e5e87b94831e39bc3",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/e23e645c4e1c57ba2b40ef95b51e5015ad940cba"
+        },
+        "date": 1770998886943,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 63626.95,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 52936.8,
+            "unit": "KiB"
+          },
+          {
+            "name": "approval-distribution/test-environment",
+            "value": 0.00002052998,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-1",
+            "value": 2.6794308012099997,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-db",
+            "value": 2.3700179772799927,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-subsystem",
+            "value": 0.8249107550900124,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting",
+            "value": 0.00001903985,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-3",
+            "value": 2.6559486017600005,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting/test-environment",
+            "value": 0.00001903985,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-gather-signatures",
+            "value": 0.005529554160000003,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 4.529159828313322,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel",
+            "value": 13.938881401530006,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-0",
+            "value": 2.6789756128799995,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-voting-parallel/approval-voting-parallel-2",
+            "value": 2.724068099150002,
+            "unit": "seconds"
+          },
+          {
+            "name": "approval-distribution",
+            "value": 0.00002052998,
             "unit": "seconds"
           }
         ]

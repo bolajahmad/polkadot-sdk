@@ -1,52 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770979883239,
+  "lastUpdate": 1770982222096,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "statement-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "5588131+kianenigma@users.noreply.github.com",
-            "name": "Kian Paimani",
-            "username": "kianenigma"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "252649fc0105efc8b32b2e1a3649bd6d09f8bd53",
-          "message": "add benchmark for prune-era (#9056)\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-04T18:25:54Z",
-          "tree_id": "c4480f0f14cd79f70f4a2733fab6a6d0c4c81f6b",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/252649fc0105efc8b32b2e1a3649bd6d09f8bd53"
-        },
-        "date": 1751657666631,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 127.94399999999995,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 106.39999999999996,
-            "unit": "KiB"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.04505068585999994,
-            "unit": "seconds"
-          },
-          {
-            "name": "statement-distribution",
-            "value": 0.034203412334000004,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -21999,6 +21955,50 @@ window.BENCHMARK_DATA = {
           {
             "name": "statement-distribution",
             "value": 0.03795936475,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robertvaneerdewijk@gmail.com",
+            "name": "0xRVE",
+            "username": "0xRVE"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bab8ed7347e783af162d0921d476ab61af2f68ce",
+          "message": "Consolidate pallet-assets metadata benchmarks into single get_metadata benchmark (#11037)\n\n## Summary\n\nConsolidates the three identical `get_name`, `get_symbol`, and\n`get_decimals` benchmarks into a single `get_metadata` benchmark. This\naddresses the follow-up from #10971 where it was noted that these\nbenchmarks perform the same operation (`Pallet::get_metadata()`).\n\n## Changes\n\n### Benchmarks\n- **`substrate/frame/assets/src/benchmarking.rs`**\n- Replaced `get_name`, `get_symbol`, `get_decimals` with single\n`get_metadata` benchmark\n- Updated verification to check all three metadata fields (name, symbol,\ndecimals)\n\n### Weight Functions\n- **`substrate/frame/assets/src/weights.rs`**\n- Replaced `get_name()`, `get_symbol()`, `get_decimals()` with single\n`get_metadata()` in `WeightInfo` trait\n  - Updated implementations for `SubstrateWeight<T>` and `()`\n\n### Precompile\n- **`substrate/frame/assets/precompiles/src/lib.rs`**\n- Updated `name()`, `symbol()`, and `decimals()` methods to all charge\n`get_metadata()` weight\n\n### Cumulus Runtimes\nUpdated weight implementations in:\n- `asset-hub-rococo`: `pallet_assets_foreign.rs`,\n`pallet_assets_local.rs`, `pallet_assets_pool.rs`\n- `asset-hub-westend`: `pallet_assets_foreign.rs`,\n`pallet_assets_local.rs`, `pallet_assets_pool.rs`\n\n## Rationale\n\nAll three original benchmarks were measuring the exact same operation -\na single metadata storage read. Consolidating them:\n1. Reduces code duplication\n2. Simplifies the `WeightInfo` trait\n3. Accurately reflects that `name()`, `symbol()`, and `decimals()` have\nidentical costs\n\nCloses follow-up from\nhttps://github.com/paritytech/polkadot-sdk/pull/10971#discussion_r2782977769\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T10:18:25Z",
+          "tree_id": "23a183c194e6dc101de6273eeff05b420e8a96ae",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/bab8ed7347e783af162d0921d476ab61af2f68ce"
+        },
+        "date": 1770982198097,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 128.054,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 106.39999999999996,
+            "unit": "KiB"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.06858871113999992,
+            "unit": "seconds"
+          },
+          {
+            "name": "statement-distribution",
+            "value": 0.038125758019999983,
             "unit": "seconds"
           }
         ]

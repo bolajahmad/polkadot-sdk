@@ -21,7 +21,6 @@ async fn validator_disabling_test() -> Result<(), anyhow::Error> {
 	);
 	let images = zombienet_sdk::environment::get_images_from_env();
 	let config_builder = NetworkConfigBuilder::new()
-		.with_global_settings(|global_settings| global_settings.with_tear_down_on_failure(false))
 		.with_relaychain(|r| {
 			let r = r
 				.with_chain("westend-local") // Use westend-local so the disabling can take effect.
@@ -75,6 +74,7 @@ async fn validator_disabling_test() -> Result<(), anyhow::Error> {
 				.with_default_args(vec!["-lparachain=debug".into()])
 				.with_collator(|n| n.with_name("alice"))
 		})
+		.with_global_settings(|global_settings| global_settings.with_tear_down_on_failure(false))
 		.build()
 		.map_err(|e| {
 			let errors = e.into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join(" ");

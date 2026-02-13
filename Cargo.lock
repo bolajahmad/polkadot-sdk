@@ -6849,6 +6849,7 @@ dependencies = [
  "frame-benchmarking-cli",
  "sc-chain-spec",
  "sc-cli",
+ "sc-client-db",
  "sp-genesis-builder",
  "sp-runtime",
  "sp-statement-store",

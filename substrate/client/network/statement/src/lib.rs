@@ -89,7 +89,7 @@ mod rep {
 	/// Reputation change when a peer sends us a duplicate statement.
 	pub const DUPLICATE_STATEMENT: Rep = Rep::new(-(1 << 7), "Duplicate statement");
 	/// Reputation change when a peer floods us with statements.
-	pub const STATEMENT_FLOODING: Rep = Rep::new(-(1 << 12), "Statement flooding");
+	pub const STATEMENT_FLOODING: Rep = Rep::new_fatal("Statement flooding");
 }
 
 const LOG_TARGET: &str = "statement-gossip";
@@ -236,16 +236,17 @@ impl StatementHandlerPrototype {
 			num_submission_workers = 1;
 		}
 
-		let statements_per_second = if statements_per_second == 0 {
-			log::warn!(
-				target: LOG_TARGET,
-				"statements_per_second is 0, defaulting to {}",
-				DEFAULT_STATEMENTS_PER_SECOND
-			);
-			NonZeroU32::new(DEFAULT_STATEMENTS_PER_SECOND)
-				.expect("DEFAULT_STATEMENTS_PER_SECOND is nonzero")
-		} else {
-			NonZeroU32::new(statements_per_second).expect("checked above")
+		let statements_per_second = match NonZeroU32::new(statements_per_second) {
+			Some(rate) => rate,
+			None => {
+				log::warn!(
+					target: LOG_TARGET,
+					"statements_per_second is 0, defaulting to {}",
+					DEFAULT_STATEMENTS_PER_SECOND
+				);
+				NonZeroU32::new(DEFAULT_STATEMENTS_PER_SECOND)
+					.expect("DEFAULT_STATEMENTS_PER_SECOND is nonzero")
+			},
 		};
 
 		for _ in 0..num_submission_workers {
@@ -343,7 +344,10 @@ pub struct StatementHandler<
 	initial_sync_peer_queue: VecDeque<PeerId>,
 }
 
-/// Per-peer rate limiter.
+/// Per-peer rate limiter using a token bucket algorithm.
+///
+/// The token bucket allows short bursts up to the per-second limit while enforcing
+/// the average rate over time.
 #[derive(Debug)]
 struct PeerRateLimiter {
 	limiter: RateLimiter<NotKeyed, InMemoryState, DefaultClock>,
@@ -355,8 +359,12 @@ impl PeerRateLimiter {
 		Self { limiter: RateLimiter::direct(quota) }
 	}
 
-	/// Check if receiving statements would exceed the rate limit.
+	/// Check if receiving `count` statements would exceed the rate limit.
 	fn is_flooding(&self, count: usize) -> bool {
+		if count > u32::MAX as usize {
+			return true;
+		}
+
 		let Some(n) = NonZeroU32::new(count as u32) else {
 			return false;
 		};
@@ -371,7 +379,7 @@ pub struct Peer {
 	/// Holds a set of statements known to this peer.
 	known_statements: LruHashSet<Hash>,
 	role: ObservedRole,
-	/// Rate limiter for statement flooding protection
+	/// Rate limiter for statement flooding protection.
 	rate_limiter: PeerRateLimiter,
 }
 
@@ -2067,7 +2075,8 @@ mod tests {
 			reports
 				.iter()
 				.any(|(id, rep)| *id == peer_id && *rep == rep::STATEMENT_FLOODING),
-			"Sending 60,000 statements should trigger flooding (limit: 50,000/sec). Reports: {:?}",
+			"Sending 60,000 statements should trigger flooding (limit: {}/sec). Reports: {:?}",
+			DEFAULT_STATEMENTS_PER_SECOND,
 			reports
 		);
 

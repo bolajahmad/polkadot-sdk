@@ -51,6 +51,9 @@ pub struct Cli {
 
 	/// Maximum statements per second per peer before rate limiting kicks in.
 	///
+	/// Uses a token bucket algorithm that allows short bursts up to this limit
+	/// while enforcing the average rate over time.
+	///
 	/// Only relevant when `--enable-statement-store` is used.
 	#[arg(long, default_value_t = 50_000)]
 	pub statement_rate_limit: u32,

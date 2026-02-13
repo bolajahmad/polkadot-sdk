@@ -32,8 +32,6 @@ pub const MAX_STATEMENT_NOTIFICATION_SIZE: u64 = 1024 * 1024;
 /// Maximum number of statement validation request we keep at any moment.
 pub const MAX_PENDING_STATEMENTS: usize = 2 * 1024 * 1024;
 
-/// Maximum statements in a 10-second sliding window before punishment.
-pub const MAX_STATEMENTS_PER_WINDOW: u32 = 500_000;
-
-/// Sliding window duration for flood detection.
-pub const RATE_LIMIT_WINDOW_DURATION: time::Duration = time::Duration::from_secs(10);
+/// Maximum statements per second before rate limiting kicks in.
+/// This translates to 500,000 statements per 10-second window equivalent.
+pub const STATEMENTS_PER_SECOND: u32 = 50_000;

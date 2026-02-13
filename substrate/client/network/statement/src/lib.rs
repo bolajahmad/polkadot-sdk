@@ -32,6 +32,11 @@ use codec::{Compact, Decode, Encode, MaxEncodedLen};
 #[cfg(any(test, feature = "test-helpers"))]
 use futures::future::pending;
 use futures::{channel::oneshot, future::FusedFuture, prelude::*, stream::FuturesUnordered};
+use governor::{
+	clock::DefaultClock,
+	state::{InMemoryState, NotKeyed},
+	Quota, RateLimiter,
+};
 use prometheus_endpoint::{
 	prometheus, register, Counter, Gauge, Histogram, HistogramOpts, PrometheusError, Registry, U64,
 };
@@ -56,10 +61,9 @@ use sp_statement_store::{
 use std::{
 	collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
 	iter,
-	num::NonZeroUsize,
+	num::{NonZeroU32, NonZeroUsize},
 	pin::Pin,
 	sync::Arc,
-	time::Instant,
 };
 use tokio::time::timeout;
 pub mod config;
@@ -323,28 +327,26 @@ pub struct StatementHandler<
 	initial_sync_peer_queue: VecDeque<PeerId>,
 }
 
-/// Per-peer rate limiter using sliding window.
+/// Per-peer rate limiter.
 #[derive(Debug)]
 struct PeerRateLimiter {
-	/// Sliding window of (timestamp, count)
-	statement_window: VecDeque<(Instant, usize)>,
+	limiter: RateLimiter<NotKeyed, InMemoryState, DefaultClock>,
 }
 
 impl PeerRateLimiter {
 	fn new() -> Self {
-		Self { statement_window: VecDeque::new() }
+		let quota = Quota::per_second(
+			NonZeroU32::new(STATEMENTS_PER_SECOND).expect("STATEMENTS_PER_SECOND is nonzero"),
+		);
+		Self { limiter: RateLimiter::direct(quota) }
 	}
 
-	/// Check if peer can send N statements. Returns true if flooding detected.
-	fn is_flooding(&mut self, count: usize) -> bool {
-		let now = Instant::now();
-		let cutoff = now - RATE_LIMIT_WINDOW_DURATION;
-		while self.statement_window.front().is_some_and(|(t, _)| *t < cutoff) {
-			self.statement_window.pop_front();
-		}
-		let window_total: usize = self.statement_window.iter().map(|(_, c)| c).sum();
-		self.statement_window.push_back((now, count));
-		window_total + count > MAX_STATEMENTS_PER_WINDOW as usize
+	/// Check if receiving statements would exceed the rate limit.
+	fn is_flooding(&self, count: usize) -> bool {
+		let Some(n) = NonZeroU32::new(count as u32) else {
+			return false;
+		};
+		self.limiter.check_n(n).is_err()
 	}
 }
 
@@ -661,11 +663,9 @@ where
 			if peer.rate_limiter.is_flooding(statements.len()) {
 				log::warn!(
 					target: LOG_TARGET,
-					"Peer {} exceeded statement rate limit: {} statements in {}s window (limit: {}). Disconnecting.",
+					"Peer {} exceeded statement rate limit ({} statements/sec). Disconnecting.",
 					who,
-					statements.len(),
-					RATE_LIMIT_WINDOW_DURATION.as_secs(),
-					MAX_STATEMENTS_PER_WINDOW
+					STATEMENTS_PER_SECOND
 				);
 
 				self.network.report_peer(who, rep::STATEMENT_FLOODING);
@@ -673,6 +673,11 @@ where
 				if let Some(ref metrics) = self.metrics {
 					metrics.statement_flooding_detected.inc();
 				}
+
+				// Clean up peer state immediately
+				self.peers.remove(&who);
+				self.pending_initial_syncs.remove(&who);
+				self.initial_sync_peer_queue.retain(|p| *p != who);
 
 				return;
 			}
@@ -1961,5 +1966,91 @@ mod tests {
 			peer_id,
 			disconnected
 		);
+
+		// Verify peer state was cleaned up
+		assert!(!handler.peers.contains_key(&peer_id), "Peer should be removed from peers map");
+		assert!(
+			!handler.pending_initial_syncs.contains_key(&peer_id),
+			"Peer should be removed from pending_initial_syncs"
+		);
+		assert!(
+			!handler.initial_sync_peer_queue.contains(&peer_id),
+			"Peer should be removed from initial_sync_peer_queue"
+		);
+	}
+
+	#[tokio::test]
+	async fn test_legitimate_traffic_not_flagged() {
+		let (mut handler, _statement_store, network, _notification_service, _queue_receiver) =
+			build_handler();
+
+		let peer_id = *handler.peers.keys().next().unwrap();
+
+		let mut statements = Vec::new();
+		for i in 0..25_000 {
+			let mut statement = Statement::new();
+			statement.set_plain_data(vec![i as u8, (i >> 8) as u8, (i >> 16) as u8]);
+			statements.push(statement);
+		}
+
+		handler.on_statements(peer_id, statements);
+
+		let reports = network.get_reports();
+		assert!(
+			!reports
+				.iter()
+				.any(|(id, rep)| *id == peer_id && *rep == rep::STATEMENT_FLOODING),
+			"Legitimate traffic should not trigger flooding detection. Reports: {:?}",
+			reports
+		);
+
+		let disconnected = network.get_disconnected_peers();
+		assert!(
+			!disconnected.contains(&peer_id),
+			"Legitimate traffic should not cause disconnection. Disconnected peers: {:?}",
+			disconnected
+		);
+
+		assert!(handler.peers.contains_key(&peer_id), "Peer should still be connected");
+	}
+
+	#[tokio::test]
+	async fn test_just_over_rate_limit_triggers_flooding() {
+		let (mut handler, _statement_store, network, _notification_service, _queue_receiver) =
+			build_handler();
+
+		let peer_id = *handler.peers.keys().next().unwrap();
+
+		let mut statements = Vec::new();
+		for i in 0..60_000 {
+			let mut statement = Statement::new();
+			statement.set_plain_data(vec![
+				i as u8,
+				(i >> 8) as u8,
+				(i >> 16) as u8,
+				(i >> 24) as u8,
+			]);
+			statements.push(statement);
+		}
+
+		handler.on_statements(peer_id, statements);
+
+		let reports = network.get_reports();
+		assert!(
+			reports
+				.iter()
+				.any(|(id, rep)| *id == peer_id && *rep == rep::STATEMENT_FLOODING),
+			"Sending 60,000 statements should trigger flooding (limit: 50,000/sec). Reports: {:?}",
+			reports
+		);
+
+		let disconnected = network.get_disconnected_peers();
+		assert!(
+			disconnected.contains(&peer_id),
+			"Peer should be disconnected after exceeding rate limit. Disconnected: {:?}",
+			disconnected
+		);
+
+		assert!(!handler.peers.contains_key(&peer_id), "Peer should be removed from peers map");
 	}
 }

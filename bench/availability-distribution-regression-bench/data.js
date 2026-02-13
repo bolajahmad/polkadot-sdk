@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770985010877,
+  "lastUpdate": 1770998880280,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "pgherveou@gmail.com",
-            "name": "PG Herveou",
-            "username": "pgherveou"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": false,
-          "id": "9b7c20a2a187e57433c055592609e35af0258bbc",
-          "message": "Fix seal_call benchmark (#9112)\n\nFix seal_call benchmark, ensure that the benchmarked block actually\nsucceed\n\n---------\n\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
-          "timestamp": "2025-07-08T18:30:43Z",
-          "tree_id": "a5d64f5c7d1bffccf857ee5ff83a6f6b305f5ee0",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/9b7c20a2a187e57433c055592609e35af0258bbc"
-        },
-        "date": 1752004356733,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013040855453333328,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.007429897726666626,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.15757371894000005,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022402051926666666,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "bitfield-distribution",
             "value": 0.024805433646666666,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "117115317+lrubasze@users.noreply.github.com",
+            "name": "Lukasz Rubaszewski",
+            "username": "lrubasze"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "e23e645c4e1c57ba2b40ef95b51e5015ad940cba",
+          "message": "  Gap Sync: Skip Body Requests for Non-Archive Nodes (#10752)\n\n### Summary\nThis PR optimizes gap sync bandwidth usage by skipping body requests for\nnon-archive nodes. Bodies are unnecessary during gap sync when the node\ndoesn't maintain full block history, while archive nodes continue to\nrequest bodies to preserve complete history.\nIt reduces bandwidth consumption and database size significantly for\ntypical validator/full nodes.\n\nAdditionally added some gap sync statistics for observability:\n- Introduced `GapSyncStats` to track bandwidth usage: header bytes, body\nbytes, justification bytes\n- Logged on gap sync completion to provide visibility into bandwidth\nsavings\n\n---------\n\nCo-authored-by: sistemd <enntheprogrammer@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T15:01:49Z",
+          "tree_id": "0aeca6e0c5c392f43263ad5e5e87b94831e39bc3",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/e23e645c4e1c57ba2b40ef95b51e5015ad940cba"
+        },
+        "date": 1770998859153,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007203896066666664,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.009855082273333319,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.02538903302,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14781327954000004,
             "unit": "seconds"
           }
         ]

@@ -212,9 +212,6 @@ impl<T: Config> UncheckedMigrateToV4<T> {
 				"Old CoreDescriptors should be empty"
 			);
 
-			// Check no schedules remain (by checking a few potential block numbers)
-			// We can't fully verify without iterating all possible block numbers,
-			// but checking the descriptor is empty should be sufficient
 		}
 
 		// Verify new storage (Twox64Concat allows iteration)

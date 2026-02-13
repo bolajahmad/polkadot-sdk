@@ -76,6 +76,17 @@ pub trait WeightInfo {
 	fn migrate_asset_step_finished() -> Weight;
 }
 
+/// Weight functions needed for `pallet_assets_precompiles::permit`.
+pub trait PermitWeightInfo {
+	/// Weight for reading a nonce from storage.
+	fn nonces() -> Weight;
+	/// Weight for computing the EIP-712 domain separator.
+	fn domain_separator() -> Weight;
+	/// Weight for the full permit operation (verify signature + increment nonce).
+	/// This does NOT include the approval weight from pallet_assets.
+	fn use_permit() -> Weight;
+}
+
 /// Weights for `pallet_assets_precompiles` using the Substrate node and recommended hardware.
 pub struct SubstrateWeight<T>(PhantomData<T>);
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
@@ -124,5 +135,62 @@ impl WeightInfo for () {
 		//  Estimated: `0`
 		// Minimum execution time: 4_307_000 picoseconds.
 		Weight::from_parts(4_593_000, 0)
+	}
+}
+
+/// Weights for permit operations using the Substrate node and recommended hardware.
+pub struct PermitWeight<T>(PhantomData<T>);
+impl<T: frame_system::Config> PermitWeightInfo for PermitWeight<T> {
+	/// Weight for reading a nonce from storage.
+	/// Storage: `Nonces` (r:1 w:0)
+	fn nonces() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `76`
+		//  Estimated: `3541`
+		// Minimum execution time: 3_000_000 picoseconds.
+		Weight::from_parts(3_500_000, 3541)
+			.saturating_add(T::DbWeight::get().reads(1_u64))
+	}
+
+	/// Weight for computing the EIP-712 domain separator.
+	/// Pure computation: 4x keccak256 hashes.
+	fn domain_separator() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 5_000_000 picoseconds.
+		Weight::from_parts(5_500_000, 0)
+	}
+
+	/// Weight for the full permit verification and nonce consumption.
+	/// Includes: permit digest computation, ECDSA recovery, nonce read + write.
+	/// Storage: `Nonces` (r:1 w:1)
+	fn use_permit() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `76`
+		//  Estimated: `3541`
+		// Minimum execution time: 60_000_000 picoseconds.
+		// Includes: keccak256 hashes + secp256k1 recovery + storage ops
+		Weight::from_parts(62_000_000, 3541)
+			.saturating_add(T::DbWeight::get().reads(1_u64))
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+}
+
+// For backwards compatibility and tests.
+impl PermitWeightInfo for () {
+	fn nonces() -> Weight {
+		Weight::from_parts(3_500_000, 3541)
+			.saturating_add(RocksDbWeight::get().reads(1_u64))
+	}
+
+	fn domain_separator() -> Weight {
+		Weight::from_parts(5_500_000, 0)
+	}
+
+	fn use_permit() -> Weight {
+		Weight::from_parts(62_000_000, 3541)
+			.saturating_add(RocksDbWeight::get().reads(1_u64))
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
 }

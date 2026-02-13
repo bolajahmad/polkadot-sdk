@@ -94,6 +94,7 @@ parameter_types! {
 
 impl permit::pallet::Config for Test {
 	type ChainId = ChainId;
+	type WeightInfo = ();
 }
 
 #[derive_impl(pallet_revive::config_preludes::TestDefaultConfig)]

@@ -41,6 +41,8 @@ pub mod migration;
 #[cfg(feature = "runtime-benchmarks")]
 pub(crate) mod migration_benchmarks;
 pub mod permit;
+#[cfg(feature = "runtime-benchmarks")]
+pub(crate) mod permit_benchmarks;
 pub mod weights;
 
 #[cfg(test)]
@@ -60,6 +62,7 @@ pub use permit::{
 	pallet::Config as PermitConfig, DIGEST_PREFIX_LEN, DOMAIN_SEPARATOR_ENCODED_LEN,
 	PERMIT_STRUCT_ENCODED_LEN, PERMIT_TYPEHASH, SECP256K1_N_DIV_2,
 };
+pub use weights::{PermitWeight, PermitWeightInfo};
 
 /// Mean of extracting the asset id from the precompile address.
 pub trait AssetIdExtractor {
@@ -395,11 +398,10 @@ where
 		call: &IERC20::permitCall,
 		env: &mut impl Ext<T = Runtime>,
 	) -> Result<Vec<u8>, Error> {
-		// Permit operation is more expensive than approve_transfer:
-		// - 2+ keccak256 hashes (domain separator, struct hash, digest)
-		// - secp256k1 ECDSA recovery
-		// - Storage reads (nonce) and writes (nonce increment, approval)
-		env.charge(<Runtime as Config<Instance>>::WeightInfo::approve_transfer())?;
+		// Charge for permit verification/consumption + the approval from pallet_assets
+		let permit_weight = <Runtime as permit::Config>::WeightInfo::use_permit()
+			.saturating_add(<Runtime as Config<Instance>>::WeightInfo::approve_transfer());
+		env.charge(permit_weight)?;
 
 		let owner_h160: H160 = call.owner.into_array().into();
 		let spender_h160: H160 = call.spender.into_array().into();
@@ -488,8 +490,7 @@ where
 		call: &IERC20::noncesCall,
 		env: &mut impl Ext<T = Runtime>,
 	) -> Result<Vec<u8>, Error> {
-		// TODO: Add proper weight for nonces read
-		env.charge(<Runtime as Config<Instance>>::WeightInfo::balance())?;
+		env.charge(<Runtime as permit::Config>::WeightInfo::nonces())?;
 
 		let owner_h160: H160 = call.owner.into_array().into();
 		let nonce = permit::Pallet::<Runtime>::nonce(&verifying_contract, &owner_h160);
@@ -506,8 +507,7 @@ where
 		verifying_contract: H160,
 		env: &mut impl Ext<T = Runtime>,
 	) -> Result<Vec<u8>, Error> {
-		// TODO: Add proper weight for domain separator computation
-		env.charge(<Runtime as Config<Instance>>::WeightInfo::balance())?;
+		env.charge(<Runtime as permit::Config>::WeightInfo::domain_separator())?;
 
 		let separator = permit::Pallet::<Runtime>::compute_domain_separator(&verifying_contract);
 		let separator_alloy: alloy::primitives::FixedBytes<32> = separator.0.into();

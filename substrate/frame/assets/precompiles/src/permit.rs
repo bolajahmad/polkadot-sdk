@@ -36,6 +36,7 @@ use sp_core::{H256, U256};
 use sp_io::{crypto::secp256k1_ecdsa_recover, hashing::keccak_256};
 use sp_runtime::traits::UniqueSaturatedInto;
 
+pub use crate::weights::PermitWeightInfo;
 pub use pallet::*;
 
 /// EIP-712 type hash for Permit.
@@ -74,6 +75,9 @@ pub mod pallet {
 		/// The chain ID used in EIP-712 domain separator.
 		#[pallet::constant]
 		type ChainId: Get<u64>;
+
+		/// Weight information for permit operations.
+		type WeightInfo: PermitWeightInfo;
 	}
 
 	#[pallet::pallet]

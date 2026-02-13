@@ -577,6 +577,7 @@ impl pallet_assets_precompiles::ForeignAssetsConfig for Runtime {
 
 impl pallet_assets_precompiles::PermitConfig for Runtime {
 	type ChainId = ConstU64<420_420_421>;
+	type WeightInfo = pallet_assets_precompiles::weights::PermitWeight<Runtime>;
 }
 
 /// Assets managed by some foreign location. Note: we do not declare a `ForeignAssetsCall` type, as

@@ -175,6 +175,7 @@ pub mod pallet {
 		///
 		/// - `_origin`: Can be any kind of origin.
 		/// - `meta_tx`: Meta Transaction with a target call to be dispatched.
+		/// - `len`: The size of the encoded meta transaction in bytes.
 		#[pallet::call_index(0)]
 		#[pallet::weight({
 			let dispatch_info = meta_tx.call.get_dispatch_info();
@@ -190,7 +191,7 @@ pub mod pallet {
 		pub fn dispatch(
 			_origin: OriginFor<T>,
 			meta_tx: Box<MetaTxFor<T>>,
-			len: u32, // The size of the meta transaction in bytes.
+			len: u32, // The size of the encoded meta transaction in bytes.
 		) -> DispatchResultWithPostInfo {
 			let origin = SystemOrigin::None;
 			let meta_tx_size = meta_tx.encoded_size();

@@ -185,8 +185,8 @@ pub enum StorageProof {
 
 #[derive(Debug, Clone, codec::Encode, codec::Decode)]
 pub struct NomtCompactProof {
-	proof: NomtMultiProof,
-	values: Vec<Vec<u8>>,
+	pub proof: NomtMultiProof,
+	pub values: Vec<Vec<u8>>,
 }
 
 /// Storage proof in compact form.

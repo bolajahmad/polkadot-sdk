@@ -754,11 +754,15 @@ impl NomtReadRecorder {
 	}
 
 	fn drain_storage_proof(self) -> NomtStorageProof {
-		// TODO HERE
 		// UNWRAP: the recorder is moved here, it is not expected to be used anymore
 		// within other state backends.
 		let witness = Arc::into_inner(self.witness).unwrap().into_inner().unwrap();
-		let reads = Arc::into_inner(self.reads)
+		// TODO: this should be filtered and changed to just be a vector with all the
+		// values because both keys and the terminals information is already stored
+		// within the proof. The witnessed terminal can be parsed to find out
+		// all the keys that were accessed and most importantly if the terminal was a
+		// terminator it means that the value was not present.
+		let reads: Vec<_> = Arc::into_inner(self.reads)
 			.unwrap()
 			.into_inner()
 			.into_iter()

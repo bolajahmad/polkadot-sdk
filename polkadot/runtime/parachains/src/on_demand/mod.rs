@@ -20,16 +20,11 @@
 //! assignments. This module is not handled by the initializer but is instead instantiated in the
 //! `construct_runtime` macro.
 //!
-//! The module currently limits parallel execution of blocks from the same `ParaId` via
-//! a core affinity mechanism. As long as there exists an affinity for a `CoreIndex` for
-//! a specific `ParaId`, orders for blockspace for that `ParaId` will only be assigned to
-//! that `CoreIndex`.
-//!
-//! NOTE: Once we have elastic scaling implemented we might want to extend this module to support
-//! ignoring core affinity up to a certain extend. This should be opt-in though as the parachain
-//! needs to support multiple cores in the same block. If we want to enable a single parachain
-//! occupying multiple cores in on-demand, we will likely add a separate order type, where the
-//! intent can be made explicit.
+//! The module uses a single queue for all on-demand orders. Orders are generally processed in the
+//! order they are received, but with an important constraint: only one order per ParaId can be
+//! assigned in each scheduling round. If multiple orders for the same ParaId exist in the queue,
+//! only the first will be assigned, and subsequent orders for that ParaId will remain queued until
+//! the next round.
 
 use core::mem;
 

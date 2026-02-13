@@ -193,8 +193,12 @@ async fn build_network_config() -> Result<NetworkConfig, anyhow::Error> {
 	let images = zombienet_sdk::environment::get_images_from_env();
 	log::info!("Using images: {images:?}");
 
-	let chain_a = format!("glutton-westend-local-{PARA_A}");
-	let chain_b = format!("glutton-westend-local-{PARA_B}");
+	// Use asset-hub-rococo-local as the base chain spec for both parachains.
+	// Asset Hub is the standard system parachain used for testing and provides a minimal,
+	// well-tested runtime without unnecessary overhead (unlike Glutton which is designed
+	// for stress testing and intentionally consumes weight).
+	let chain_a = "asset-hub-rococo-local";
+	let chain_b = "asset-hub-rococo-local";
 
 	// Network setup:
 	// - Relay chain with 4 validators

@@ -308,6 +308,16 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for UncheckedMigrateToV4<T> {
 			new_descriptors.insert(core_index, old_descriptor);
 		}
 
+		// Defensive check: verify descriptor count matches what we collected
+		if descriptor_count > 0 && new_descriptors.len() as u64 != descriptor_count {
+			log::error!(
+				target: super::LOG_TARGET,
+				"Descriptor count mismatch during migration: expected {} but got {}",
+				descriptor_count,
+				new_descriptors.len()
+			);
+		}
+
 		// Write all descriptors at once
 		super::CoreDescriptors::<T>::put(new_descriptors);
 		weight.saturating_accrue(T::DbWeight::get().writes(1));
@@ -594,7 +604,10 @@ mod v4_tests {
 	}
 
 	#[test]
-	fn claim_queue_pool_assignments_preserved() {
+	fn claim_queue_migration_works() {
+		// This test covers both pool and bulk assignment handling during ClaimQueue migration:
+		// - Pool assignments should be pushed to the on-demand pallet queue
+		// - Bulk assignments should be dropped (they will be rescheduled from CoreSchedules)
 		new_test_ext(MockGenesisConfig::default()).execute_with(|| {
 			// Setup configuration with 1 core
 			configuration::ActiveConfig::<Test>::mutate(|c| {
@@ -604,20 +617,21 @@ mod v4_tests {
 			let core = CoreIndex(0);
 			let pool_para_1 = ParaId::from(1000);
 			let pool_para_2 = ParaId::from(1001);
-			let bulk_para = ParaId::from(2000);
+			let bulk_para_claimqueue = ParaId::from(2000);
+			let bulk_para_descriptor = ParaId::from(3000);
 			let block_number = 10u32;
 
-			// Create a minimal CoreDescriptor and Schedule to pass sanity check
-			// (production networks will have these)
+			// Create a CoreDescriptor and Schedule (production networks will have these)
 			let descriptor = CoreDescriptor::new(
 				Some(QueueDescriptor { first: block_number, last: block_number }),
 				None,
 			);
 			v3::CoreDescriptors::<Test>::insert(core, descriptor);
 
+			// Schedule contains the authoritative bulk assignment
 			let schedule = Schedule::new(
 				vec![(
-					BrokerCoreAssignment::Task(pool_para_1.into()),
+					BrokerCoreAssignment::Task(bulk_para_descriptor.into()),
 					PartsOf57600::new_saturating(57600),
 				)],
 				None,
@@ -625,11 +639,13 @@ mod v4_tests {
 			);
 			v3::CoreSchedules::<Test>::insert((block_number, core), schedule);
 
-			// Create ClaimQueue with mixed assignments
+			// Create ClaimQueue with mixed assignments to test migration behavior:
+			// - Pool assignments (para 1000, 1001) should be migrated to on-demand queue
+			// - Bulk assignment (para 2000) should be dropped during migration
 			let mut claim_queue = BTreeMap::new();
 			let mut assignments = VecDeque::new();
 			assignments.push_back(v3::Assignment::Pool { para_id: pool_para_1, core_index: core });
-			assignments.push_back(v3::Assignment::Bulk(bulk_para));
+			assignments.push_back(v3::Assignment::Bulk(bulk_para_claimqueue)); // Will be dropped
 			assignments.push_back(v3::Assignment::Pool { para_id: pool_para_2, core_index: core });
 			claim_queue.insert(core, assignments);
 
@@ -643,7 +659,7 @@ mod v4_tests {
 			let core_queue = claim_queue_before.get(&core).expect("Core should be in claim queue");
 			assert_eq!(core_queue.len(), 3, "Core should have 3 assignments");
 			assert_eq!(core_queue[0], pool_para_1);
-			assert_eq!(core_queue[1], bulk_para);
+			assert_eq!(core_queue[1], bulk_para_claimqueue);
 			assert_eq!(core_queue[2], pool_para_2);
 
 			// Run migration with pre and post upgrade checks
@@ -655,7 +671,7 @@ mod v4_tests {
 			// Verify ClaimQueue is removed
 			assert!(!v3::ClaimQueue::<Test>::exists());
 
-			// Verify pool assignments went to on-demand
+			// Test 1: Verify pool assignments went to on-demand
 			// The migration calls `on_demand::Pallet::<T>::push_back_order` for each pool
 			// assignment, which adds them to the on-demand queue. We verify by popping
 			// assignments. Orders are ready 2 blocks after being placed (asynchronous backing).
@@ -667,87 +683,21 @@ mod v4_tests {
 			assert_eq!(popped.len(), 2, "Should have 2 pool assignments in on-demand queue");
 			assert!(popped.contains(&pool_para_1), "pool_para_1 should be in queue");
 			assert!(popped.contains(&pool_para_2), "pool_para_2 should be in queue");
-		});
-	}
 
-	#[test]
-	fn claim_queue_bulk_assignments_dropped() {
-		new_test_ext(MockGenesisConfig::default()).execute_with(|| {
-			// Setup configuration with 1 core
-			configuration::ActiveConfig::<Test>::mutate(|c| {
-				c.scheduler_params.num_cores = 1;
-			});
-
-			let core = CoreIndex(0);
-			let block_number = System::block_number().saturating_plus_one();
-
-			// Create CoreSchedule with different bulk assignments (these should win)
-			let descriptor_para_1 = ParaId::from(3000);
-			let descriptor_para_2 = ParaId::from(3001);
-
-			let descriptor_schedule = Schedule::new(
-				vec![
-					(
-						BrokerCoreAssignment::Task(descriptor_para_1.into()),
-						PartsOf57600::new_saturating(28800),
-					),
-					(
-						BrokerCoreAssignment::Task(descriptor_para_2.into()),
-						PartsOf57600::new_saturating(28800),
-					),
-				],
-				None,
-				None,
-			);
-
-			let descriptor = CoreDescriptor::new(
-				Some(QueueDescriptor { first: block_number, last: block_number }),
-				None,
-			);
-
-			v3::CoreSchedules::<Test>::insert((block_number, core), descriptor_schedule);
-			v3::CoreDescriptors::<Test>::insert(core, descriptor);
-
-			// Create ClaimQueue with different bulk assignments (these should be dropped)
-			let claimqueue_para_1 = ParaId::from(2000);
-			let claimqueue_para_2 = ParaId::from(2001);
-
-			let mut claim_queue = BTreeMap::new();
-			let mut assignments = VecDeque::new();
-			assignments.push_back(v3::Assignment::Bulk(claimqueue_para_1));
-			assignments.push_back(v3::Assignment::Bulk(claimqueue_para_2));
-			claim_queue.insert(core, assignments);
-
-			v3::ClaimQueue::<Test>::put(claim_queue);
-
-			StorageVersion::new(3).put::<super::Pallet<Test>>();
-
-			// Run migration with pre and post upgrade checks
-			let state =
-				UncheckedMigrateToV4::<Test>::pre_upgrade().expect("pre_upgrade should succeed");
-			UncheckedMigrateToV4::<Test>::on_runtime_upgrade();
-			UncheckedMigrateToV4::<Test>::post_upgrade(state).expect("post_upgrade should succeed");
-
-			// Verify ClaimQueue is removed
-			assert!(!v3::ClaimQueue::<Test>::exists());
-
-			// Peek at the next block to see what will be scheduled
-			// Should see assignments from descriptor (3000, 3001), NOT from ClaimQueue (2000, 2001)
+			// Test 2: Verify bulk assignments from ClaimQueue were dropped
+			// and the authoritative descriptor assignments are used instead
 			let peeked = scheduler::assigner_coretime::peek_next_block::<Test>(10);
-
 			let core_assignments = peeked.get(&core).expect("Core should have assignments");
 			let para_ids: Vec<ParaId> = core_assignments.iter().copied().collect();
 
-			// Verify we see descriptor paras, not claimqueue paras
-			assert!(para_ids.contains(&descriptor_para_1), "Should contain para from descriptor");
-			assert!(para_ids.contains(&descriptor_para_2), "Should contain para from descriptor");
+			// Should see para from descriptor, not from claimqueue
 			assert!(
-				!para_ids.contains(&claimqueue_para_1),
-				"Should NOT contain para from old ClaimQueue"
+				para_ids.contains(&bulk_para_descriptor),
+				"Should contain bulk para from descriptor"
 			);
 			assert!(
-				!para_ids.contains(&claimqueue_para_2),
-				"Should NOT contain para from old ClaimQueue"
+				!para_ids.contains(&bulk_para_claimqueue),
+				"Should NOT contain bulk para from old ClaimQueue"
 			);
 		});
 	}

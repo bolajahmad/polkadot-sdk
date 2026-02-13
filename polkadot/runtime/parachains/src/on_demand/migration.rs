@@ -21,13 +21,13 @@ use frame_support::{
 	migrations::VersionedMigration, storage_alias, traits::UncheckedOnRuntimeUpgrade,
 	weights::Weight,
 };
+use polkadot_primitives::CoreIndex;
 
 // v1 storage definitions
 mod v1 {
 	use super::*;
 	use alloc::collections::BinaryHeap;
 	use core::cmp::Ordering;
-	use polkadot_primitives::CoreIndex;
 
 	/// Old value of ON_DEMAND_MAX_QUEUE_MAX_SIZE from v1.
 	const ON_DEMAND_MAX_QUEUE_MAX_SIZE: u32 = 1_000_000_000;
@@ -136,13 +136,8 @@ mod v1 {
 		StorageValue<Pallet<T>, BinaryHeap<OldEnqueuedOrder>, OptionQuery>;
 
 	#[storage_alias]
-	pub(super) type AffinityEntries<T: Config> = StorageMap<
-		Pallet<T>,
-		Twox64Concat,
-		polkadot_primitives::CoreIndex,
-		BinaryHeap<OldEnqueuedOrder>,
-		OptionQuery,
-	>;
+	pub(super) type AffinityEntries<T: Config> =
+		StorageMap<Pallet<T>, Twox64Concat, CoreIndex, BinaryHeap<OldEnqueuedOrder>, OptionQuery>;
 }
 
 /// Migration to V2 - Remove affinity system and simplify to single queue.
@@ -221,6 +216,16 @@ impl<T: Config> UncheckedMigrateToV2<T> {
 		}
 
 		let migrated_orders = new_order_status.queue.len() as u32;
+
+		// Verify the migrated order count matches expectations
+		// Note: pre_upgrade already ensures total_orders <= capacity, so exact match is expected
+		ensure!(
+			migrated_orders == expected_orders,
+			"Migrated order count mismatch: expected {} but got {}",
+			expected_orders,
+			migrated_orders
+		);
+
 		log::info!(
 			target: LOG_TARGET,
 			"Successfully migrated {} orders (expected {}), removed {} affinity mappings, traffic preserved: {:?}",
@@ -248,7 +253,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for UncheckedMigrateToV2<T> {
 		// Collect all orders from both free and affinity queues
 		let mut all_orders = alloc::vec::Vec::new();
 
-		// Collect from free entries
+		// Collect from free entries (1 read + 1 write via take())
 		let free_entries = v1::FreeEntries::<T>::take().unwrap_or_default();
 		weight.saturating_accrue(T::DbWeight::get().reads_writes(1, 1));
 		for order in free_entries.into_iter() {
@@ -287,9 +292,11 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for UncheckedMigrateToV2<T> {
 				if let Err(para_id) = order_status.queue.try_push(now, old_order.para_id) {
 					log::warn!(
 						target: LOG_TARGET,
-						"Failed to migrate order for para_id {:?} - queue full",
+						"Failed to migrate order for para_id {:?} - queue full, stopping migration of remaining orders",
 						para_id
 					);
+					// Queue is full, no point trying to add more orders
+					break;
 				}
 			}
 		});

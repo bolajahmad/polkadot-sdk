@@ -1,62 +1,8 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770982156840,
+  "lastUpdate": 1770985010877,
   "repoUrl": "https://github.com/paritytech/polkadot-sdk",
   "entries": {
     "availability-distribution-regression-bench": [
-      {
-        "commit": {
-          "author": {
-            "email": "franciscoaguirreperez@gmail.com",
-            "name": "Francisco Aguirre",
-            "username": "franciscoaguirre"
-          },
-          "committer": {
-            "email": "noreply@github.com",
-            "name": "GitHub",
-            "username": "web-flow"
-          },
-          "distinct": true,
-          "id": "4d5e95217831fb75942d8153a22f6864858c1d71",
-          "message": "XCM precompile: don't support older xcm versions (#9126)\n\nThe latest XCM version is 5. A lot of parachains are still running V3 or\nV4 which is why we haven't removed them, but the XCM precompile is new\nand should only have to deal with versions 5 and onwards. No need to\nkeep dragging 3 and 4 in contracts.",
-          "timestamp": "2025-07-08T17:27:43Z",
-          "tree_id": "2944a79e52968a0f54da0a246a07867b8f95dffe",
-          "url": "https://github.com/paritytech/polkadot-sdk/commit/4d5e95217831fb75942d8153a22f6864858c1d71"
-        },
-        "date": 1751999965530,
-        "tool": "customSmallerIsBetter",
-        "benches": [
-          {
-            "name": "Sent to peers",
-            "value": 18481.666666666653,
-            "unit": "KiB"
-          },
-          {
-            "name": "Received from peers",
-            "value": 433.3333333333332,
-            "unit": "KiB"
-          },
-          {
-            "name": "availability-distribution",
-            "value": 0.013111665873333329,
-            "unit": "seconds"
-          },
-          {
-            "name": "test-environment",
-            "value": 0.007252886413333313,
-            "unit": "seconds"
-          },
-          {
-            "name": "bitfield-distribution",
-            "value": 0.022469487113333332,
-            "unit": "seconds"
-          },
-          {
-            "name": "availability-store",
-            "value": 0.1579632946666667,
-            "unit": "seconds"
-          }
-        ]
-      },
       {
         "commit": {
           "author": {
@@ -26999,6 +26945,60 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-environment",
             "value": 0.009779937233333336,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "40807189+AlexandruCihodaru@users.noreply.github.com",
+            "name": "Alexandru Cihodaru",
+            "username": "AlexandruCihodaru"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "744acf5599bcf978350015a73c75e05455a4d8f3",
+          "message": "Implement persistent reputation database for collator protocol (#7751) (#10917)\n\nImplements persistent storage for the experimental collator protocol's\nreputation database.\n\nChanges:\n\n- Adds `PersistentDb` wrapper that persists the in-memory reputation DB\nto disk\n  - Periodic persistence every 10 minutes (30s in test mode)\n  - Immediate persistence on slashes and parachain deregistration\n  - Loads existing state on startup with lookback for missed blocks\n  \nImplementation:\n  \n  `PersistentDb` wraps the existing `Db` and adds persistence on top:\n\n    - All reputation logic (scoring, decay, LRU) stays in `Db`\n    - Persistence layer handles disk I/O and serialization\n    - Per-para data stored in parachains_db\n    \nTests:\n\n- `basic_persistence.rs`: Validates persistence across restarts and\nstartup lookback\n- `pruning.rs`: Validates automatic cleanup on parachain deregistration\n\n---------\n\nSigned-off-by: Alexandru Cihodaru <alexandru.cihodaru@parity.io>\nCo-authored-by: alindima <alin@parity.io>\nCo-authored-by: Tsvetomir Dimitrov <tsvetomir@parity.io>\nCo-authored-by: Serban Iorga <serban@parity.io>\nCo-authored-by: Serban Iorga <serban300@gmail.com>\nCo-authored-by: cmd[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+          "timestamp": "2026-02-13T11:09:46Z",
+          "tree_id": "c5ea4bb300af28d1a2569244ef9ce654a0da4602",
+          "url": "https://github.com/paritytech/polkadot-sdk/commit/744acf5599bcf978350015a73c75e05455a4d8f3"
+        },
+        "date": 1770984987142,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Sent to peers",
+            "value": 18481.666666666653,
+            "unit": "KiB"
+          },
+          {
+            "name": "Received from peers",
+            "value": 433.3333333333332,
+            "unit": "KiB"
+          },
+          {
+            "name": "availability-store",
+            "value": 0.14505457350000006,
+            "unit": "seconds"
+          },
+          {
+            "name": "test-environment",
+            "value": 0.010003556053333317,
+            "unit": "seconds"
+          },
+          {
+            "name": "availability-distribution",
+            "value": 0.007107386213333333,
+            "unit": "seconds"
+          },
+          {
+            "name": "bitfield-distribution",
+            "value": 0.024805433646666666,
             "unit": "seconds"
           }
         ]

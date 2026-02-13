@@ -229,10 +229,10 @@ impl Tracing for ExecutionTracer {
 		let total_weight = trace_info.weight_consumed().saturating_sub(step.weight_cost);
 		step.weight_cost = total_weight.saturating_sub(pending.child_weight);
 
-		if !self.config.disable_syscall_details {
-			if let ExecutionStepKind::PVMSyscall { returned: ref mut ret, .. } = step.kind {
-				*ret = returned;
-			}
+		if !self.config.disable_syscall_details &&
+			let ExecutionStepKind::PVMSyscall { returned: ref mut ret, .. } = step.kind
+		{
+			*ret = returned;
 		}
 	}
 

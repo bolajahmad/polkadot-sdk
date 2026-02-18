@@ -1,0 +1,50 @@
+[relaychain]
+default_command = "./target/release/polkadot"
+chain = "westend-local"
+
+[[relaychain.nodes]]
+name = "alice"
+validator = true
+extra_args = [ "-lparachain=debug" ]
+
+[[relaychain.nodes]]
+name = "bob"
+validator = true
+extra_args = [ "-lparachain=debug" ]
+
+# --- Parachain 1000 (Asset Hub) ---
+[[parachains]]
+id = 1000
+cumulus_based = true
+chain = "asset-hub-westend-local"
+
+[[parachains.collators]]
+name = "charlie"
+validator = true
+command = "./target/release/polkadot-parachain"
+args = ["--force-authoring", "-lparachain=debug", "--authoring=slot-based"]
+
+# --- Parachain 1300 (Second Asset Hub-like Chain) ---
+[[parachains]]
+id = 1300
+cumulus_based = true
+chain = "asset-hub-westend-local" # Using the same runtime/logic as 1000
+
+[[parachains.collators]]
+name = "dave"
+validator = true
+command = "./target/release/polkadot-parachain"
+args = ["--force-authoring", "-lparachain=debug", "--authoring=slot-based"]
+
+# --- HRMP Channels for XCM ---
+[[hrmpChannels]]
+sender = 1000
+recipient = 1300
+maxCapacity = 8
+maxMessageSize = 102400
+
+[[hrmpChannels]]
+sender = 1300
+recipient = 1000
+maxCapacity = 8
+maxMessageSize = 102400

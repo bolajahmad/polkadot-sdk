@@ -42,6 +42,7 @@ rand = { workspace = true, optional = true }
 rand_pcg = { workspace = true, optional = true }
 revm = { workspace = true }
 rlp = { workspace = true }
+secp256k1 = { workspace = true }
 scale-info = { features = ["derive"], workspace = true }
 serde = { features = ["alloc", "derive"], workspace = true }
 serde_json = { features = ["alloc"], workspace = true }

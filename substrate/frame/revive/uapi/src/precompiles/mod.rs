@@ -14,6 +14,7 @@
 
 pub mod storage;
 pub mod system;
+pub mod schnorr;
 pub mod utils;
 
 /// The directory with all the precompile interface files.

@@ -37,14 +37,14 @@ command = "./target/release/polkadot-parachain"
 args = ["--force-authoring", "-lparachain=debug", "--authoring=slot-based"]
 
 # --- HRMP Channels for XCM ---
-[[hrmpChannels]]
-sender = 1000
-recipient = 1300
-maxCapacity = 8
-maxMessageSize = 102400
+# [[hrmpChannels]]
+# sender = 1000
+# recipient = 1300
+# maxCapacity = 8
+# maxMessageSize = 102400
 
-[[hrmpChannels]]
-sender = 1300
-recipient = 1000
-maxCapacity = 8
-maxMessageSize = 102400
+# [[hrmpChannels]]
+# sender = 1300
+# recipient = 1000
+# maxCapacity = 8
+# maxMessageSize = 102400

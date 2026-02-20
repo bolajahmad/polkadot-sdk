@@ -26,6 +26,7 @@ mod ripemd160;
 mod sha256;
 mod storage;
 mod system;
+mod schnorr;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
@@ -63,6 +64,7 @@ type Production<T> = (
 	p256_verify::P256Verify<T>,
 	system::System<T>,
 	storage::Storage<T>,
+	schnorr::Schnorr<T>
 );
 
 #[cfg(feature = "runtime-benchmarks")]

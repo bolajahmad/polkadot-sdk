@@ -25,16 +25,16 @@ command = "./target/release/polkadot-parachain"
 args = ["--force-authoring", "-lparachain=debug", "--authoring=slot-based"]
 
 # --- Parachain 1300 (Second Asset Hub-like Chain) ---
-[[parachains]]
-id = 1300
-cumulus_based = true
-chain = "asset-hub-westend-local" # Using the same runtime/logic as 1000
+# [[parachains]]
+# id = 1300
+# cumulus_based = true
+# chain = "asset-hub-westend-local" # Using the same runtime/logic as 1000
 
-[[parachains.collators]]
-name = "dave"
-validator = true
-command = "./target/release/polkadot-parachain"
-args = ["--force-authoring", "-lparachain=debug", "--authoring=slot-based"]
+# [[parachains.collators]]
+# name = "dave"
+# validator = true
+# command = "./target/release/polkadot-parachain"
+# args = ["--force-authoring", "-lparachain=debug", "--authoring=slot-based"]
 
 # --- HRMP Channels for XCM ---
 # [[hrmpChannels]]

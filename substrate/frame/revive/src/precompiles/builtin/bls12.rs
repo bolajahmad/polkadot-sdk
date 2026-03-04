@@ -21,11 +21,22 @@ use crate::{
 	vm::RuntimeCosts,
 };
 use alloc::vec::Vec;
-use ark_bls12_381::{Fq, G1Affine, G1Projective};
-use ark_ec::{AffineRepr, CurveGroup};
+use ark_bls12_381::{Fq, Fr, G1Affine, G1Projective};
+use ark_ec::{AffineRepr, CurveGroup, VariableBaseMSM};
 use ark_ff::{BigInteger, PrimeField, Zero};
 use core::{marker::PhantomData, num::NonZero};
 use sp_runtime::DispatchError;
+
+// For host function calls (production-optimized MSM/pairing):
+use ark_scale::scale::{Decode, Encode};
+use sp_crypto_ec_utils::bls12_381::host_calls;
+
+// ark-scale encoding parameters (uncompressed, unvalidated - matching what host expects)
+const SCALE_USAGE: u8 = ark_scale::make_usage(
+	ark_scale::ark_serialize::Compress::No,
+	ark_scale::ark_serialize::Validate::No,
+);
+type ArkScale<T> = ark_scale::ArkScale<T, SCALE_USAGE>;
 
 /// Size of a single coordinate in EIP-2537 encoding (64 bytes, big-endian, zero-padded).
 const FP_LENGTH: usize = 64;
@@ -55,12 +66,10 @@ fn decode_fp(input: &[u8]) -> Result<Fq, DispatchError> {
 	le_bytes.copy_from_slice(&input[FP_PAD_SIZE..]);
 	le_bytes.reverse();
 
-	Fq::from_bigint(ark_ff::BigInt::new(
-		core::array::from_fn(|i| {
-			let start = i * 8;
-			u64::from_le_bytes(le_bytes[start..start + 8].try_into().unwrap())
-		}),
-	))
+	Fq::from_bigint(ark_ff::BigInt::new(core::array::from_fn(|i| {
+		let start = i * 8;
+		u64::from_le_bytes(le_bytes[start..start + 8].try_into().unwrap())
+	})))
 	.ok_or_else(|| DispatchError::from("Invalid field element"))
 }
 
@@ -110,9 +119,9 @@ fn encode_g1(point: &G1Affine) -> [u8; G1_LENGTH] {
 	result
 }
 
-pub struct Bls12G1Add<T>(PhantomData<T>);
+pub struct BLS12G1Add<T>(PhantomData<T>);
 
-impl<T: Config> PrimitivePrecompile for Bls12G1Add<T> {
+impl<T: Config> PrimitivePrecompile for BLS12G1Add<T> {
 	type T = T;
 	const MATCHER: BuiltinAddressMatcher =
 		BuiltinAddressMatcher::Fixed(NonZero::new(0x0b).unwrap());
@@ -135,10 +144,10 @@ impl<T: Config> PrimitivePrecompile for Bls12G1Add<T> {
 		}
 
 		// Decode the two G1 points
-		let p1 = decode_g1(&input[..G1_LENGTH])
-			.map_err(|_| Error::Revert("Invalid G1 point".into()))?;
-		let p2 = decode_g1(&input[G1_LENGTH..])
-			.map_err(|_| Error::Revert("Invalid G1 point".into()))?;
+		let p1 =
+			decode_g1(&input[..G1_LENGTH]).map_err(|_| Error::Revert("Invalid G1 point".into()))?;
+		let p2 =
+			decode_g1(&input[G1_LENGTH..]).map_err(|_| Error::Revert("Invalid G1 point".into()))?;
 
 		// Perform point addition in projective coordinates and convert back to affine
 		let sum = (G1Projective::from(p1) + G1Projective::from(p2)).into_affine();
@@ -146,4 +155,97 @@ impl<T: Config> PrimitivePrecompile for Bls12G1Add<T> {
 		// Encode the result
 		Ok(encode_g1(&sum).to_vec())
 	}
+}
+
+const G1_MSM_SLICE_SIZE: usize = 160;
+/// Scalar size in EIP-2537 encoding (32 bytes, big-endian).
+const SCALAR_LENGTH: usize = 32;
+
+/// Decode a scalar field element (Fr) from 32-byte big-endian encoding.
+fn decode_fr(input: &[u8]) -> Result<Fr, DispatchError> {
+	if input.len() != SCALAR_LENGTH {
+		return Err(DispatchError::from("Invalid scalar length"));
+	}
+
+	// EIP-2537 scalars are big-endian, ark_ff expects little-endian
+	let mut le_bytes = [0u8; SCALAR_LENGTH];
+	le_bytes.copy_from_slice(input);
+	le_bytes.reverse();
+
+	// Use from_le_bytes_mod_order which reduces modulo the scalar field order
+	Ok(Fr::from_le_bytes_mod_order(&le_bytes))
+}
+
+pub struct BLS12G1MSM<T>(PhantomData<T>);
+
+impl<T: Config> PrimitivePrecompile for BLS12G1MSM<T> {
+	type T = T;
+	const MATCHER: BuiltinAddressMatcher =
+		BuiltinAddressMatcher::Fixed(NonZero::new(0x0c).unwrap());
+	const HAS_CONTRACT_INFO: bool = false;
+
+	/// BLS12_G1MSM precompile (EIP-2537).
+	/// Inputs: (160 * k)-bytes representing k pairs of (G1 point, scalar).
+	/// Each pair consists of a 128-byte G1 point followed by a
+	/// 32-byte scalar.
+	fn call(
+		_address: &[u8; 20],
+		input: Vec<u8>,
+		env: &mut impl Ext<T = Self::T>,
+	) -> Result<Vec<u8>, Error> {
+		// TODO: add proper benchmarking and weight charging for this precompile.
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+
+		if input.is_empty() || input.len() % G1_MSM_SLICE_SIZE != 0 {
+			return Err(Error::Revert("Invalid input length".into()));
+		}
+		let k = input.len() / G1_MSM_SLICE_SIZE;
+
+		let mut points = Vec::with_capacity(k);
+		let mut scalars = Vec::with_capacity(k);
+
+		for chunk in input.chunks_exact(G1_MSM_SLICE_SIZE) {
+			let point = decode_g1(&chunk[..G1_LENGTH])
+				.map_err(|_| Error::Revert("Invalid G1 point".into()))?;
+			let scalar = decode_fr(&chunk[G1_LENGTH..])
+				.map_err(|_| Error::Revert("Invalid scalar".into()))?;
+
+			points.push(point);
+			scalars.push(scalar);
+		}
+
+		// Use host function for MSM - offloads to native code in both production AND tests
+		// This is the same code path for WASM runtime (via FFI) and native tests (direct call)
+		let result = msm_g1_via_host(&points, &scalars)
+			.map_err(|_| Error::Revert("MSM computation failed".into()))?;
+
+		Ok(encode_g1(&result).to_vec())
+	}
+}
+
+/// Perform G1 MSM using host functions.
+///
+/// This works in both:
+/// - **Production (WASM)**: Calls across FFI boundary to native host
+/// - **Testing (native)**: Direct function call (same implementation)
+///
+/// The `#[runtime_interface]` macro generates both codepaths automatically.
+fn msm_g1_via_host(bases: &[G1Affine], scalars: &[Fr]) -> Result<G1Affine, &'static str> {
+	// 1. Encode inputs using ark-scale (matching the host function's expected format)
+	let encoded_bases: Vec<u8> = ArkScale::from(bases).encode();
+	let encoded_scalars: Vec<u8> = ArkScale::from(scalars).encode();
+
+	// 2. Prepare output buffer (G1Affine is ~96 bytes encoded)
+	let mut out_buf = alloc::vec![0u8; 128]; // Generous buffer size
+
+	// 3. Call host function - this is:
+	//    - FFI call in WASM builds (production)
+	//    - Direct function call in native builds (tests)
+	host_calls::bls12_381_msm_g1(&encoded_bases, &encoded_scalars, &mut out_buf)
+		.map_err(|_| "Host call failed")?;
+
+	// 4. Decode the result
+	ArkScale::<G1Affine>::decode(&mut &out_buf[..])
+		.map(|v| v.0)
+		.map_err(|_| "Failed to decode result")
 }

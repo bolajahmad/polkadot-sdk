@@ -1,0 +1,149 @@
+// This file is not really part of Substrate.
+
+// Copyright (C) bolajahmad.
+// SPDX-License-Identifier: Apache-2.0
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::{
+	Config,
+	precompiles::{BuiltinAddressMatcher, Error, Ext, PrimitivePrecompile},
+	vm::RuntimeCosts,
+};
+use alloc::vec::Vec;
+use ark_bls12_381::{Fq, G1Affine, G1Projective};
+use ark_ec::{AffineRepr, CurveGroup};
+use ark_ff::{BigInteger, PrimeField, Zero};
+use core::{marker::PhantomData, num::NonZero};
+use sp_runtime::DispatchError;
+
+/// Size of a single coordinate in EIP-2537 encoding (64 bytes, big-endian, zero-padded).
+const FP_LENGTH: usize = 64;
+/// Size of a G1 point in EIP-2537 encoding (128 bytes = 2 coordinates).
+const G1_LENGTH: usize = 128;
+/// Actual byte size of a BLS12-381 field element (48 bytes).
+const FP_ACTUAL_SIZE: usize = 48;
+/// Padding bytes at the start of each coordinate (16 bytes of zeros).
+const FP_PAD_SIZE: usize = FP_LENGTH - FP_ACTUAL_SIZE;
+
+/// Decode a field element (Fq) from 64-byte big-endian EIP-2537 encoding.
+///
+/// The first 16 bytes must be zeros (padding), followed by 48 bytes of the actual field element.
+fn decode_fp(input: &[u8]) -> Result<Fq, DispatchError> {
+	if input.len() != FP_LENGTH {
+		return Err(DispatchError::from("Invalid field element length"));
+	}
+
+	// Check that padding 16-bytes are zeros
+	if input[..FP_PAD_SIZE].iter().any(|&b| b != 0) {
+		return Err(DispatchError::from("Invalid padding bytes"));
+	}
+
+	// The actual field element is in the last 48 bytes, big-endian
+	// ark_ff expects little-endian, so we need to reverse
+	let mut le_bytes = [0u8; FP_ACTUAL_SIZE];
+	le_bytes.copy_from_slice(&input[FP_PAD_SIZE..]);
+	le_bytes.reverse();
+
+	Fq::from_bigint(ark_ff::BigInt::new(
+		core::array::from_fn(|i| {
+			let start = i * 8;
+			u64::from_le_bytes(le_bytes[start..start + 8].try_into().unwrap())
+		}),
+	))
+	.ok_or_else(|| DispatchError::from("Invalid field element"))
+}
+
+/// Decode a G1 point from 128-byte EIP-2537 encoding.
+///
+/// Input format: 64 bytes for x-coordinate || 64 bytes for y-coordinate
+/// Returns the point at infinity if both coordinates are zero.
+fn decode_g1(input: &[u8]) -> Result<G1Affine, DispatchError> {
+	if input.len() != G1_LENGTH {
+		return Err(DispatchError::from("Invalid G1 point length"));
+	}
+
+	let x = decode_fp(&input[..FP_LENGTH])?;
+	let y = decode_fp(&input[FP_LENGTH..])?;
+
+	// Check for point at infinity (both coordinates zero)
+	if x.is_zero() && y.is_zero() {
+		return Ok(G1Affine::identity());
+	}
+
+	// Construct the affine point and validate it's on the curve
+	let point = G1Affine::new(x, y);
+	if !point.is_on_curve() {
+		return Err(DispatchError::from("Point not on curve"));
+	}
+
+	Ok(point)
+}
+
+/// Encode a G1 point to 128-byte EIP-2537 format.
+fn encode_g1(point: &G1Affine) -> [u8; G1_LENGTH] {
+	let mut result = [0u8; G1_LENGTH];
+
+	if point.is_zero() {
+		// Point at infinity - return all zeros
+		return result;
+	}
+
+	// Encode x coordinate (big-endian, zero-padded to 64 bytes)
+	let x_bytes = point.x().unwrap().into_bigint().to_bytes_be();
+	result[FP_PAD_SIZE..FP_LENGTH].copy_from_slice(&x_bytes);
+
+	// Encode y coordinate (big-endian, zero-padded to 64 bytes)
+	let y_bytes = point.y().unwrap().into_bigint().to_bytes_be();
+	result[FP_LENGTH + FP_PAD_SIZE..].copy_from_slice(&y_bytes);
+
+	result
+}
+
+pub struct Bls12G1Add<T>(PhantomData<T>);
+
+impl<T: Config> PrimitivePrecompile for Bls12G1Add<T> {
+	type T = T;
+	const MATCHER: BuiltinAddressMatcher =
+		BuiltinAddressMatcher::Fixed(NonZero::new(0x0b).unwrap());
+	const HAS_CONTRACT_INFO: bool = false;
+
+	/// BLS12_G1ADD precompile (EIP-2537).
+	///
+	/// Input: 256 bytes representing two G1 points (128 bytes each).
+	/// Output: 128 bytes representing the sum of the two points.
+	fn call(
+		_address: &[u8; 20],
+		input: Vec<u8>,
+		env: &mut impl Ext<T = Self::T>,
+	) -> Result<Vec<u8>, Error> {
+		// TODO: add proper benchmarking and weight charging for this precompile.
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+
+		if input.len() != 256 {
+			return Err(Error::Revert("Invalid input length".into()));
+		}
+
+		// Decode the two G1 points
+		let p1 = decode_g1(&input[..G1_LENGTH])
+			.map_err(|_| Error::Revert("Invalid G1 point".into()))?;
+		let p2 = decode_g1(&input[G1_LENGTH..])
+			.map_err(|_| Error::Revert("Invalid G1 point".into()))?;
+
+		// Perform point addition in projective coordinates and convert back to affine
+		let sum = (G1Projective::from(p1) + G1Projective::from(p2)).into_affine();
+
+		// Encode the result
+		Ok(encode_g1(&sum).to_vec())
+	}
+}

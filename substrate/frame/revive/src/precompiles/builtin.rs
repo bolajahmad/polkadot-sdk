@@ -27,6 +27,7 @@ mod sha256;
 mod storage;
 mod system;
 mod schnorr;
+mod bls12;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;

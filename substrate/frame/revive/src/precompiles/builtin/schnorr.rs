@@ -3,7 +3,10 @@ use crate::{
 	precompiles::{BuiltinAddressMatcher, BuiltinPrecompile, Error, Ext}, vm::RuntimeCosts,
 };
 use alloc::vec::Vec;
-use alloy_core::{primitives::Keccak256, sol_types::SolValue};
+use alloy_core::{
+	primitives::Keccak256,
+	sol_types::{SolType, sol_data::Bool},
+};
 use core::{marker::PhantomData, num::NonZero};
 use k256::{
 	AffinePoint, EncodedPoint, ProjectivePoint, Scalar,
@@ -26,7 +29,12 @@ impl<T: Config> BuiltinPrecompile for Schnorr<T> {
 		input: &Self::Interface,
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error> {
-    log::info!("🔐 Schnorr precompile called!");
+		log::info!("🔐 Schnorr precompile called!");
+
+		fn abi_bool(value: bool) -> Vec<u8> {
+			Bool::abi_encode(&value)
+		}
+
 		fn lift_even_y_point(x: &[u8]) -> Option<AffinePoint> {
 			if x.len() != 32 {
 				return None;
@@ -59,17 +67,17 @@ impl<T: Config> BuiltinPrecompile for Schnorr<T> {
 
 				let pubkey_point = match lift_even_y_point(pubkey_x) {
 					Some(pk) => pk,
-					None => return Ok(false.abi_encode()),
+					None => return Ok(abi_bool(false)),
 				};
 
 				let nonce_point = match lift_even_y_point(rx) {
 					Some(pk) => pk,
-					None => return Ok(false.abi_encode()),
+					None => return Ok(abi_bool(false)),
 				};
 
 				let s = match Option::<Scalar>::from(Scalar::from_repr(s_bytes.into())) {
 					Some(s) => s,
-					None => return Ok(false.abi_encode()),
+					None => return Ok(abi_bool(false)),
 				};
 
 				// Compute the challenge, e
@@ -86,7 +94,7 @@ impl<T: Config> BuiltinPrecompile for Schnorr<T> {
 
 				let e = match Option::<Scalar>::from(Scalar::from_repr((*result).into())) {
 					Some(e) => e,
-					None => return Ok(false.abi_encode()),
+					None => return Ok(abi_bool(false)),
 				};
 
 				let lhs = ProjectivePoint::GENERATOR * s;
@@ -94,9 +102,9 @@ impl<T: Config> BuiltinPrecompile for Schnorr<T> {
 					ProjectivePoint::from(nonce_point) + (ProjectivePoint::from(pubkey_point) * e);
 
 				if lhs == rhs {
-					return Ok(true.abi_encode());
+					return Ok(abi_bool(true));
 				} else {
-					return Ok(false.abi_encode());
+					return Ok(abi_bool(false));
 				}
 			},
 		}
@@ -113,8 +121,8 @@ mod tests {
 		tests::{ExtBuilder, Test},
 	};
 	use frame_support::traits::fungible::Mutate;
-	use polkavm_common::hasher;
 	use secp256k1::{Parity, PublicKey, Scalar, Secp256k1, SecretKey};
+	use crate::precompiles::alloy::sol_types::{SolType, sol_data::Bool};
 
 	fn generate_nonce_key(aux: &[u8; 32], priv_key: &SecretKey, msg: &[u8; 32]) -> SecretKey {
 		let secp = Secp256k1::new();
@@ -235,11 +243,13 @@ mod tests {
 
 			let result =
 				call_with(generate_verify_input(false)).expect("valid 128-byte input should work");
-			assert_eq!(result, true.abi_encode(), "Input should match");
+			assert_eq!(result.len(), 32, "bool ABI output should be 32 bytes");
+			assert_eq!(result, Bool::abi_encode(&true), "Input should match");
 
 			let result = call_with(generate_verify_input(true))
 				.expect("invalid 128-byte input should not work");
-			assert_eq!(result, false.abi_encode(), "Input should match");
+			assert_eq!(result.len(), 32, "bool ABI output should be 32 bytes");
+			assert_eq!(result, Bool::abi_encode(&false), "Input should match");
 		})
 	}
 }

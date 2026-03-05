@@ -22,7 +22,7 @@ use crate::{
 };
 use alloc::vec::Vec;
 use alloy_core::sol_types::SolValue;
-use ark_bls12_381::{Fq, Fr, G1Affine, G1Projective};
+use ark_bls12_381::{Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::{AffineRepr, CurveGroup, VariableBaseMSM};
 use ark_ff::{BigInteger, PrimeField, Zero};
 use core::{marker::PhantomData, num::NonZero};
@@ -154,7 +154,7 @@ const G1_MSM_SLICE_SIZE: usize = 160;
 const SCALAR_LENGTH: usize = 32;
 
 /// Decode a scalar field element (Fr) from 32-byte big-endian encoding.
-fn decode_fr(input: &[u8]) -> Result<Fr, DispatchError> {
+fn decode_scalar(input: &[u8]) -> Result<Fr, DispatchError> {
 	if input.len() != SCALAR_LENGTH {
 		return Err(DispatchError::from("Invalid scalar length"));
 	}
@@ -199,7 +199,7 @@ impl<T: Config> PrimitivePrecompile for BLS12G1MSM<T> {
 		for chunk in input.chunks_exact(G1_MSM_SLICE_SIZE) {
 			let point = decode_g1(&chunk[..G1_LENGTH])
 				.map_err(|_| Error::Revert("Invalid G1 point".into()))?;
-			let scalar = decode_fr(&chunk[G1_LENGTH..])
+			let scalar = decode_scalar(&chunk[G1_LENGTH..])
 				.map_err(|_| Error::Revert("Invalid scalar".into()))?;
 
 			points.push(point);
@@ -212,6 +212,173 @@ impl<T: Config> PrimitivePrecompile for BLS12G1MSM<T> {
 			.map_err(|_| Error::Revert("MSM computation failed".into()))?;
 
 		Ok(encode_g1(&result).to_vec())
+	}
+}
+
+/// Size of a single coordinate in EIP-2537 encoding (64 bytes, big-endian, zero-padded).
+const FP2_LENGTH: usize = 128;
+/// Size of a G1 point in EIP-2537 encoding (128 bytes = 2 coordinates).
+const G2_LENGTH: usize = 256;
+/// Actual byte size of a BLS12-381 field element (48 bytes).
+const FP2_ACTUAL_SIZE: usize = 96;
+/// Padding bytes at the start of each coordinate (16 bytes of zeros).
+const FP2_PAD_SIZE: usize = FP2_LENGTH - FP2_ACTUAL_SIZE;
+
+fn decode_fp2(input: &[u8]) -> Result<Fq2, DispatchError> {
+	if input.len() != FP2_LENGTH {
+		return Err(DispatchError::from("Invalid Fp2 length"));
+	}
+
+	let c1 = decode_fp(&input[..64])?;
+	let c0 = decode_fp(&input[64..])?;
+
+	Ok(Fq2::new(c0, c1))
+}
+
+fn decode_g2(input: &[u8]) -> Result<G2Affine, DispatchError> {
+	if input.len() != G2_LENGTH {
+		return Err(DispatchError::from("Invalid G2 length"));
+	}
+
+	let x = decode_fp2(&input[..FP2_LENGTH])?;
+	let y = decode_fp2(&input[FP2_LENGTH..])?;
+
+	if x.is_zero() && y.is_zero() {
+		return Ok(G2Affine::identity());
+	}
+
+	let point = G2Affine::new(x, y);
+	if !point.is_on_curve() {
+		return Err(DispatchError::from("Point not on curve"));
+	}
+
+	Ok(point)
+}
+
+fn encode_fp(value: &Fq) -> [u8; FP_LENGTH] {
+	let mut out = [0u8; FP_LENGTH];
+
+	// Convert field element to little endian bytes
+	let mut le_bytes = value.into_bigint().to_bytes_le();
+
+	// Ensure exactly 48 bytes
+	le_bytes.resize(FP_ACTUAL_SIZE, 0);
+
+	// Convert to big endian
+	le_bytes.reverse();
+
+	// Copy into padded area
+	out[FP_PAD_SIZE..].copy_from_slice(&le_bytes);
+
+	out
+}
+
+fn encode_fp2(point: &Fq2) -> [u8; FP2_LENGTH] {
+	let mut out = [0u8; FP2_LENGTH];
+
+	let c1_bytes = encode_fp(&point.c1);
+	let c0_bytes = encode_fp(&point.c0);
+
+	out[..64].copy_from_slice(&c1_bytes);
+	out[64..].copy_from_slice(&c0_bytes);
+
+	out
+}
+
+pub fn encode_g2(point: &G2Affine) -> [u8; G2_LENGTH] {
+	let mut out = [0u8; G2_LENGTH];
+
+	// infinity encoding
+	if point.x.is_zero() && point.y.is_zero() {
+		return out;
+	}
+
+	let x_bytes = encode_fp2(&point.x);
+	let y_bytes = encode_fp2(&point.y);
+
+	out[..FP2_LENGTH].copy_from_slice(&x_bytes);
+	out[FP2_LENGTH..].copy_from_slice(&y_bytes);
+
+	out
+}
+
+pub struct BLS12G2Add<T>(PhantomData<T>);
+
+impl<T: Config> PrimitivePrecompile for BLS12G2Add<T> {
+	type T = T;
+	const MATCHER: BuiltinAddressMatcher =
+		BuiltinAddressMatcher::Fixed(NonZero::new(0x0d).unwrap());
+	const HAS_CONTRACT_INFO: bool = false;
+
+	fn call(
+		_address: &[u8; 20],
+		input: Vec<u8>,
+		env: &mut impl Ext<T = Self::T>,
+	) -> Result<Vec<u8>, Error> {
+		// TODO: add proper benchmarking and weight charging for this precompile.
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+
+		if input.len() != 512 {
+			return Err(Error::Revert("Invalid input length".into()));
+		}
+
+		// Decode the two G1 points
+		let p1 =
+			decode_g2(&input[..G2_LENGTH]).map_err(|_| Error::Revert("Invalid G2 point".into()))?;
+		let p2 =
+			decode_g2(&input[G2_LENGTH..]).map_err(|_| Error::Revert("Invalid G2 point".into()))?;
+
+		// Perform point addition in projective coordinates and convert back to affine
+		let sum = (G2Projective::from(p1) + G2Projective::from(p2)).into_affine();
+
+		// Encode the result
+		let result = encode_g2(&sum);
+		println!("G12` Add Result, {:?}", result);
+		Ok(result.to_vec())
+	}
+}
+
+const G2_MSM_SLICE_SIZE: usize = 288;
+
+pub struct BLS12G2MSM<T>(PhantomData<T>);
+
+impl<T: Config> PrimitivePrecompile for BLS12G2MSM<T> {
+	type T = T;
+	const MATCHER: BuiltinAddressMatcher =
+		BuiltinAddressMatcher::Fixed(NonZero::new(0x0e).unwrap());
+	const HAS_CONTRACT_INFO: bool = false;
+
+	fn call(
+		_address: &[u8; 20],
+		input: Vec<u8>,
+		env: &mut impl Ext<T = Self::T>,
+	) -> Result<Vec<u8>, Error> {
+		// TODO: add proper benchmarking and weight charging for this precompile.
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+
+		if input.is_empty() || input.len() % G1_MSM_SLICE_SIZE != 0 {
+			return Err(Error::Revert("Invalid input length".into()));
+		}
+		let k = input.len() / G2_MSM_SLICE_SIZE;
+
+		let mut points = Vec::with_capacity(k);
+		let mut scalars = Vec::with_capacity(k);
+
+		for chunk in input.chunks_exact(G2_MSM_SLICE_SIZE) {
+			let point = decode_g2(&chunk[..G2_LENGTH])
+				.map_err(|_| Error::Revert("Invalid G2 point".into()))?;
+			let scalar = decode_scalar(&chunk[G2_LENGTH + 256..])
+				.map_err(|_| Error::Revert("Invalid scalar".into()))?;
+
+			points.push(point);
+			scalars.push(scalar);
+		}
+
+		let result = G2Projective::msm(&points, &scalars)
+			.map(|p| p.into_affine())
+			.map_err(|_| Error::Revert("MSM computation failed".into()))?;
+
+		Ok(encode_g2(&result).to_vec())
 	}
 }
 

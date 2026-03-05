@@ -21,22 +21,12 @@ use crate::{
 	vm::RuntimeCosts,
 };
 use alloc::vec::Vec;
+use alloy_core::sol_types::SolValue;
 use ark_bls12_381::{Fq, Fr, G1Affine, G1Projective};
 use ark_ec::{AffineRepr, CurveGroup, VariableBaseMSM};
 use ark_ff::{BigInteger, PrimeField, Zero};
 use core::{marker::PhantomData, num::NonZero};
 use sp_runtime::DispatchError;
-
-// For host function calls (production-optimized MSM/pairing):
-use ark_scale::scale::{Decode, Encode};
-use sp_crypto_ec_utils::bls12_381::host_calls;
-
-// ark-scale encoding parameters (uncompressed, unvalidated - matching what host expects)
-const SCALE_USAGE: u8 = ark_scale::make_usage(
-	ark_scale::ark_serialize::Compress::No,
-	ark_scale::ark_serialize::Validate::No,
-);
-type ArkScale<T> = ark_scale::ArkScale<T, SCALE_USAGE>;
 
 /// Size of a single coordinate in EIP-2537 encoding (64 bytes, big-endian, zero-padded).
 const FP_LENGTH: usize = 64;
@@ -153,7 +143,9 @@ impl<T: Config> PrimitivePrecompile for BLS12G1Add<T> {
 		let sum = (G1Projective::from(p1) + G1Projective::from(p2)).into_affine();
 
 		// Encode the result
-		Ok(encode_g1(&sum).to_vec())
+		let result = encode_g1(&sum);
+		println!("G1 Add Result, {:?}", result);
+		Ok(result.to_vec())
 	}
 }
 
@@ -214,38 +206,31 @@ impl<T: Config> PrimitivePrecompile for BLS12G1MSM<T> {
 			scalars.push(scalar);
 		}
 
-		// Use host function for MSM - offloads to native code in both production AND tests
-		// This is the same code path for WASM runtime (via FFI) and native tests (direct call)
-		let result = msm_g1_via_host(&points, &scalars)
+		// Use arkworks VariableBaseMSM for multi-scalar multiplication
+		let result = G1Projective::msm(&points, &scalars)
+			.map(|p| p.into_affine())
 			.map_err(|_| Error::Revert("MSM computation failed".into()))?;
 
 		Ok(encode_g1(&result).to_vec())
 	}
 }
 
-/// Perform G1 MSM using host functions.
-///
-/// This works in both:
-/// - **Production (WASM)**: Calls across FFI boundary to native host
-/// - **Testing (native)**: Direct function call (same implementation)
-///
-/// The `#[runtime_interface]` macro generates both codepaths automatically.
-fn msm_g1_via_host(bases: &[G1Affine], scalars: &[Fr]) -> Result<G1Affine, &'static str> {
-	// 1. Encode inputs using ark-scale (matching the host function's expected format)
-	let encoded_bases: Vec<u8> = ArkScale::from(bases).encode();
-	let encoded_scalars: Vec<u8> = ArkScale::from(scalars).encode();
+#[cfg(test)]
+mod tests {
+	use crate::{
+		precompiles::tests::{run_failure_test_vectors, run_test_vectors},
+		tests::Test,
+	};
 
-	// 2. Prepare output buffer (G1Affine is ~96 bytes encoded)
-	let mut out_buf = alloc::vec![0u8; 128]; // Generous buffer size
+	use super::*;
 
-	// 3. Call host function - this is:
-	//    - FFI call in WASM builds (production)
-	//    - Direct function call in native builds (tests)
-	host_calls::bls12_381_msm_g1(&encoded_bases, &encoded_scalars, &mut out_buf)
-		.map_err(|_| "Host call failed")?;
+	#[test]
+	fn test_bls12381_g1_add() {
+		run_test_vectors::<BLS12G1Add<Test>>(include_str!("./testdata/11-bls12381.json"));
+	}
 
-	// 4. Decode the result
-	ArkScale::<G1Affine>::decode(&mut &out_buf[..])
-		.map(|v| v.0)
-		.map_err(|_| "Failed to decode result")
+	#[test]
+	fn test_bls12381_g1_msm() {
+		run_test_vectors::<BLS12G1MSM<Test>>(include_str!("./testdata/12-bls12381G1msm.json"));
+	}
 }

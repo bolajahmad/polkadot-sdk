@@ -48,7 +48,6 @@ serde_json = { features = ["alloc"], workspace = true }
 ark-bls12-381 = { features = ["curve"], workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
-ark-scale = { workspace = true }
 
 # Polkadot SDK Dependencies
 bn = { workspace = true }
@@ -66,7 +65,6 @@ sp-consensus-aura = { workspace = true, optional = true }
 sp-consensus-babe = { workspace = true, optional = true }
 sp-consensus-slots = { workspace = true, optional = true }
 sp-core = { workspace = true }
-sp-crypto-ec-utils = { workspace = true, features = ["bls12-381"] }
 sp-io = { workspace = true }
 sp-runtime = { workspace = true }
 sp-version = { workspace = true }
@@ -102,7 +100,6 @@ std = [
 	"ark-bls12-381/std",
 	"ark-ec/std",
 	"ark-ff/std",
-	"ark-scale/std",
 	"alloy-trie/std",
 	"codec/std",
 	"environmental/std",
@@ -136,7 +133,6 @@ std = [
 	"sp-consensus-babe/std",
 	"sp-consensus-slots/std",
 	"sp-core/std",
-	"sp-crypto-ec-utils/std",
 	"sp-io/std",
 	"sp-keystore/std",
 	"sp-runtime/std",

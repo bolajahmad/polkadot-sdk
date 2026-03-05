@@ -400,4 +400,14 @@ mod tests {
 	fn test_bls12381_g1_msm() {
 		run_test_vectors::<BLS12G1MSM<Test>>(include_str!("./testdata/12-bls12381G1msm.json"));
 	}
+
+	#[test]
+	fn test_bls12381_g2_add() {
+		run_test_vectors::<BLS12G2Add<Test>>(include_str!("./testdata/13-bls12381_g2_add.json"));
+	}
+
+	#[test]
+	fn test_bls12381_g2_msm() {
+		run_test_vectors::<BLS12G2MSM<Test>>(include_str!("./testdata/14-bls12381_g2_msm.json"));
+	}
 }

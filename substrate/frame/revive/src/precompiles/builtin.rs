@@ -63,6 +63,8 @@ type Production<T> = (
 	blake2f::Blake2F<T>,
 	point_eval::PointEval<T>,
 	p256_verify::P256Verify<T>,
+	bls12::BLS12G1Add<T>,
+	bls12::BLS12G1MSM<T>,
 	system::System<T>,
 	storage::Storage<T>,
 	schnorr::Schnorr<T>

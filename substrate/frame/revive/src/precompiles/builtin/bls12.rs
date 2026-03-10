@@ -21,10 +21,12 @@ use crate::{
 	vm::RuntimeCosts,
 };
 use alloc::vec::Vec;
-use alloy_core::sol_types::SolValue;
-use ark_bls12_381::{Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::{AffineRepr, CurveGroup, VariableBaseMSM};
-use ark_ff::{BigInteger, PrimeField, Zero};
+use ark_bls12_381::{Bls12_381, Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
+use ark_ec::hashing::{curve_maps::wb::WBMap, map_to_curve_hasher::MapToCurve};
+use ark_ec::{
+	AffineRepr, CurveGroup, VariableBaseMSM, pairing::Pairing,
+};
+use ark_ff::{BigInteger, One, PrimeField, Zero};
 use core::{marker::PhantomData, num::NonZero};
 use sp_runtime::DispatchError;
 
@@ -144,7 +146,6 @@ impl<T: Config> PrimitivePrecompile for BLS12G1Add<T> {
 
 		// Encode the result
 		let result = encode_g1(&sum);
-		println!("G1 Add Result, {:?}", result);
 		Ok(result.to_vec())
 	}
 }
@@ -333,7 +334,6 @@ impl<T: Config> PrimitivePrecompile for BLS12G2Add<T> {
 
 		// Encode the result
 		let result = encode_g2(&sum);
-		println!("G12` Add Result, {:?}", result);
 		Ok(result.to_vec())
 	}
 }
@@ -356,7 +356,7 @@ impl<T: Config> PrimitivePrecompile for BLS12G2MSM<T> {
 		// TODO: add proper benchmarking and weight charging for this precompile.
 		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
 
-		if input.is_empty() || input.len() % G1_MSM_SLICE_SIZE != 0 {
+		if input.is_empty() || input.len() % G2_MSM_SLICE_SIZE != 0 {
 			return Err(Error::Revert("Invalid input length".into()));
 		}
 		let k = input.len() / G2_MSM_SLICE_SIZE;
@@ -365,10 +365,12 @@ impl<T: Config> PrimitivePrecompile for BLS12G2MSM<T> {
 		let mut scalars = Vec::with_capacity(k);
 
 		for chunk in input.chunks_exact(G2_MSM_SLICE_SIZE) {
+			println!("Decoding chunk for G2 MSM, {}", chunk.len());
 			let point = decode_g2(&chunk[..G2_LENGTH])
 				.map_err(|_| Error::Revert("Invalid G2 point".into()))?;
-			let scalar = decode_scalar(&chunk[G2_LENGTH + 256..])
-				.map_err(|_| Error::Revert("Invalid scalar".into()))?;
+			let scalar =
+				decode_scalar(&chunk[256..]).map_err(|_| Error::Revert("Invalid scalar".into()))?;
+			println!("Decoded G2 point: {:?}", scalar);
 
 			points.push(point);
 			scalars.push(scalar);
@@ -379,6 +381,121 @@ impl<T: Config> PrimitivePrecompile for BLS12G2MSM<T> {
 			.map_err(|_| Error::Revert("MSM computation failed".into()))?;
 
 		Ok(encode_g2(&result).to_vec())
+	}
+}
+
+fn pairing_check(g1s: &[G1Affine], g2s: &[G2Affine]) -> bool {
+	let mut acc = <Bls12_381 as Pairing>::TargetField::one();
+
+	let result = Bls12_381::multi_pairing(g1s, g2s);
+
+	result.0.is_one()
+}
+pub struct BLS12PairingCheck<T>(PhantomData<T>);
+
+impl<T: Config> PrimitivePrecompile for BLS12PairingCheck<T> {
+	type T = T;
+	const MATCHER: BuiltinAddressMatcher =
+		BuiltinAddressMatcher::Fixed(NonZero::new(0x0f).unwrap());
+	const HAS_CONTRACT_INFO: bool = false;
+
+	fn call(
+		_address: &[u8; 20],
+		input: Vec<u8>,
+		env: &mut impl Ext<T = Self::T>,
+	) -> Result<Vec<u8>, Error> {
+		// TODO: add proper benchmarking and weight charging for this precompile.
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+
+		if input.is_empty() || input.len() % (G1_LENGTH + G2_LENGTH) != 0 {
+			return Err(Error::Revert("Invalid input length".into()));
+		}
+		let k = input.len() / (G1_LENGTH + G2_LENGTH);
+
+		let mut g1_points = Vec::with_capacity(k);
+		let mut g2_points = Vec::with_capacity(k);
+
+		for chunk in input.chunks_exact(G1_LENGTH + G2_LENGTH) {
+			let g1 = decode_g1(&chunk[..G1_LENGTH])?;
+			let g2 = decode_g2(&chunk[G1_LENGTH..])?;
+
+			g1_points.push(g1);
+			g2_points.push(g2);
+		}
+
+		let valid = pairing_check(&g1_points, &g2_points);
+
+		let mut out = [0u8; 32];
+		if valid {
+			out[31] = 1; // set last byte to 1 for true
+		}
+
+		Ok(out.to_vec())
+	}
+}
+
+pub struct BLS12MapFpToG1<T>(PhantomData<T>);
+
+impl<T: Config> PrimitivePrecompile for BLS12MapFpToG1<T> {
+	type T = T;
+	const MATCHER: BuiltinAddressMatcher =
+		BuiltinAddressMatcher::Fixed(NonZero::new(0x10).unwrap());
+	const HAS_CONTRACT_INFO: bool = false;
+
+	fn call(
+		_address: &[u8; 20],
+		input: Vec<u8>,
+		env: &mut impl Ext<T = Self::T>,
+	) -> Result<Vec<u8>, Error> {
+		// TODO: add proper benchmarking and weight charging for this precompile.
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+
+		if input.is_empty() || input.len() != 64 {
+			return Err(Error::Revert("Invalid input length".into()));
+		}
+
+		let fp = decode_fp(&input).map_err(|_| Error::Revert("Invalid field element".into()))?;
+
+		let mapped = <WBMap<ark_bls12_381::g1::Config> as MapToCurve<G1Projective>>::map_to_curve(
+			fp,
+		)
+		.map_err(|_| Error::Revert("Map to curve failed".into()))?;
+
+		let p = mapped.clear_cofactor();
+
+		Ok(encode_g1(&p).to_vec())
+	}
+}
+
+pub struct BLS12MapFp2ToG2<T>(PhantomData<T>);
+
+impl<T: Config> PrimitivePrecompile for BLS12MapFp2ToG2<T> {
+	type T = T;
+	const MATCHER: BuiltinAddressMatcher = BuiltinAddressMatcher::Fixed(NonZero::new(0x11).unwrap());
+	const HAS_CONTRACT_INFO: bool = false;
+
+	fn call(
+		_address: &[u8; 20],
+		input: Vec<u8>,
+		env: &mut impl Ext<T = Self::T>,
+	) -> Result<Vec<u8>, Error>  {
+		// TODO: add proper benchmarking and weight charging for this precompile.
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+
+		if input.is_empty() || input.len() != 128 {
+			return Err(Error::Revert("Invalid input length".into()));
+		}
+
+		let fp = decode_fp2(&input).map_err(|_| Error::Revert("Invalid field element".into()))?;
+
+		let mapped = <WBMap<ark_bls12_381::g2::Config> as MapToCurve<G2Projective>>::map_to_curve(
+			fp,
+		)
+		.map_err(|_| Error::Revert("Map to curve failed".into()))?;
+
+		let p = mapped.clear_cofactor();
+
+		Ok(encode_g2(&p).to_vec())
 	}
 }
 
@@ -409,5 +526,26 @@ mod tests {
 	#[test]
 	fn test_bls12381_g2_msm() {
 		run_test_vectors::<BLS12G2MSM<Test>>(include_str!("./testdata/14-bls12381_g2_msm.json"));
+	}
+
+	#[test]
+	fn test_bls12381_pairing_check() {
+		run_test_vectors::<BLS12PairingCheck<Test>>(include_str!(
+			"./testdata/15-bls12381_pairing.json"
+		));
+	}
+
+	#[test]
+	fn test_bls12381_map_fp_to_g1() {
+		run_test_vectors::<BLS12MapFpToG1<Test>>(include_str!(
+			"./testdata/16-bls12381_map_fp_to_g1.json"
+		));
+	}
+
+	#[test]
+	fn test_bls12381_map_fp2_to_g2() {
+		run_test_vectors::<BLS12MapFp2ToG2<Test>>(include_str!(
+			"./testdata/17-bls12381_map_fp2_to_g2.json"
+		));
 	}
 }

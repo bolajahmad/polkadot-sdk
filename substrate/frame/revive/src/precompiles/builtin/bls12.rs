@@ -289,13 +289,14 @@ fn encode_fp2(point: &Fq2) -> [u8; FP2_LENGTH] {
 pub fn encode_g2(point: &G2Affine) -> [u8; G2_LENGTH] {
 	let mut out = [0u8; G2_LENGTH];
 
-	// infinity encoding
-	if point.x.is_zero() && point.y.is_zero() {
+	if point.is_zero() {
+		// Point at infinity - return all zeros
 		return out;
 	}
 
-	let x_bytes = encode_fp2(&point.x);
-	let y_bytes = encode_fp2(&point.y);
+	// Use accessor methods (consistent with encode_g1) to properly handle arkworks internals
+	let x_bytes = encode_fp2(&point.x().unwrap());
+	let y_bytes = encode_fp2(&point.y().unwrap());
 
 	out[..FP2_LENGTH].copy_from_slice(&x_bytes);
 	out[FP2_LENGTH..].copy_from_slice(&y_bytes);
@@ -365,12 +366,10 @@ impl<T: Config> PrimitivePrecompile for BLS12G2MSM<T> {
 		let mut scalars = Vec::with_capacity(k);
 
 		for chunk in input.chunks_exact(G2_MSM_SLICE_SIZE) {
-			println!("Decoding chunk for G2 MSM, {}", chunk.len());
 			let point = decode_g2(&chunk[..G2_LENGTH])
 				.map_err(|_| Error::Revert("Invalid G2 point".into()))?;
 			let scalar =
 				decode_scalar(&chunk[256..]).map_err(|_| Error::Revert("Invalid scalar".into()))?;
-			println!("Decoded G2 point: {:?}", scalar);
 
 			points.push(point);
 			scalars.push(scalar);
@@ -416,8 +415,10 @@ impl<T: Config> PrimitivePrecompile for BLS12PairingCheck<T> {
 		let mut g2_points = Vec::with_capacity(k);
 
 		for chunk in input.chunks_exact(G1_LENGTH + G2_LENGTH) {
-			let g1 = decode_g1(&chunk[..G1_LENGTH])?;
-			let g2 = decode_g2(&chunk[G1_LENGTH..])?;
+			let g1 = decode_g1(&chunk[..G1_LENGTH])
+				.map_err(|_| Error::Revert("Invalid G1 point".into()))?;
+			let g2 = decode_g2(&chunk[G1_LENGTH..])
+				.map_err(|_| Error::Revert("Invalid G2 point".into()))?;
 
 			g1_points.push(g1);
 			g2_points.push(g2);

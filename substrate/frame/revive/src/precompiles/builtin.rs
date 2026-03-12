@@ -65,6 +65,11 @@ type Production<T> = (
 	p256_verify::P256Verify<T>,
 	bls12::BLS12G1Add<T>,
 	bls12::BLS12G1MSM<T>,
+	bls12::BLS12G2Add<T>,
+	bls12::BLS12G2MSM<T>,
+	bls12::BLS12PairingCheck<T>,
+	bls12::BLS12MapFpToG1<T>,
+	bls12::BLS12MapFp2ToG2<T>,
 	system::System<T>,
 	storage::Storage<T>,
 	schnorr::Schnorr<T>

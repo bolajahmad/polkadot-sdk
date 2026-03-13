@@ -1,6 +1,7 @@
 use crate::{
 	Config,
-	precompiles::{BuiltinAddressMatcher, BuiltinPrecompile, Error, Ext}, vm::RuntimeCosts,
+	precompiles::{BuiltinAddressMatcher, BuiltinPrecompile, Error, Ext},
+	vm::RuntimeCosts,
 };
 use alloc::vec::Vec;
 use alloy_core::{
@@ -29,8 +30,6 @@ impl<T: Config> BuiltinPrecompile for Schnorr<T> {
 		input: &Self::Interface,
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error> {
-		log::info!("🔐 Schnorr precompile called!");
-
 		fn abi_bool(value: bool) -> Vec<u8> {
 			Bool::abi_encode(&value)
 		}
@@ -53,7 +52,7 @@ impl<T: Config> BuiltinPrecompile for Schnorr<T> {
 		match input {
 			ISchnorrCalls::verify(ISchnorr::verifyCall { input }) => {
 				env.frame_meter_mut()
-					.charge_weight_token(RuntimeCosts::HashBlake256(input.len() as u32))?;
+					.charge_weight_token(RuntimeCosts::SchnorrVerify)?;
 				// Input must be 128 bytes exactly: pubkey_x || r_x || s || msg.
 				if input.len() != 128 {
 					return Err(Error::Revert("Invalid input len".into()));
@@ -114,6 +113,7 @@ impl<T: Config> BuiltinPrecompile for Schnorr<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::precompiles::alloy::sol_types::{SolType, sol_data::Bool};
 	use crate::{
 		call_builder::{CallSetup, VmBinaryModule},
 		precompiles::Error,
@@ -122,37 +122,57 @@ mod tests {
 	};
 	use frame_support::traits::fungible::Mutate;
 	use secp256k1::{Parity, PublicKey, Scalar, Secp256k1, SecretKey};
-	use crate::precompiles::alloy::sol_types::{SolType, sol_data::Bool};
+	const SECP256K1_ORDER: [u8; 32] = [
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36,
+		0x41, 0x41,
+	];
 
 	fn generate_nonce_key(aux: &[u8; 32], priv_key: &SecretKey, msg: &[u8; 32]) -> SecretKey {
 		let secp = Secp256k1::new();
 
+		// aux hash
 		let mut hasher = Keccak256::new();
 		hasher.update("PIP/aux");
 		hasher.update(aux);
-		let result = hasher.finalize();
-		let aux_bytes = *result;
+		let aux_hash = hasher.finalize();
 
-		let t = {
-			let mut bytes = [0u8; 32];
-			let sk_bytes = priv_key.secret_bytes();
-			for i in 0..bytes.len() {
-				bytes[i] = aux_bytes[i] ^ sk_bytes[i];
-			}
-			bytes
-		};
+		// t = aux_hash XOR sk
+		let sk_bytes = priv_key.secret_bytes();
+		let mut t = [0u8; 32];
 
-		let mut nonce_bytes = Vec::with_capacity(96);
-		nonce_bytes.extend_from_slice(&t);
-		nonce_bytes.extend_from_slice(msg);
+		for i in 0..32 {
+			t[i] = aux_hash[i] ^ sk_bytes[i];
+		}
+
+		// include public key
+		let pubkey = PublicKey::from_secret_key(&secp, priv_key);
+		let (xonly_pubkey, _) = pubkey.x_only_public_key();
+
+		// nonce hash
 		let mut hasher = Keccak256::new();
 		hasher.update("PIP/nonce");
-		hasher.update(&nonce_bytes);
-		let result = hasher.finalize();
-		let nonce_bytes = *result;
+		hasher.update(&t);
+		hasher.update(&xonly_pubkey.serialize());
+		hasher.update(msg);
 
-		let mut nonce_sk = SecretKey::from_slice(&nonce_bytes).unwrap();
+		let mut nonce_bytes = hasher.finalize();
+
+		// convert to secret key
+		let mut nonce_sk = loop {
+			let nonce_hash = *nonce_bytes;
+			if let Ok(sk) = SecretKey::from_slice(&nonce_hash) {
+				break sk;
+			}
+
+			// rehash if overflow
+			let mut retry = Keccak256::new();
+			retry.update(&nonce_bytes);
+			nonce_bytes = retry.finalize();
+		};
+		// ensure even Y coordinate
 		let (_, parity) = PublicKey::from_secret_key(&secp, &nonce_sk).x_only_public_key();
+
 		if parity == Parity::Odd {
 			nonce_sk = nonce_sk.negate();
 		}
@@ -165,6 +185,45 @@ mod tests {
 		let mut hasher = Keccak256::new();
 		hasher.update(value);
 		hasher.finalize().into()
+	}
+
+	pub fn generate_challenge_hash(rx: &[u8; 32], pubkey_x: &[u8; 32], msg: &[u8; 32]) -> Scalar {
+		let mut hasher = Keccak256::new();
+		hasher.update("PIP/challenge");
+		hasher.update(rx);
+		hasher.update(pubkey_x);
+		hasher.update(msg);
+		let digest = hasher.finalize();
+		let data = *digest;
+
+		let mut bytes = [0u8; 32];
+		bytes.copy_from_slice(&data);
+		let reduced = mod_n(bytes);
+
+		Scalar::from_be_bytes(reduced).unwrap()
+	}
+
+	fn mod_n(mut x: [u8; 32]) -> [u8; 32] {
+		if x >= SECP256K1_ORDER {
+			let mut borrow = 0u16;
+
+			for i in (0..32).rev() {
+				let xi = x[i] as i16;
+				let ni = SECP256K1_ORDER[i] as i16;
+
+				let val = xi - ni - borrow as i16;
+
+				if val < 0 {
+					x[i] = (val + 256) as u8;
+					borrow = 1;
+				} else {
+					x[i] = val as u8;
+					borrow = 0;
+				}
+			}
+		}
+
+		x
 	}
 
 	fn generate_verify_input(invalid: bool) -> Vec<u8> {
@@ -192,15 +251,7 @@ mod tests {
 		let rx = nonce_xonly.serialize();
 
 		// Compute challenge hash
-		let mut challenge = Vec::with_capacity(96);
-		challenge.extend_from_slice(&rx);
-		challenge.extend_from_slice(&pubkey_x);
-		challenge.extend_from_slice(&message(None));
-		let mut hasher = Keccak256::new();
-		hasher.update("PIP/challenge");
-		hasher.update(challenge);
-		let digest = hasher.finalize();
-		let e = Scalar::from_be_bytes(*digest).unwrap();
+		let e = generate_challenge_hash(&rx, &pubkey_x, &message(None));
 		let ed = signer_secret.mul_tweak(&e).expect("e*secret key should be valid");
 
 		let ex_scalar = Scalar::from_be_bytes(ed.secret_bytes()).unwrap();

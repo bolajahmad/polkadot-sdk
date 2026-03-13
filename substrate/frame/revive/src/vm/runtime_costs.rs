@@ -178,6 +178,22 @@ pub enum RuntimeCosts {
 	Blake2F(u32),
 	/// Weight of calling `Modexp` precompile
 	Modexp(u64),
+	/// Weight of verifying Schnorr signatures precompile
+	SchnorrVerify,
+	/// Weight of calling `BLS12-381 G1 Add` precompile
+	Bls12381G1Add,
+	/// Weight of calling `BLS12-381 G2 Add` precompile
+	Bls12381G2Add,
+	/// Weight of calling `BLS12-381 G1 MSM` precompile
+	Bls12381G1MSM(u32),
+	/// Weight of calling `BLS12-381 G2 MSM` precompile
+	Bls12381G2MSM(u32),
+	/// Weight of calling `BLS12-381 Pairing` precompile
+	Bls12381Pairing(u32),
+	/// Weight of calling `BLS12-381 Fp -> G1` precompile
+	Bls12381FpToG1,
+	/// Weight of calling `BLS12-381 Fp2 -> G2` precompile
+	Bls12381Fp2ToG2,
 }
 
 /// For functions that modify storage, benchmarks are performed with one item in the
@@ -340,6 +356,14 @@ impl<T: Config> Token<T> for RuntimeCosts {
 			Identity(len) => T::WeightInfo::identity(len),
 			Blake2F(rounds) => T::WeightInfo::blake2f(rounds),
 			Modexp(gas) => Weight::from_parts(gas.saturating_mul(WEIGHT_PER_GAS), 0),
+			SchnorrVerify => T::WeightInfo::schnorr_verify(),
+			Bls12381G1Add => T::WeightInfo::bls12_381_g1_add(),
+			Bls12381G2Add => T::WeightInfo::bls12_381_g2_add(),
+			Bls12381G1MSM(k) => T::WeightInfo::bls12_381_msm_g1(k),
+			Bls12381G2MSM(k) => T::WeightInfo::bls12_381_msm_g2(k),
+			Bls12381Pairing(k) => T::WeightInfo::bls12_381_pairing(k),
+			Bls12381FpToG1 => T::WeightInfo::bls12_381_fp_to_g1(),
+			Bls12381Fp2ToG2 => T::WeightInfo::bls12_381_fp2_to_g2(),
 		}
 	}
 }

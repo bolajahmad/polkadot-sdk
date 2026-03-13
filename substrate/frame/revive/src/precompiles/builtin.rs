@@ -43,6 +43,11 @@ pub use self::{
 	benchmarking::{IBenchmarking, NoInfo, WithInfo},
 	storage::Storage,
 	system::System,
+	schnorr::Schnorr,
+	bls12::{
+		BLS12G1Add, BLS12G1MSM, BLS12G2Add, BLS12G2MSM, BLS12MapFp2ToG2, BLS12MapFpToG1,
+		BLS12PairingCheck,
+	},
 };
 
 #[cfg(not(feature = "runtime-benchmarks"))]

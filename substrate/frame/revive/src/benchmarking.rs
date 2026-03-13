@@ -274,10 +274,11 @@ mod benchmarks {
 			T::Currency::balance_on_hold(&HoldReason::AddressMapping.into(), &caller);
 		assert_eq!(
 			T::Currency::balance(&caller),
-			caller_funding::<T>() -
-				value - deposit -
-				code_deposit - mapping_deposit -
-				Pallet::<T>::min_balance(),
+			caller_funding::<T>()
+				- value - deposit
+				- code_deposit
+				- mapping_deposit
+				- Pallet::<T>::min_balance(),
 		);
 		// contract has the full value
 		assert_eq!(T::Currency::balance(&account_id), value + Pallet::<T>::min_balance());
@@ -379,10 +380,11 @@ mod benchmarks {
 		// value was removed from the caller
 		assert_eq!(
 			T::Currency::total_balance(&caller),
-			caller_funding::<T>() -
-				value - deposit -
-				code_deposit - mapping_deposit -
-				Pallet::<T>::min_balance(),
+			caller_funding::<T>()
+				- value - deposit
+				- code_deposit
+				- mapping_deposit
+				- Pallet::<T>::min_balance(),
 		);
 		// contract has the full value
 		assert_eq!(T::Currency::balance(&account_id), value + Pallet::<T>::min_balance());
@@ -422,10 +424,11 @@ mod benchmarks {
 		// value and value transferred via call should be removed from the caller
 		assert_eq!(
 			T::Currency::balance(&instance.caller),
-			caller_funding::<T>() -
-				value - deposit -
-				code_deposit - mapping_deposit -
-				Pallet::<T>::min_balance()
+			caller_funding::<T>()
+				- value - deposit
+				- code_deposit
+				- mapping_deposit
+				- Pallet::<T>::min_balance()
 		);
 		// contract should have received the value
 		assert_eq!(T::Currency::balance(&instance.account_id), before + value);
@@ -3062,6 +3065,165 @@ mod benchmarks {
 		assert_eq!(Pallet::<T>::eth_block().transactions.len(), 1);
 
 		Ok(())
+	}
+
+	#[benchmark(pov_mode = Measured)]
+	fn schnorr_verify() {
+		use hex_literal::hex;
+		let input = hex!("1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078fffad398fbd85c7406f0e68846073793330a14415b3545d702c24aed6c7c1f82d58afb04cf885f969a07c8a6aca2b050f8fa1e1dd4a0b649f22e43a596c11f4cbb6e16d27ac5ab427a7f68900ac5559ce272dc6c37c82b3e052246c82244c50e4").to_vec();
+		let mut call_setup = CallSetup::<T>::default();
+		let (mut ext, _) = call_setup.ext();
+
+		let result;
+		#[block]
+		{
+			result = run_builtin_precompile(&mut ext, H160::from_low_u64_be(2309).as_fixed_bytes(), input);
+		}
+
+		assert_ok!(result);
+	}
+
+	#[benchmark(pov_mode = Measured)]
+	fn bls12_381_g1_add() {
+		use hex_literal::hex;
+		let input = hex!("000000000000000000000000000000000f0b0417d1bb6d1457ed46251e612172c3897b145fff1e581641d300c0678eba456840cc9ef971743d6a6925eb9f224a000000000000000000000000000000000173d224a3963a6b786181218a81174da2143ec85e2f0acf7f32376f79239bd5b4afe737f037796d080d33dc410c6c920000000000000000000000000000000006932e08272bb01497eb879bf75092d25536df1f05625403e04be68314652134551dfdec504b65951e36a040db846aee000000000000000000000000000000000304ed17f031b4f731c5e44201faea35dcf5b711d93bdcc91a893f81e7b855b69db7f83d4da2e608de119298d137286d").to_vec();
+		let expected = hex!(
+			"000000000000000000000000000000000a25813623353195dde936add52600543b9a37a70806a7bda210c6c17c09cc90e8638aa501d51004bddac60b9ec369140000000000000000000000000000000015609e2beb512940f01eedc2962fea7c3f09877f766e6faa0d4288121e8f19b7f416c5e196a3a4439751d21d7dcb8a97"
+		);
+		let mut call_setup = CallSetup::<T>::default();
+		let (mut ext, _) = call_setup.ext();
+
+		let result;
+		#[block]
+		{
+			result =
+				run_builtin_precompile(&mut ext, H160::from_low_u64_be(11).as_fixed_bytes(), input);
+		}
+
+		assert_eq!(result.unwrap().data, expected);
+	}
+
+	#[benchmark(pov_mode = Measured)]
+	fn bls12_381_msm_g1(k: Linear<1, { limits::CALLDATA_BYTES / 160 }>) {
+		const PAIR_LEN: usize = 160;
+
+		let pair = [0u8; PAIR_LEN];
+		let mut input = Vec::with_capacity(k as usize * PAIR_LEN);
+		for _ in 0..k {
+			input.extend_from_slice(&pair);
+		}
+
+		let expected = vec![0u8; 128];
+		let mut call_setup = CallSetup::<T>::default();
+		let (mut ext, _) = call_setup.ext();
+
+		let result;
+		#[block]
+		{
+			result =
+				run_builtin_precompile(&mut ext, H160::from_low_u64_be(12).as_fixed_bytes(), input)
+		}
+
+		assert_eq!(result.unwrap().data, expected);
+	}
+
+	#[benchmark(pov_mode = Measured)]
+	fn bls12_381_g2_add() {
+		use hex_literal::hex;
+		let input = hex!("000000000000000000000000000000000495fc47b7fc1e49a82c2d82f5653f33138c90c5f386a9d4fca0118e663f8c817d10adaf3ade592eb74ffd17ef06596500000000000000000000000000000000019aa7fb2b75a8d18b563cd203542618d6c73b1e91442f57d1705a6312e65c39647918bb20c2fc540c9674049927c41b000000000000000000000000000000000562a00deb9f16b47f1a4fdb1554ee013d742b5ae79ae122e1381fa16dc87356ec05406384284e45f92801d8d7014b4d00000000000000000000000000000000028b33a7afdbb9db8907d9bfba11dc25da3a8f39e0681e32fbf3f359200a2f73c4b7cfcc051e2d2f9479a4d538de6b660000000000000000000000000000000008a0df083b04437fb5a306986e68ba28e5a9261c3dbbb5089ed82a51df3d0fb9d856855bd011b22eaa2a5c0e104b02d2000000000000000000000000000000000f54bc0cdcaf513730b5d1b3cbbdcf08e31aae9f018f3b25588e0516a44711cc46802fca6f0bcfb79ce48453589d4097000000000000000000000000000000000a65bd306c0420e350a214a790146c7ef4df80869731a5aeea3b20020f5b0861d1be2e929ba09b7838006e6d42ef292700000000000000000000000000000000158c408e4d5cd2fdc2ad246d4c124f2d20a8be387e77a78b6bbae27414899ec0a4bab4c52a16aebe5112c531c806429d").to_vec();
+		let expected = hex!("0000000000000000000000000000000007d6d4e76f74b1c7de880cf23b20960cdb8b8f027ad498adf2e85839d339d6ad8b8cd5d152f0919674cc7341f404e8c1000000000000000000000000000000000d1c9ae33bddafed866a062ac3fd8a0e63e853d6d63cd50fa4fdbe985c7458bead2e49ecad41091c8b7e55c09f4bb7b30000000000000000000000000000000007456aeb1bc1be06c5c8202316e98e210d89e952994979c5f55df6f607acea4b45bcc9542a054386c02254648d902a42000000000000000000000000000000000731ff25fd3ccaeb6fae14c0dc80ce7c84a4f9f3145f53f2e9746717d0e900ed3fbba130fea7e74ad51602c823f5c318").to_vec();
+		let mut call_setup = CallSetup::<T>::default();
+		let (mut ext, _) = call_setup.ext();
+
+		let result;
+		#[block]
+		{
+			result =
+				run_builtin_precompile(&mut ext, H160::from_low_u64_be(13).as_fixed_bytes(), input);
+		}
+
+		assert_eq!(result.unwrap().data, expected);
+	}
+
+	#[benchmark(pov_mode = Measured)]
+	fn bls12_381_msm_g2(k: Linear<1, { limits::CALLDATA_BYTES / 288 }>) {
+		const PAIR_LEN: usize = 288;
+
+		let pair = [0u8; PAIR_LEN];
+		let mut input = Vec::with_capacity(k as usize * PAIR_LEN);
+		for _ in 0..k {
+			input.extend_from_slice(&pair);
+		}
+
+		let expected = vec![0u8; 256];
+		let mut call_setup = CallSetup::<T>::default();
+		let (mut ext, _) = call_setup.ext();
+
+		let result;
+		#[block]
+		{
+			result =
+				run_builtin_precompile(&mut ext, H160::from_low_u64_be(14).as_fixed_bytes(), input)
+		}
+
+		assert_eq!(result.unwrap().data, expected);
+	}
+
+	#[benchmark(pov_mode = Measured)]
+	fn bls12_381_fp_to_g1() {
+		use hex_literal::hex;
+		let input = hex!("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").to_vec();
+		let expected = hex!("0000000000000000000000000000000011a9a0372b8f332d5c30de9ad14e50372a73fa4c45d5f2fa5097f2d6fb93bcac592f2e1711ac43db0519870c7d0ea41500000000000000000000000000000000092c0f994164a0719f51c24ba3788de240ff926b55f58c445116e8bc6a47cd63392fd4e8e22bdf9feaa96ee773222133").to_vec();
+		let mut call_setup = CallSetup::<T>::default();
+		let (mut ext, _) = call_setup.ext();
+
+		let result;
+		#[block]
+		{
+			result =
+				run_builtin_precompile(&mut ext, H160::from_low_u64_be(16).as_fixed_bytes(), input);
+		}
+
+		assert_eq!(result.unwrap().data, expected);
+	}
+
+	#[benchmark(pov_mode = Measured)]
+	fn bls12_381_fp2_to_g2() {
+		use hex_literal::hex;
+		let input = hex!("0000000000000000000000000000000017cff55e6bbc2ba7bef9242de4ecf5cab1f714f84435ecc224dee233b245effdfc55f0d09b016b6b7f6f31a6e1a2f18b0000000000000000000000000000000017cff55e6bbc2ba7bef9242de4ecf5cab1f714f84435ecc224dee233b245effdfc55f0d09b016b6b7f6f31a6e1a2f18b").to_vec();
+		let expected = hex!("000000000000000000000000000000000b5af1250716b1e84eda441001772cbd85fc3276fb0e91940605b20192643fb01601b7acddc64fbdea9354107bfbd6270000000000000000000000000000000001c7808f9c8e90040b42d1e11f3787f65b6cd63d418193d181b1c56b354cfd7f978f3bd8d6412ad01880641c89f8546b000000000000000000000000000000000370dd9812cce3c5fd321537992b5f21b334d19d4b1a930abf26327f58d95e7b94b529fe37a6eff728c0fa6a7cb58c6a0000000000000000000000000000000002117bbfbc4f77baf27d43c2660e792de0fffe2bf04a66f69e6da373a55ef328116cd06f9d6be243d3add4160d157e72").to_vec();
+		let mut call_setup = CallSetup::<T>::default();
+		let (mut ext, _) = call_setup.ext();
+
+		let result;
+		#[block]
+		{
+			result =
+				run_builtin_precompile(&mut ext, H160::from_low_u64_be(17).as_fixed_bytes(), input);
+		}
+
+		assert_eq!(result.unwrap().data, expected);
+	}
+
+	#[benchmark(pov_mode = Measured)]
+	fn bls12_381_pairing(k: Linear<1, { limits::CALLDATA_BYTES / 384 }>) {
+		const PAIR_LEN: usize = 384;
+
+		let pair = [0u8; PAIR_LEN];
+		let mut input = Vec::with_capacity(k as usize * PAIR_LEN);
+		for _ in 0..k {
+			input.extend_from_slice(&pair);
+		}
+		let mut call_setup = CallSetup::<T>::default();
+		let (mut ext, _) = call_setup.ext();
+
+		let result;
+		#[block]
+		{
+			result =
+				run_builtin_precompile(&mut ext, H160::from_low_u64_be(15).as_fixed_bytes(), input)
+		}
+		assert_ok!(result);
 	}
 
 	impl_benchmark_test_suite!(

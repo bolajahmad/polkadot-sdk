@@ -128,8 +128,7 @@ impl<T: Config> PrimitivePrecompile for BLS12G1Add<T> {
 		input: Vec<u8>,
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error> {
-		// TODO: add proper benchmarking and weight charging for this precompile.
-		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381G1Add)?;
 
 		if input.len() != 256 {
 			return Err(Error::Revert("Invalid input length".into()));
@@ -186,13 +185,11 @@ impl<T: Config> PrimitivePrecompile for BLS12G1MSM<T> {
 		input: Vec<u8>,
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error> {
-		// TODO: add proper benchmarking and weight charging for this precompile.
-		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
-
 		if input.is_empty() || input.len() % G1_MSM_SLICE_SIZE != 0 {
 			return Err(Error::Revert("Invalid input length".into()));
 		}
 		let k = input.len() / G1_MSM_SLICE_SIZE;
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381G1MSM(k as u32))?;
 
 		let mut points = Vec::with_capacity(k);
 		let mut scalars = Vec::with_capacity(k);
@@ -220,10 +217,6 @@ impl<T: Config> PrimitivePrecompile for BLS12G1MSM<T> {
 const FP2_LENGTH: usize = 128;
 /// Size of a G1 point in EIP-2537 encoding (128 bytes = 2 coordinates).
 const G2_LENGTH: usize = 256;
-/// Actual byte size of a BLS12-381 field element (48 bytes).
-const FP2_ACTUAL_SIZE: usize = 96;
-/// Padding bytes at the start of each coordinate (16 bytes of zeros).
-const FP2_PAD_SIZE: usize = FP2_LENGTH - FP2_ACTUAL_SIZE;
 
 fn decode_fp2(input: &[u8]) -> Result<Fq2, DispatchError> {
 	if input.len() != FP2_LENGTH {
@@ -317,8 +310,7 @@ impl<T: Config> PrimitivePrecompile for BLS12G2Add<T> {
 		input: Vec<u8>,
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error> {
-		// TODO: add proper benchmarking and weight charging for this precompile.
-		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381G2Add)?;
 
 		if input.len() != 512 {
 			return Err(Error::Revert("Invalid input length".into()));
@@ -354,13 +346,12 @@ impl<T: Config> PrimitivePrecompile for BLS12G2MSM<T> {
 		input: Vec<u8>,
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error> {
-		// TODO: add proper benchmarking and weight charging for this precompile.
-		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
 
 		if input.is_empty() || input.len() % G2_MSM_SLICE_SIZE != 0 {
 			return Err(Error::Revert("Invalid input length".into()));
 		}
 		let k = input.len() / G2_MSM_SLICE_SIZE;
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381G2MSM(k as u32))?;
 
 		let mut points = Vec::with_capacity(k);
 		let mut scalars = Vec::with_capacity(k);
@@ -384,10 +375,7 @@ impl<T: Config> PrimitivePrecompile for BLS12G2MSM<T> {
 }
 
 fn pairing_check(g1s: &[G1Affine], g2s: &[G2Affine]) -> bool {
-	let mut acc = <Bls12_381 as Pairing>::TargetField::one();
-
 	let result = Bls12_381::multi_pairing(g1s, g2s);
-
 	result.0.is_one()
 }
 pub struct BLS12PairingCheck<T>(PhantomData<T>);
@@ -403,13 +391,11 @@ impl<T: Config> PrimitivePrecompile for BLS12PairingCheck<T> {
 		input: Vec<u8>,
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error> {
-		// TODO: add proper benchmarking and weight charging for this precompile.
-		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
-
 		if input.is_empty() || input.len() % (G1_LENGTH + G2_LENGTH) != 0 {
 			return Err(Error::Revert("Invalid input length".into()));
 		}
 		let k = input.len() / (G1_LENGTH + G2_LENGTH);
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381Pairing(k as u32))?;
 
 		let mut g1_points = Vec::with_capacity(k);
 		let mut g2_points = Vec::with_capacity(k);
@@ -448,8 +434,7 @@ impl<T: Config> PrimitivePrecompile for BLS12MapFpToG1<T> {
 		input: Vec<u8>,
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error> {
-		// TODO: add proper benchmarking and weight charging for this precompile.
-		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381FpToG1)?;
 
 		if input.is_empty() || input.len() != 64 {
 			return Err(Error::Revert("Invalid input length".into()));
@@ -480,8 +465,7 @@ impl<T: Config> PrimitivePrecompile for BLS12MapFp2ToG2<T> {
 		input: Vec<u8>,
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error>  {
-		// TODO: add proper benchmarking and weight charging for this precompile.
-		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bn128Add)?;
+		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381Fp2ToG2)?;
 
 		if input.is_empty() || input.len() != 128 {
 			return Err(Error::Revert("Invalid input length".into()));

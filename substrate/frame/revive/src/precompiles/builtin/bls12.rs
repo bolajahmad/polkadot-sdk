@@ -23,9 +23,7 @@ use crate::{
 use alloc::vec::Vec;
 use ark_bls12_381::{Bls12_381, Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::hashing::{curve_maps::wb::WBMap, map_to_curve_hasher::MapToCurve};
-use ark_ec::{
-	AffineRepr, CurveGroup, VariableBaseMSM, pairing::Pairing,
-};
+use ark_ec::{AffineRepr, CurveGroup, VariableBaseMSM, pairing::Pairing};
 use ark_ff::{BigInteger, One, PrimeField, Zero};
 use core::{marker::PhantomData, num::NonZero};
 use sp_runtime::DispatchError;
@@ -189,7 +187,8 @@ impl<T: Config> PrimitivePrecompile for BLS12G1MSM<T> {
 			return Err(Error::Revert("Invalid input length".into()));
 		}
 		let k = input.len() / G1_MSM_SLICE_SIZE;
-		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381G1MSM(k as u32))?;
+		env.frame_meter_mut()
+			.charge_weight_token(RuntimeCosts::Bls12381G1MSM(k as u32))?;
 
 		let mut points = Vec::with_capacity(k);
 		let mut scalars = Vec::with_capacity(k);
@@ -244,6 +243,9 @@ fn decode_g2(input: &[u8]) -> Result<G2Affine, DispatchError> {
 	let point = G2Affine::new(x, y);
 	if !point.is_on_curve() {
 		return Err(DispatchError::from("Point not on curve"));
+	}
+	if !point.is_in_correct_subgroup_assuming_on_curve() {
+		return Err(DispatchError::from("Point not in G2 subgroup"));
 	}
 
 	Ok(point)
@@ -346,12 +348,12 @@ impl<T: Config> PrimitivePrecompile for BLS12G2MSM<T> {
 		input: Vec<u8>,
 		env: &mut impl Ext<T = Self::T>,
 	) -> Result<Vec<u8>, Error> {
-
 		if input.is_empty() || input.len() % G2_MSM_SLICE_SIZE != 0 {
 			return Err(Error::Revert("Invalid input length".into()));
 		}
 		let k = input.len() / G2_MSM_SLICE_SIZE;
-		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381G2MSM(k as u32))?;
+		env.frame_meter_mut()
+			.charge_weight_token(RuntimeCosts::Bls12381G2MSM(k as u32))?;
 
 		let mut points = Vec::with_capacity(k);
 		let mut scalars = Vec::with_capacity(k);
@@ -395,7 +397,8 @@ impl<T: Config> PrimitivePrecompile for BLS12PairingCheck<T> {
 			return Err(Error::Revert("Invalid input length".into()));
 		}
 		let k = input.len() / (G1_LENGTH + G2_LENGTH);
-		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381Pairing(k as u32))?;
+		env.frame_meter_mut()
+			.charge_weight_token(RuntimeCosts::Bls12381Pairing(k as u32))?;
 
 		let mut g1_points = Vec::with_capacity(k);
 		let mut g2_points = Vec::with_capacity(k);
@@ -442,10 +445,9 @@ impl<T: Config> PrimitivePrecompile for BLS12MapFpToG1<T> {
 
 		let fp = decode_fp(&input).map_err(|_| Error::Revert("Invalid field element".into()))?;
 
-		let mapped = <WBMap<ark_bls12_381::g1::Config> as MapToCurve<G1Projective>>::map_to_curve(
-			fp,
-		)
-		.map_err(|_| Error::Revert("Map to curve failed".into()))?;
+		let mapped =
+			<WBMap<ark_bls12_381::g1::Config> as MapToCurve<G1Projective>>::map_to_curve(fp)
+				.map_err(|_| Error::Revert("Map to curve failed".into()))?;
 
 		let p = mapped.clear_cofactor();
 
@@ -457,14 +459,15 @@ pub struct BLS12MapFp2ToG2<T>(PhantomData<T>);
 
 impl<T: Config> PrimitivePrecompile for BLS12MapFp2ToG2<T> {
 	type T = T;
-	const MATCHER: BuiltinAddressMatcher = BuiltinAddressMatcher::Fixed(NonZero::new(0x11).unwrap());
+	const MATCHER: BuiltinAddressMatcher =
+		BuiltinAddressMatcher::Fixed(NonZero::new(0x11).unwrap());
 	const HAS_CONTRACT_INFO: bool = false;
 
 	fn call(
 		_address: &[u8; 20],
 		input: Vec<u8>,
 		env: &mut impl Ext<T = Self::T>,
-	) -> Result<Vec<u8>, Error>  {
+	) -> Result<Vec<u8>, Error> {
 		env.frame_meter_mut().charge_weight_token(RuntimeCosts::Bls12381Fp2ToG2)?;
 
 		if input.is_empty() || input.len() != 128 {
@@ -473,10 +476,9 @@ impl<T: Config> PrimitivePrecompile for BLS12MapFp2ToG2<T> {
 
 		let fp = decode_fp2(&input).map_err(|_| Error::Revert("Invalid field element".into()))?;
 
-		let mapped = <WBMap<ark_bls12_381::g2::Config> as MapToCurve<G2Projective>>::map_to_curve(
-			fp,
-		)
-		.map_err(|_| Error::Revert("Map to curve failed".into()))?;
+		let mapped =
+			<WBMap<ark_bls12_381::g2::Config> as MapToCurve<G2Projective>>::map_to_curve(fp)
+				.map_err(|_| Error::Revert("Map to curve failed".into()))?;
 
 		let p = mapped.clear_cofactor();
 

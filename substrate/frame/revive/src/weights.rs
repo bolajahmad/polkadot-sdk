@@ -249,7 +249,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `System::Account` (r:1 w:1)
 	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `Measured`)
 	/// The range of component `c` is `[1, 10240]`.
-	fn call_with_evm_code_per_byte(_c: u32, ) -> Weight {
+	fn call_with_evm_code_per_byte(c: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `1208 + c * (1 ±0)`
 		//  Estimated: `7147 + c * (1 ±0)`
@@ -335,7 +335,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// The range of component `c` is `[0, 102400]`.
 	/// The range of component `i` is `[0, 131072]`.
 	/// The range of component `d` is `[0, 1]`.
-	fn eth_instantiate_with_code(c: u32, i: u32, _d: u32, ) -> Weight {
+	fn eth_instantiate_with_code(c: u32, i: u32, d: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `994`
 		//  Estimated: `6934`
@@ -817,7 +817,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `Revive::OriginalAccount` (r:2 w:0)
 	/// Proof: `Revive::OriginalAccount` (`max_values`: None, `max_size`: Some(52), added: 2527, mode: `Measured`)
 	/// The range of component `r` is `[0, 1]`.
-	fn seal_terminate(_r: u32, ) -> Weight {
+	fn seal_terminate(r: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `924`
 		//  Estimated: `6864`
@@ -909,7 +909,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Proof: `Skipped::Metadata` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	/// The range of component `n` is `[0, 416]`.
 	/// The range of component `o` is `[0, 416]`.
-	fn seal_set_storage(_n: u32, o: u32, ) -> Weight {
+	fn seal_set_storage(n: u32, o: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `248 + o * (1 ±0)`
 		//  Estimated: `247 + o * (1 ±0)`
@@ -964,7 +964,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `Skipped::Metadata` (r:0 w:0)
 	/// Proof: `Skipped::Metadata` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	/// The range of component `n` is `[0, 416]`.
-	fn take_storage(_n: u32, ) -> Weight {
+	fn take_storage(n: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `376`
 		//  Estimated: `376`
@@ -1024,7 +1024,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(Weight::from_parts(299, 0).saturating_mul(o.into()))
 	}
 	/// The range of component `n` is `[0, 416]`.
-	fn seal_clear_transient_storage(_n: u32, ) -> Weight {
+	fn seal_clear_transient_storage(n: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -1074,7 +1074,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// The range of component `t` is `[0, 1]`.
 	/// The range of component `d` is `[0, 1]`.
 	/// The range of component `i` is `[0, 1048576]`.
-	fn seal_call(t: u32, d: u32, _i: u32, ) -> Weight {
+	fn seal_call(t: u32, d: u32, i: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `1834`
 		//  Estimated: `5299`
@@ -1609,7 +1609,7 @@ impl WeightInfo for () {
 	/// Storage: `System::Account` (r:1 w:1)
 	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `Measured`)
 	/// The range of component `c` is `[1, 10240]`.
-	fn call_with_evm_code_per_byte(_c: u32, ) -> Weight {
+	fn call_with_evm_code_per_byte(c: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `1208 + c * (1 ±0)`
 		//  Estimated: `7147 + c * (1 ±0)`
@@ -1695,7 +1695,7 @@ impl WeightInfo for () {
 	/// The range of component `c` is `[0, 102400]`.
 	/// The range of component `i` is `[0, 131072]`.
 	/// The range of component `d` is `[0, 1]`.
-	fn eth_instantiate_with_code(c: u32, i: u32, _d: u32, ) -> Weight {
+	fn eth_instantiate_with_code(c: u32, i: u32, d: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `994`
 		//  Estimated: `6934`
@@ -2177,7 +2177,7 @@ impl WeightInfo for () {
 	/// Storage: `Revive::OriginalAccount` (r:2 w:0)
 	/// Proof: `Revive::OriginalAccount` (`max_values`: None, `max_size`: Some(52), added: 2527, mode: `Measured`)
 	/// The range of component `r` is `[0, 1]`.
-	fn seal_terminate(_r: u32, ) -> Weight {
+	fn seal_terminate(r: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `924`
 		//  Estimated: `6864`
@@ -2269,7 +2269,7 @@ impl WeightInfo for () {
 	/// Proof: `Skipped::Metadata` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	/// The range of component `n` is `[0, 416]`.
 	/// The range of component `o` is `[0, 416]`.
-	fn seal_set_storage(_n: u32, o: u32, ) -> Weight {
+	fn seal_set_storage(n: u32, o: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `248 + o * (1 ±0)`
 		//  Estimated: `247 + o * (1 ±0)`
@@ -2324,7 +2324,7 @@ impl WeightInfo for () {
 	/// Storage: `Skipped::Metadata` (r:0 w:0)
 	/// Proof: `Skipped::Metadata` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	/// The range of component `n` is `[0, 416]`.
-	fn take_storage(_n: u32, ) -> Weight {
+	fn take_storage(n: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `376`
 		//  Estimated: `376`
@@ -2384,7 +2384,7 @@ impl WeightInfo for () {
 			.saturating_add(Weight::from_parts(299, 0).saturating_mul(o.into()))
 	}
 	/// The range of component `n` is `[0, 416]`.
-	fn seal_clear_transient_storage(_n: u32, ) -> Weight {
+	fn seal_clear_transient_storage(n: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -2434,7 +2434,7 @@ impl WeightInfo for () {
 	/// The range of component `t` is `[0, 1]`.
 	/// The range of component `d` is `[0, 1]`.
 	/// The range of component `i` is `[0, 1048576]`.
-	fn seal_call(t: u32, d: u32, _i: u32, ) -> Weight {
+	fn seal_call(t: u32, d: u32, i: u32, ) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `1834`
 		//  Estimated: `5299`

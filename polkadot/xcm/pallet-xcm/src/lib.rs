@@ -1021,6 +1021,7 @@ pub mod pallet {
 					}
 				}
 			}
+
 			// Should never fail since we only removed items. But better safe than panicking as it's
 			// way better to drop the queue than panic on initialize.
 			if let Ok(q) = BoundedVec::try_from(q) {
@@ -1722,8 +1723,8 @@ pub mod pallet {
 			ensure!(origin_location != new_aliaser, Error::<T>::BadLocation);
 			if let Some(expiry) = expires {
 				ensure!(
-					expiry >
-						frame_system::Pallet::<T>::current_block_number().saturated_into::<u64>(),
+					expiry
+						> frame_system::Pallet::<T>::current_block_number().saturated_into::<u64>(),
 					Error::<T>::ExpiresInPast
 				);
 			}
@@ -3420,12 +3421,12 @@ impl<T: Config> Pallet<T> {
 		Ok(Self::authorized_aliasers(target)?.into_iter().any(|aliaser| {
 			// `aliasers` and `origin` have already been transformed to `desired_version`, we
 			// can just directly compare them.
-			aliaser.location == origin &&
-				aliaser
+			aliaser.location == origin
+				&& aliaser
 					.expiry
 					.map(|expiry| {
-						frame_system::Pallet::<T>::current_block_number().saturated_into::<u64>() <
-							expiry
+						frame_system::Pallet::<T>::current_block_number().saturated_into::<u64>()
+							< expiry
 					})
 					.unwrap_or(true)
 		}))
@@ -3590,8 +3591,8 @@ impl<T: Config> Pallet<T> {
 		// check `RemoteLockedFungibles`
 		ensure!(
 			!RemoteLockedFungibles::<T>::iter()
-				.any(|(key, data)| key.needs_migration(minimal_allowed_xcm_version) ||
-					data.needs_migration(minimal_allowed_xcm_version)),
+				.any(|(key, data)| key.needs_migration(minimal_allowed_xcm_version)
+					|| data.needs_migration(minimal_allowed_xcm_version)),
 			TryRuntimeError::Other(
 				"`RemoteLockedFungibles` data should be migrated to the higher xcm version!"
 			)
@@ -3992,8 +3993,8 @@ impl<T: Config> OnResponse for Pallet<T> {
 	) -> bool {
 		match Queries::<T>::get(query_id) {
 			Some(QueryStatus::Pending { responder, maybe_match_querier, .. }) => {
-				Location::try_from(responder).map_or(false, |r| origin == &r) &&
-					maybe_match_querier.map_or(true, |match_querier| {
+				Location::try_from(responder).map_or(false, |r| origin == &r)
+					&& maybe_match_querier.map_or(true, |match_querier| {
 						Location::try_from(match_querier).map_or(false, |match_querier| {
 							querier.map_or(false, |q| q == &match_querier)
 						})

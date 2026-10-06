@@ -336,7 +336,7 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		burn_dust: bool,
 	) -> Result<(T::Balance, Option<T::Balance>), DispatchError> {
 		let (credit, maybe_burn) = match (burn_dust, debit.checked_sub(&amount)) {
-			(true, Some(dust)) => (amount, Some(dust)),
+			(true, Some(dust)) if !dust.is_zero() => (amount, Some(dust)),
 			_ => (debit, None),
 		};
 		Self::can_increase(id, dest, credit, false).into_result()?;
@@ -400,15 +400,17 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			return Ok(());
 		}
 
+		Asset::<T, I>::insert(&id, details);
+
 		if !account.balance.is_zero() {
 			Self::deposit_event(Event::Burned {
 				asset_id: id.clone(),
 				owner: who.clone(),
 				balance: account.balance,
 			});
+			T::CallbackHandle::burned(&id, &who, account.balance);
 		}
 
-		Asset::<T, I>::insert(&id, details);
 		// Executing a hook here is safe, since it is not in a `mutate`.
 		T::Freezer::died(id.clone(), &who);
 		T::Holder::died(id, &who);
@@ -475,7 +477,12 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 			Ok(())
 		})?;
 
-		Self::deposit_event(Event::Issued { asset_id: id, owner: beneficiary.clone(), amount });
+		Self::deposit_event(Event::Issued {
+			asset_id: id.clone(),
+			owner: beneficiary.clone(),
+			amount,
+		});
+		T::CallbackHandle::issued(&id, beneficiary, amount);
 
 		Ok(())
 	}
@@ -559,7 +566,12 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 
 			Ok(())
 		})?;
-		Self::deposit_event(Event::Burned { asset_id: id, owner: target.clone(), balance: actual });
+		Self::deposit_event(Event::Burned {
+			asset_id: id.clone(),
+			owner: target.clone(),
+			balance: actual,
+		});
+		T::CallbackHandle::burned(&id, target, actual);
 		Ok(actual)
 	}
 
@@ -669,7 +681,12 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		// Figure out the debit and credit, together with side-effects.
 		let debit = Self::prep_debit(id.clone(), source, amount, f.into())?;
 
-		ensure!(source == dest || f.best_effort || debit == amount, Error::<T, I>::WouldSweepDust);
+		// With `burn_dust`, `dest` is credited exactly `amount` and the swept remainder is burned
+		// rather than credited, so only a sweep that would land in `dest` is refused.
+		ensure!(
+			source == dest || f.best_effort || f.burn_dust || debit == amount,
+			Error::<T, I>::WouldSweepDust
+		);
 
 		let (credit, maybe_burn) = Self::prep_credit(id.clone(), dest, amount, debit, f.burn_dust)?;
 
@@ -746,11 +763,18 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		})?;
 
 		Self::deposit_event(Event::Transferred {
-			asset_id: id,
+			asset_id: id.clone(),
 			from: source.clone(),
 			to: dest.clone(),
 			amount: credit,
 		});
+		T::CallbackHandle::transferred(&id, source, dest, credit);
+		// A self-transfer is skipped above, dust included.
+		if source != dest {
+			if let Some(burn) = maybe_burn {
+				T::CallbackHandle::burned(&id, source, burn);
+			}
+		}
 		Ok((credit, source_died))
 	}
 

@@ -26,7 +26,9 @@ doc:
     Fixes, none of which change any public signature or require a migration:
 
     - `transfer_and_die` now requires the debit to equal `amount` unless the caller passed
-      `best_effort`, returning the new `Error::WouldSweepDust` otherwise. Sending the whole
+      `best_effort` or `burn_dust`, returning the new `Error::WouldSweepDust` otherwise. With
+      `burn_dust` the destination is still credited exactly `amount` and the remainder is burned,
+      which the `burned` balance-change callback reports. Sending the whole
       balance leaves no remainder and still reaps the account, and a self-transfer is exempt
       because it is settled as a no-op.
     - `pallet-assets` now implements `fungibles::Mutate::transfer` itself, deferring to

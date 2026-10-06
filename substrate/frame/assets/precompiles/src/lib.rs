@@ -264,6 +264,8 @@ where
 	fn dispatch_reason(e: DispatchError) -> &'static str {
 		match e {
 			DispatchError::Token(token) => token.into(),
+			DispatchError::Arithmetic(arith) => arith.into(),
+			DispatchError::Other(msg) => msg,
 			DispatchError::Module(module) => match Self::decode_pallet_error(e) {
 				Some(err) => Self::pallet_reason(err),
 				None => module.message.unwrap_or(ERR_UNEXPECTED),

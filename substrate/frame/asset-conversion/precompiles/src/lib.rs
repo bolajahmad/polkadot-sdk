@@ -239,7 +239,9 @@ const ERR_STATE_CHANGE_DENIED: &str = "cannot modify state in a static call";
 const ERR_UNEXPECTED: &str = "Unexpected error";
 const ERR_PATH_TOO_LONG: &str = "Swap path exceeds MaxSwapPathLength";
 const ERR_INVALID_ASSET_ENCODING: &str = "Failed to SCALE-decode asset kind";
-const ERR_WOULD_SWEEP_REMAINDER: &str = "Swap would leave sender below minimum balance";
+/// `Token(BelowMinimum)` comes from both the sender's and the pool's withdraw in a swap, so the
+/// reason cannot name the account.
+const ERR_INEXACT_WITHDRAW: &str = "Swap amount cannot be withdrawn exactly";
 
 impl<const ADDRESS: u16, Runtime> AssetConversion<ADDRESS, Runtime>
 where
@@ -299,8 +301,10 @@ where
 
 	fn dispatch_reason(e: DispatchError) -> &'static str {
 		match e {
-			DispatchError::Token(TokenError::BelowMinimum) => ERR_WOULD_SWEEP_REMAINDER,
+			DispatchError::Token(TokenError::BelowMinimum) => ERR_INEXACT_WITHDRAW,
 			DispatchError::Token(token) => token.into(),
+			DispatchError::Arithmetic(arith) => arith.into(),
+			DispatchError::Other(msg) => msg,
 			DispatchError::Module(module) => match Self::decode_pallet_error(e) {
 				Some(err) => Self::pallet_reason(err),
 				None => module.message.unwrap_or(ERR_UNEXPECTED),

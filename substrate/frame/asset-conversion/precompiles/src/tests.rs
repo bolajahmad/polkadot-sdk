@@ -171,6 +171,33 @@ fn swap_exact_tokens_for_tokens_works() {
 	});
 }
 
+/// A swap that fails inside `pallet-assets` must revert with that pallet's error name.
+/// Freezing the asset makes the debit return `AssetNotLive`. That is not an
+/// asset-conversion error, so the precompile reports the module message.
+#[test]
+fn swap_reverts_with_the_inner_pallets_message() {
+	new_test_ext().execute_with(|| {
+		let provider = 1u64;
+		let swapper = 2u64;
+		let asset_id = 1u32;
+
+		setup_pool(provider, 10_000, 10_000);
+		assert_ok!(Assets::mint(RuntimeOrigin::signed(provider), asset_id, swapper, 1_000));
+		assert_ok!(Assets::freeze_asset(RuntimeOrigin::signed(provider), asset_id));
+
+		let data = IAssetConversion::swapExactTokensForTokensCall {
+			path: vec![encode_asset(asset_id).into(), encode_native().into()],
+			amountIn: U256::from(100),
+			amountOutMin: U256::from(1),
+			sendTo: account_addr(&swapper),
+			keepAlive: false,
+		}
+		.abi_encode();
+
+		assert_revert_reason(&bare_call(swapper, data), "AssetNotLive");
+	});
+}
+
 #[test]
 fn swap_tokens_for_exact_tokens_works() {
 	new_test_ext().execute_with(|| {
@@ -979,7 +1006,7 @@ fn swap_exact_tokens_for_tokens_reverts_when_it_would_sweep_remainder() {
 		let exec = result.result.expect("must not trap");
 		assert!(exec.did_revert(), "dust-producing swap must revert");
 		let decoded = Revert::abi_decode(&exec.data).expect("Error(string) revert");
-		assert_eq!(decoded.reason, "Swap would leave sender below minimum balance");
+		assert_eq!(decoded.reason, "Swap amount cannot be withdrawn exactly");
 		assert_eq!(
 			<NativeAndAssets as Inspect<u64>>::balance(NativeOrWithId::WithId(asset_id), &swapper),
 			800
@@ -1057,7 +1084,7 @@ fn swap_tokens_for_exact_tokens_reverts_when_it_would_sweep_remainder() {
 		let exec = result.result.expect("must not trap");
 		assert!(exec.did_revert(), "dust-producing exact-out swap must revert");
 		let decoded = Revert::abi_decode(&exec.data).expect("Error(string) revert");
-		assert_eq!(decoded.reason, "Swap would leave sender below minimum balance");
+		assert_eq!(decoded.reason, "Swap amount cannot be withdrawn exactly");
 		assert_eq!(
 			<NativeAndAssets as Inspect<u64>>::balance(NativeOrWithId::WithId(asset_id), &swapper),
 			800

@@ -703,6 +703,34 @@ fn remove_liquidity_fails_with_excessive_lp_burn() {
 	});
 }
 
+/// Paying out less than the native minimum balance to a new account fails with
+/// `Token(BelowMinimum)`. That is not a swap, so the reason must not be the swap's.
+#[test]
+fn remove_liquidity_below_minimum_reverts_with_token_reason() {
+	new_test_ext().execute_with(|| {
+		let provider = 1u64;
+		let fresh = 99u64;
+
+		setup_pool(provider, 10_000, 10_000);
+
+		// 50 LP of 10_000 redeems 50 native, below the existential deposit of 100.
+		let data = IAssetConversion::removeLiquidityCall {
+			asset1: encode_native().into(),
+			asset2: encode_asset(1).into(),
+			lpTokenBurn: U256::from(50),
+			amount1MinReceive: U256::from(1),
+			amount2MinReceive: U256::from(1),
+			withdrawTo: account_addr(&fresh),
+		}
+		.abi_encode();
+
+		assert_revert_reason(
+			&bare_call(provider, data),
+			"Account cannot exist with the funds that would be given",
+		);
+	});
+}
+
 #[test]
 fn get_reserves_works() {
 	new_test_ext().execute_with(|| {

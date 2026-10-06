@@ -67,6 +67,10 @@ doc:
     - `quoteExactTokensForTokens` and `quoteTokensForExactTokens` now say which failure it was:
       "Amount can't be zero", "Pool does not exist", "Pool exists but has no liquidity", or
       "Insufficient liquidity". `getReserves` reports the same pool reasons.
+    - A swap that would have to withdraw more than the quoted amount, from the sender or from a
+      pool, reverts with "Swap amount cannot be withdrawn exactly". Other calls that hit the same
+      token error, such as `removeLiquidity` paying less than the minimum balance to a new
+      account, revert with "Account cannot exist with the funds that would be given".
 
     No storage migration and no signature change. Update any caller that matched the old empty
     return data, or the single quote string "Pool does not exist or has no liquidity".

@@ -239,8 +239,8 @@ const ERR_STATE_CHANGE_DENIED: &str = "cannot modify state in a static call";
 const ERR_UNEXPECTED: &str = "Unexpected error";
 const ERR_PATH_TOO_LONG: &str = "Swap path exceeds MaxSwapPathLength";
 const ERR_INVALID_ASSET_ENCODING: &str = "Failed to SCALE-decode asset kind";
-/// `Token(BelowMinimum)` comes from both the sender's and the pool's withdraw in a swap, so the
-/// reason cannot name the account.
+/// In a swap, `Token(BelowMinimum)` comes from both the sender's and the pool's withdraw, so the
+/// reason cannot name the account. Only swaps use it; see `revert_swap`.
 const ERR_INEXACT_WITHDRAW: &str = "Swap amount cannot be withdrawn exactly";
 
 impl<const ADDRESS: u16, Runtime> AssetConversion<ADDRESS, Runtime>
@@ -299,9 +299,19 @@ where
 		Error::Revert(Revert { reason: Self::dispatch_reason(e).into() })
 	}
 
+	/// Like `revert_dispatch`, but reports `Token(BelowMinimum)` as an inexact withdraw.
+	/// Other calls hit that error for other reasons, e.g. `removeLiquidity` paying less than
+	/// the minimum balance to a new account, so they keep the plain token reason.
+	fn revert_swap(e: DispatchError) -> Error {
+		let reason = match e {
+			DispatchError::Token(TokenError::BelowMinimum) => ERR_INEXACT_WITHDRAW,
+			e => Self::dispatch_reason(e),
+		};
+		Error::Revert(Revert { reason: reason.into() })
+	}
+
 	fn dispatch_reason(e: DispatchError) -> &'static str {
 		match e {
-			DispatchError::Token(TokenError::BelowMinimum) => ERR_INEXACT_WITHDRAW,
 			DispatchError::Token(token) => token.into(),
 			DispatchError::Arithmetic(arith) => arith.into(),
 			DispatchError::Other(msg) => msg,
@@ -380,7 +390,7 @@ where
 			send_to,
 			call.keepAlive,
 		)
-		.map_err(Self::revert_dispatch)?;
+		.map_err(Self::revert_swap)?;
 
 		Ok(IAssetConversion::swapExactTokensForTokensCall::abi_encode_returns(&Self::to_u256(
 			amount_out,
@@ -414,7 +424,7 @@ where
 			send_to,
 			call.keepAlive,
 		)
-		.map_err(Self::revert_dispatch)?;
+		.map_err(Self::revert_swap)?;
 
 		Ok(IAssetConversion::swapTokensForExactTokensCall::abi_encode_returns(&Self::to_u256(
 			amount_in,

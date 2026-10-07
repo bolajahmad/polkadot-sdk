@@ -12,7 +12,10 @@ doc:
     and the reasons `DELEGATE_CALL_DENIED` and `STATIC_CALL_DENIED`.
     `ensure_not_read_only` is the only place that decides whether a static call reverts or traps.
     `Error::try_to_revert` also maps `DispatchError::RootNotAllowed` to
-    "root origin is not allowed". The delegate-call text is unchanged.
+    "root origin is not allowed", `EcdsaRecoveryFailed` to "invalid compressed public key",
+    `ContractNotFound` to "no contract to terminate", and `DispatchError::Token` to the same
+    sentences `From<TokenError> for &'static str` already uses. The delegate-call text is
+    unchanged.
 
     No precompile signature change and no storage migration. A runtime that already registers
     these precompiles picks up the new reasons on upgrade. Nothing to reconfigure.
@@ -27,7 +30,13 @@ doc:
     - A static call of XCM `send` or `execute`, a state-changing vesting method, System
       `terminate`, or Storage `clearStorage` / `takeStorage` now reverts.
     - System `ownCodeHash` for the root origin, and any vesting call whose caller is root, now
-      reverts.
+      reverts with "root origin is not allowed".
+    - System `ecdsaToEthAddress` with a public key that is not a valid compressed secp256k1 key
+      reverts with "invalid compressed public key".
+    - System `terminate` called when there is no contract to destroy (an EOA calling the
+      precompile directly) reverts with "no contract to terminate".
+    - System `terminate` whose balance transfer fails with a token error reverts with that
+      error's reason, for example "Funds exist but are frozen" or "Funds are unavailable".
     - Storage `takeStorage` reports the same write failure as `clearStorage`
     - XCM `send` and `execute` name the `pallet_xcm` error. A failed `execute` includes the
       instruction index, for example

@@ -150,6 +150,7 @@ mod tests {
 	use alloy_core::primitives::FixedBytes;
 	use codec::Decode;
 	use frame_support::traits::fungible::Mutate;
+	use sp_runtime::{DispatchError, TokenError};
 
 	#[test]
 	fn test_system_precompile() {
@@ -323,6 +324,48 @@ mod tests {
 				<System<Test>>::call(&<System<Test>>::MATCHER.base_address(), &input, &mut ext);
 			assert_eq!(result, Err(Error::Revert("root origin is not allowed".into())));
 		});
+	}
+
+	#[test]
+	fn ecdsa_to_eth_address_invalid_key_reverts() {
+		ExtBuilder::default().build().execute_with(|| {
+			let mut call_setup = CallSetup::<Test>::default();
+			let (mut ext, _) = call_setup.ext();
+
+			let input = ISystem::ISystemCalls::ecdsaToEthAddress(ISystem::ecdsaToEthAddressCall {
+				publicKey: [0u8; 33],
+			});
+			let result =
+				<System<Test>>::call(&<System<Test>>::MATCHER.base_address(), &input, &mut ext);
+			assert_eq!(result, Err(Error::Revert("invalid compressed public key".into())));
+		});
+	}
+
+	#[test]
+	fn terminate_without_contract_reverts() {
+		ExtBuilder::default().build().execute_with(|| {
+			let mut call_setup = CallSetup::<Test>::default();
+			let (mut ext, _) = call_setup.ext();
+
+			let input = ISystem::ISystemCalls::terminate(ISystem::terminateCall {
+				beneficiary: [0u8; 20].into(),
+			});
+			let result =
+				<System<Test>>::call(&<System<Test>>::MATCHER.base_address(), &input, &mut ext);
+			assert_eq!(result, Err(Error::Revert("no contract to terminate".into())));
+		});
+	}
+
+	#[test]
+	fn token_error_reverts_with_token_reason() {
+		// `terminate_caller` returns these from the balance transfer. `try_to_revert` is the
+		// mapping that call uses.
+		let frozen = Error::try_to_revert::<Test>(DispatchError::Token(TokenError::Frozen));
+		assert_eq!(frozen, Error::Revert("Funds exist but are frozen".into()));
+
+		let unavailable =
+			Error::try_to_revert::<Test>(DispatchError::Token(TokenError::FundsUnavailable));
+		assert_eq!(unavailable, Error::Revert("Funds are unavailable".into()));
 	}
 
 	#[test]

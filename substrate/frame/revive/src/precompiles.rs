@@ -180,7 +180,6 @@ pub fn ensure_not_delegate_call<T: Config>(env: &impl Ext<T = T>) -> Result<(), 
 pub fn ensure_not_read_only<T: Config>(env: &impl Ext<T = T>) -> Result<(), Error> {
 	if env.is_read_only() {
 		Err(Error::Revert(STATIC_CALL_DENIED.into()))
-		// Err(Error::Error(CrateError::<T>::StateChangeDenied.into()))
 	} else {
 		Ok(())
 	}

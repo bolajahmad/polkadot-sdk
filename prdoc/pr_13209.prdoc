@@ -29,12 +29,16 @@ doc:
       `best_effort` or `burn_dust`, returning the new `Error::WouldSweepDust` otherwise. With
       `burn_dust` the destination is still credited exactly `amount` and the remainder is burned,
       which the `burned` balance-change callback reports. Sending the whole
-      balance leaves no remainder and still reaps the account, and a self-transfer is exempt
-      because it is settled as a no-op.
+      balance leaves no remainder and still reaps the account. A self-transfer is held to the
+      same rule: it moves nothing, but used to report the increased debit as the amount
+      transferred, in `Transferred`, in the balance-change callback, and so in the precompile's
+      ERC-20 `Transfer` log.
     - `pallet-assets` now implements `fungibles::Mutate::transfer` itself, deferring to
       `do_transfer` after running the same preconditions as the default implementation so the
       same `TokenError`s still surface. Debit and credit are settled against one figure and
-      supply stays consistent.
+      supply stays consistent. Unlike the default, it does not short-circuit a self-transfer, so
+      one now emits `Transferred` and runs the balance-change callback like `do_transfer` does,
+      and fails with `WouldSweepDust` where any other transfer would.
     - `pallet_asset_conversion::withdraw` rejects an expendable withdrawal that would strand a
       remainder before touching state, and asserts the returned credit matches the requested
       value as a backstop.
@@ -50,11 +54,18 @@ doc:
     reserves cannot fill with "Insufficient liquidity". `getReserves` uses that same mapping, so
     a missing pool now reports "Pool does not exist" rather than the empty-pool reason.
 
+    Telling those two apart reads `AssetConversion::Pools`, which `WeightInfo::get_reserves` does
+    not cover. `pallet-asset-conversion` gains `Pallet::pool_exists` and a matching
+    `WeightInfo::pool_exists` benchmark, and the precompile charges it before the read, only when
+    the reserves come back empty. Runtimes implementing `pallet_asset_conversion::WeightInfo` must
+    add `pool_exists`.
+
 - audience: Runtime User
   description: |-
     Transferring an amount that would leave you holding less than an asset's minimum balance now
-    fails with `WouldSweepDust` instead of quietly moving your entire balance. This applies to
-    `transfer`, `transfer_keep_alive`, `force_transfer` and `transfer_approved`, to ERC-20
+    fails with `WouldSweepDust` instead of quietly moving your entire balance, including when you
+    send to yourself. This applies to `transfer`, `transfer_keep_alive`, `force_transfer` and
+    `transfer_approved`, to ERC-20
     `transfer`/`transferFrom` on `pallet-assets` tokens, to assets moved over XCM, and to
     `swap_exact_tokens_for_tokens` / `swap_tokens_for_exact_tokens` with `keep_alive: false`. Send
     your whole balance instead — that leaves no remainder and still cleans up the account.
@@ -80,12 +91,15 @@ doc:
 crates:
 - name: pallet-assets
   bump: major
+# `WeightInfo` gains `pool_exists`, which every implementor must add.
 - name: pallet-asset-conversion
-  bump: patch
+  bump: major
 - name: pallet-assets-precompiles
   bump: patch
 - name: pallet-asset-conversion-precompiles
   bump: patch
-# Test-only: exercises the fix end-to-end over XCM; no runtime API change.
+# Implements the new `pallet_asset_conversion::WeightInfo::pool_exists`.
 - name: asset-hub-westend-runtime
-  bump: none
+  bump: patch
+- name: asset-hub-rococo-runtime
+  bump: patch

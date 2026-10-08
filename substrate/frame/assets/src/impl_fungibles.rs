@@ -99,6 +99,10 @@ impl<T: Config<I>, I: 'static> fungibles::Mutate<<T as SystemConfig>::AccountId>
 	/// `do_transfer` debits and credits in one step against the same figure and keeps supply
 	/// consistent, so deferring to it removes the discrepancy at its source. It also emits
 	/// `Transferred` itself, which is why `done_transfer` is not invoked here.
+	///
+	/// Unlike the default, a self-transfer is not short-circuited: `do_transfer` moves nothing
+	/// for it, but holds it to the same rules as any other transfer, so an `amount` that would
+	/// strand a sub-`min_balance` remainder fails with `WouldSweepDust` here too.
 	fn transfer(
 		asset: Self::AssetId,
 		source: &<T as SystemConfig>::AccountId,
@@ -119,9 +123,6 @@ impl<T: Config<I>, I: 'static> fungibles::Mutate<<T as SystemConfig>::AccountId>
 			Provenance::Extant,
 		)
 		.into_result()?;
-		if source == dest {
-			return Ok(amount);
-		}
 
 		let f = TransferFlags {
 			keep_alive: preservation != Expendable,

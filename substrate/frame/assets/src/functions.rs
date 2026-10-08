@@ -682,11 +682,10 @@ impl<T: Config<I>, I: 'static> Pallet<T, I> {
 		let debit = Self::prep_debit(id.clone(), source, amount, f.into())?;
 
 		// With `burn_dust`, `dest` is credited exactly `amount` and the swept remainder is burned
-		// rather than credited, so only a sweep that would land in `dest` is refused.
-		ensure!(
-			source == dest || f.best_effort || f.burn_dust || debit == amount,
-			Error::<T, I>::WouldSweepDust
-		);
+		// rather than credited, so only a sweep that would land in `dest` is refused. A
+		// self-transfer is held to the same rule even though it moves nothing, so that the amount
+		// it reports is the amount requested, as for any other transfer.
+		ensure!(f.best_effort || f.burn_dust || debit == amount, Error::<T, I>::WouldSweepDust);
 
 		let (credit, maybe_burn) = Self::prep_credit(id.clone(), dest, amount, debit, f.burn_dust)?;
 

@@ -2800,6 +2800,45 @@ mod exact_amounts {
 	}
 
 	#[test]
+	fn self_transfer_is_held_to_the_same_rules() {
+		build_and_execute(|| {
+			setup_dust_window();
+
+			// Sending 95 of 100 to oneself moves nothing, yet the debit would still grow to 100
+			// and be reported as the amount transferred. Every entry point refuses it, as it
+			// would for any other destination.
+			assert_noop!(
+				Assets::transfer(RuntimeOrigin::signed(1), 0, 1, 95),
+				Error::<Test>::WouldSweepDust
+			);
+			assert_noop!(
+				<Assets as FungiblesMutate<u64>>::transfer(0, &1, &1, 95, Expendable),
+				Error::<Test>::WouldSweepDust
+			);
+
+			// One that strands nothing still moves nothing, and reports exactly what was asked.
+			System::reset_events();
+			assert_eq!(
+				<Assets as FungiblesMutate<u64>>::transfer(0, &1, &1, 90, Expendable),
+				Ok(90)
+			);
+			assert_ok!(Assets::transfer(RuntimeOrigin::signed(1), 0, 1, 90));
+			assert_eq!(Assets::balance(0, 1), 100);
+			assert_eq!(Assets::total_supply(0), 110);
+			let transferred = System::events()
+				.into_iter()
+				.filter_map(|r| match r.event {
+					RuntimeEvent::Assets(crate::Event::Transferred {
+						from, to, amount, ..
+					}) => Some((from, to, amount)),
+					_ => None,
+				})
+				.collect::<Vec<_>>();
+			assert_eq!(transferred, vec![(1, 1, 90), (1, 1, 90)]);
+		});
+	}
+
+	#[test]
 	fn burn_still_sweeps_a_stranded_remainder() {
 		build_and_execute(|| {
 			setup_dust_window();

@@ -1793,12 +1793,14 @@ fn transfer_from_reverts_when_it_would_sweep_remainder(asset_index: u16) {
 	});
 }
 
-/// A self-transfer must not revert. `pallet_assets` short-circuits `source == dest`
-/// before touching any balance, so the net movement is zero regardless of what the
-/// remainder would have been.
+/// A self-transfer moves nothing, but is held to the same rules as any other: a `value` that
+/// would strand a sub-`min_balance` remainder reverts rather than logging a `Transfer` for more
+/// than `value`, and one that strands nothing logs exactly `value`.
 #[test_case(PRECOMPILE_ADDRESS_PREFIX)]
 #[test_case(PRECOMPILE_ADDRESS_PREFIX_FOREIGN)]
-fn self_transfer_of_dust_producing_amount_is_a_noop(asset_index: u16) {
+fn self_transfer_is_held_to_the_same_rules(asset_index: u16) {
+	use alloy::sol_types::{Revert, SolError};
+
 	new_test_ext().execute_with(|| {
 		let asset_id = 0u32;
 		let asset_addr = H160::from(set_prefix_in_address(asset_index));
@@ -1810,8 +1812,26 @@ fn self_transfer_of_dust_producing_amount_is_a_noop(asset_index: u16) {
 		let exec = raw_transfer(from, asset_addr, from_addr, U256::from(95u64))
 			.result
 			.expect("must not trap");
-		assert!(!exec.did_revert(), "self-transfer must not revert");
+		assert!(exec.did_revert(), "dust-producing self-transfer must revert");
+		let decoded = Revert::abi_decode(&exec.data).expect("Error(string) revert");
+		assert_eq!(decoded.reason, "Transfer would leave sender below minimum balance");
 		assert_eq!(Assets::balance(asset_id, from), 100);
+
+		let exec = raw_transfer(from, asset_addr, from_addr, U256::from(90u64))
+			.result
+			.expect("must not trap");
+		assert!(!exec.did_revert(), "self-transfer stranding nothing must succeed");
+		assert_eq!(Assets::balance(asset_id, from), 100);
+		// Mirrored by `Erc20TransferLogsCallback` at the callback's token address, not
+		// `asset_addr`.
+		assert_contract_event(
+			H160::from(set_prefix_in_address(PRECOMPILE_ADDRESS_PREFIX)),
+			IERC20Events::Transfer(IERC20::Transfer {
+				from: from_addr.0.into(),
+				to: from_addr.0.into(),
+				value: U256::from(90u64),
+			}),
+		);
 	});
 }
 

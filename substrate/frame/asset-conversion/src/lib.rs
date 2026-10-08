@@ -1497,6 +1497,17 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Whether a pool exists for the pair, whatever its liquidity.
+		///
+		/// [`Self::get_reserves`] reports a missing pool and one without liquidity alike as
+		/// [`Error::PoolEmpty`]; this tells the two apart. Costs one read of [`Pools`], weighed by
+		/// [`crate::weights::WeightInfo::pool_exists`].
+		pub fn pool_exists(asset1: &T::AssetKind, asset2: &T::AssetKind) -> Result<bool, Error<T>> {
+			let pool_id = T::PoolLocator::pool_id(asset1, asset2)
+				.map_err(|_| Error::<T>::InvalidAssetPair)?;
+			Ok(Pools::<T>::contains_key(&pool_id))
+		}
+
 		/// Returns the next pool asset id for benchmark purposes only.
 		#[cfg(any(test, feature = "runtime-benchmarks"))]
 		pub fn get_next_pool_asset_id() -> T::PoolAssetId {

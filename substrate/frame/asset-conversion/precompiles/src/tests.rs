@@ -771,6 +771,46 @@ fn get_reserves_fails_for_nonexistent_pool() {
 	});
 }
 
+/// `get_reserves()` only weighs the two balance reads. Telling a missing pool from an empty one
+/// reads `Pools` as well, so those paths must also pay `pool_exists()`, and the success path,
+/// which never reads `Pools`, must not.
+#[test]
+fn get_reserves_charges_pool_lookup_only_when_reserves_are_empty() {
+	use pallet_asset_conversion::WeightInfo;
+
+	new_test_ext().execute_with(|| {
+		let provider = 1u64;
+		let reserves = <() as WeightInfo>::get_reserves();
+		let with_lookup = reserves.saturating_add(<() as WeightInfo>::pool_exists());
+		let call = |asset2: u32| {
+			IAssetConversion::getReservesCall {
+				asset1: encode_native().into(),
+				asset2: encode_asset(asset2).into(),
+			}
+			.abi_encode()
+		};
+
+		setup_pool(provider, 10_000, 20_000);
+		let result = bare_call(provider, call(1));
+		assert!(!did_fail(&result), "get_reserves must succeed");
+		assert_eq!(result.weight_consumed, reserves, "success path must not pay the lookup");
+
+		let result = bare_call(provider, call(99));
+		assert_revert_reason(&result, "Pool does not exist");
+		assert_eq!(result.weight_consumed, with_lookup, "missing pool must pay the lookup");
+
+		assert_ok!(Assets::force_create(RuntimeOrigin::root(), 2u32, provider, true, 1));
+		assert_ok!(AssetConversionPallet::create_pool(
+			RuntimeOrigin::signed(provider),
+			Box::new(NativeOrWithId::Native),
+			Box::new(NativeOrWithId::WithId(2)),
+		));
+		let result = bare_call(provider, call(2));
+		assert_revert_reason(&result, "Pool exists but has no liquidity");
+		assert_eq!(result.weight_consumed, with_lookup, "empty pool must pay the lookup");
+	});
+}
+
 // --- Read-only guard tests via STATICCALL ---
 
 alloy::sol! {

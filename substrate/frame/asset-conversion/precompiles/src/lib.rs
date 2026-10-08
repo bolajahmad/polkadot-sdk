@@ -32,7 +32,7 @@ use codec::Decode;
 use core::marker::PhantomData;
 use frame_support::traits::{Get, PalletInfoAccess};
 use pallet_asset_conversion::{
-	weights::WeightInfo as _, AddLiquidityAsset, MutateLiquidity, PoolLocator, QuotePrice, Swap,
+	weights::WeightInfo as _, AddLiquidityAsset, MutateLiquidity, QuotePrice, Swap,
 };
 use pallet_revive::precompiles::{
 	alloy::{
@@ -456,7 +456,7 @@ where
 				amount,
 				call.includeFee,
 			)
-			.ok_or_else(|| Self::quote_failure(&asset1, &asset2, amount))?;
+			.ok_or_else(|| Self::quote_failure(&asset1, &asset2, amount, env))?;
 
 		Ok(IAssetConversion::quoteExactTokensForTokensCall::abi_encode_returns(&Self::to_u256(
 			quoted,
@@ -485,7 +485,7 @@ where
 				amount,
 				call.includeFee,
 			)
-			.ok_or_else(|| Self::quote_failure(&asset1, &asset2, amount))?;
+			.ok_or_else(|| Self::quote_failure(&asset1, &asset2, amount, env))?;
 
 		Ok(IAssetConversion::quoteTokensForExactTokensCall::abi_encode_returns(&Self::to_u256(
 			quoted,
@@ -586,8 +586,7 @@ where
 		let asset1 = Self::decode_asset_kind(&call.asset1)?;
 		let asset2 = Self::decode_asset_kind(&call.asset2)?;
 
-		let (reserve1, reserve2) =
-			Self::reserves(&asset1, &asset2).map_err(Self::reserves_error)?;
+		let (reserve1, reserve2) = Self::reserves(&asset1, &asset2, env)?;
 
 		Ok(IAssetConversion::getReservesCall::abi_encode_returns(
 			&IAssetConversion::getReservesReturn {
@@ -600,35 +599,37 @@ where
 	/// Read pool reserves, telling a missing pool apart from an empty one.
 	///
 	/// `Pallet::get_reserves` reports both as `PoolEmpty`, because both have a zero
-	/// balance. `Pools` is only read in that case.
+	/// balance. `Pools` is only read in that case, and `pool_exists` is charged before it is.
+	/// The caller has already paid for the reserve reads themselves.
 	fn reserves(
 		asset1: &<Runtime as pallet_asset_conversion::Config>::AssetKind,
 		asset2: &<Runtime as pallet_asset_conversion::Config>::AssetKind,
+		env: &mut impl Ext<T = Runtime>,
 	) -> Result<
 		(
 			<Runtime as pallet_asset_conversion::Config>::Balance,
 			<Runtime as pallet_asset_conversion::Config>::Balance,
 		),
-		pallet_asset_conversion::Error<Runtime>,
+		Error,
 	> {
-		match pallet_asset_conversion::Pallet::<Runtime>::get_reserves(
+		let err = match pallet_asset_conversion::Pallet::<Runtime>::get_reserves(
 			asset1.clone(),
 			asset2.clone(),
 		) {
-			Ok(reserves) => Ok(reserves),
+			Ok(reserves) => return Ok(reserves),
 			Err(pallet_asset_conversion::Error::PoolEmpty) => {
-				let pool_id = <Runtime as pallet_asset_conversion::Config>::PoolLocator::pool_id(
-					asset1, asset2,
-				)
-				.map_err(|_| pallet_asset_conversion::Error::InvalidAssetPair)?;
-				if pallet_asset_conversion::Pools::<Runtime>::contains_key(&pool_id) {
-					Err(pallet_asset_conversion::Error::PoolEmpty)
-				} else {
-					Err(pallet_asset_conversion::Error::PoolNotFound)
+				env.charge(
+					<Runtime as pallet_asset_conversion::Config>::WeightInfo::pool_exists(),
+				)?;
+				match pallet_asset_conversion::Pallet::<Runtime>::pool_exists(asset1, asset2) {
+					Ok(true) => pallet_asset_conversion::Error::PoolEmpty,
+					Ok(false) => pallet_asset_conversion::Error::PoolNotFound,
+					Err(e) => e,
 				}
 			},
-			Err(e) => Err(e),
-		}
+			Err(e) => e,
+		};
+		Err(Self::reserves_error(err))
 	}
 
 	/// Map a reserves failure to the same revert `getReserves` returns.
@@ -678,14 +679,15 @@ where
 		asset1: &<Runtime as pallet_asset_conversion::Config>::AssetKind,
 		asset2: &<Runtime as pallet_asset_conversion::Config>::AssetKind,
 		amount: <Runtime as pallet_asset_conversion::Config>::Balance,
+		env: &mut impl Ext<T = Runtime>,
 	) -> Error {
 		if amount.is_zero() {
 			return Error::Revert(Revert {
 				reason: Self::pallet_reason(pallet_asset_conversion::Error::ZeroAmount).into(),
 			});
 		}
-		match Self::reserves(asset1, asset2) {
-			Err(e) => Self::reserves_error(e),
+		match Self::reserves(asset1, asset2, env) {
+			Err(e) => e,
 			Ok(_) => Error::Revert(Revert { reason: ERR_INSUFFICIENT_LIQUIDITY.into() }),
 		}
 	}
